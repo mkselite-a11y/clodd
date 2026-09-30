@@ -77,7 +77,7 @@ void Town_Update(PlayState* play) {
 
 // Rainbow tint: set the fog colour/position right before the carpenter draws,
 // the same way the game tints actors that were just hit, then restore it.
-static u8 sTinted = false;
+static PlayState* sTinted = NULL;
 
 static void TintBegin(PlayState* play, MfColor c, s32 strength) {
     OPEN_DISPS(play->state.gfxCtx);
@@ -85,13 +85,13 @@ static void TintBegin(PlayState* play, MfColor c, s32 strength) {
     gDPSetFogColor(POLY_OPA_DISP++, c.r, c.g, c.b, 255);
     gSPFogPosition(POLY_OPA_DISP++, 0, strength);
     CLOSE_DISPS(play->state.gfxCtx);
-    sTinted = true;
+    sTinted = play;
 }
 
-static void TintEnd(PlayState* play) {
-    if (sTinted) {
-        func_800AE5A0(play);
-        sTinted = false;
+static void TintEnd(void) {
+    if (sTinted != NULL) {
+        func_800AE5A0(sTinted);
+        sTinted = NULL;
     }
 }
 
@@ -101,8 +101,9 @@ RECOMP_HOOK("EnDaiku_Draw") void Mf_BeforeDaikuDraw(Actor* thisx, PlayState* pla
     }
 }
 
-RECOMP_HOOK_RETURN("EnDaiku_Draw") void Mf_AfterDaikuDraw(Actor* thisx, PlayState* play) {
-    TintEnd(play);
+// Return hooks get no arguments; the tint remembers which PlayState it used.
+RECOMP_HOOK_RETURN("EnDaiku_Draw") void Mf_AfterDaikuDraw(void) {
+    TintEnd();
 }
 
 RECOMP_HOOK("ObjWarpstone_Draw") void Mf_BeforeOwlDraw(Actor* thisx, PlayState* play) {
@@ -117,6 +118,6 @@ RECOMP_HOOK("ObjWarpstone_Draw") void Mf_BeforeOwlDraw(Actor* thisx, PlayState* 
     }
 }
 
-RECOMP_HOOK_RETURN("ObjWarpstone_Draw") void Mf_AfterOwlDraw(Actor* thisx, PlayState* play) {
-    TintEnd(play);
+RECOMP_HOOK_RETURN("ObjWarpstone_Draw") void Mf_AfterOwlDraw(void) {
+    TintEnd();
 }

@@ -294,8 +294,11 @@ RECOMP_CALLBACK("*", recomp_after_play_update) void Mf_AfterPlayUpdate(PlayState
 // Drawing
 // ---------------------------------------------------------------------------
 
-RECOMP_HOOK_RETURN("Actor_DrawAll") void Mf_AfterActorDrawAll(PlayState* play, ActorContext* actorCtx) {
-    if (!gRt.loaded) {
+// Note: return hooks don't receive the hooked function's arguments (the
+// registers hold whatever they had at the return), so use the saved PlayState.
+RECOMP_HOOK_RETURN("Actor_DrawAll") void Mf_AfterActorDrawAll(void) {
+    PlayState* play = gRt.play;
+    if (!gRt.loaded || play == NULL || gSaveContext.gameMode != GAMEMODE_NORMAL) {
         return;
     }
     Draw3D_Begin(play);
@@ -303,8 +306,9 @@ RECOMP_HOOK_RETURN("Actor_DrawAll") void Mf_AfterActorDrawAll(PlayState* play, A
     Draw3D_End();
 }
 
-RECOMP_HOOK_RETURN("Play_Draw") void Mf_AfterPlayDraw(PlayState* play) {
-    if (!gRt.loaded) {
+RECOMP_HOOK_RETURN("Play_Draw") void Mf_AfterPlayDraw(void) {
+    PlayState* play = gRt.play;
+    if (!gRt.loaded || play == NULL || gSaveContext.gameMode != GAMEMODE_NORMAL) {
         return;
     }
     Draw2D_Begin(play->state.gfxCtx);
