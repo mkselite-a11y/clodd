@@ -301,6 +301,19 @@ void Pouch_Update(PlayState* play) {
     (void)sTempterBonus;
 }
 
+// Next item (in direction dir) that you own at least one of. Returns `from`
+// unchanged if you own nothing.
+s32 Pouch_NextOwned(s32 from, s32 dir) {
+    s32 i;
+    for (i = 1; i <= NUM_POUCH_ITEMS; i++) {
+        s32 idx = (from + dir * i + NUM_POUCH_ITEMS * 2) % NUM_POUCH_ITEMS;
+        if (gMf.pouch[idx] > 0) {
+            return idx;
+        }
+    }
+    return from;
+}
+
 // Bottom-left pouch panel while L is held, and a compact buff line otherwise.
 void Pouch_DrawHud(PlayState* play) {
     char buf[48];
@@ -317,6 +330,16 @@ void Pouch_DrawHud(PlayState* play) {
         MfColor desc = { 220, 220, 255, 255 };
         MfColor dim = { 150, 150, 170, 255 };
 
+        // Never show an item you have none of.
+        if (gMf.pouch[gMf.pouchSel] == 0) {
+            gMf.pouchSel = Pouch_NextOwned(gMf.pouchSel, 1);
+        }
+        if (gMf.pouch[gMf.pouchSel] == 0) {
+            Draw2D_Rect(6, 190, 308, 16, bg);
+            Draw2D_TextCentered(194, dim, "Pouch empty - buy items in Moon Menu");
+            return;
+        }
+        it = &gPouchItems[gMf.pouchSel];
         Draw2D_Rect(6, 176, 308, 42, bg);
         buf[0] = '\0';
         Str_Cat(buf, "< ", sizeof(buf));
@@ -327,7 +350,7 @@ void Pouch_DrawHud(PlayState* play) {
         Draw2D_Text(12, 180, name, buf);
         Draw2D_Text(12, 191, desc, it->desc);
         buf[0] = '\0';
-        Str_Cat(buf, "Down: use   Up: next owned   Marks: ", sizeof(buf));
+        Str_Cat(buf, "Left/Right: pick   Down: use   Marks: ", sizeof(buf));
         Str_CatInt(buf, gMf.moonMarks, sizeof(buf));
         Draw2D_Text(12, 204, dim, buf);
         return;

@@ -438,6 +438,7 @@ s32 Pouch_Buy(s32 item);
 void Pouch_Update(PlayState* play);
 void Pouch_DrawHud(PlayState* play);
 s32 Pouch_Use(PlayState* play, s32 item);
+s32 Pouch_NextOwned(s32 from, s32 dir);
 void Pouch_Give(s32 item, s32 count);
 extern s32 gBuffTimers[NUM_POUCH_ITEMS];
 s32 Pouch_BuffActive(s32 item);

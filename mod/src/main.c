@@ -112,34 +112,25 @@ static void HandleLCombo(PlayState* play) {
             sLHeld = true;
             gRt.lHeldCombo = false;
         }
+        // Left/right only step through items you actually own.
         if (gRt.btnPress & (BTN_DLEFT | BTN_CLEFT)) {
-            gMf.pouchSel = (gMf.pouchSel + NUM_POUCH_ITEMS - 1) % NUM_POUCH_ITEMS;
+            gMf.pouchSel = Pouch_NextOwned(gMf.pouchSel, -1);
             gRt.lHeldCombo = true;
             Mf_Sfx(NA_SE_SY_CURSOR);
         }
         if (gRt.btnPress & (BTN_DRIGHT | BTN_CRIGHT)) {
-            gMf.pouchSel = (gMf.pouchSel + 1) % NUM_POUCH_ITEMS;
+            gMf.pouchSel = Pouch_NextOwned(gMf.pouchSel, 1);
             gRt.lHeldCombo = true;
             Mf_Sfx(NA_SE_SY_CURSOR);
         }
         if (gRt.btnPress & (BTN_DDOWN | BTN_CDOWN)) {
             gRt.lHeldCombo = true;
-            if (gRt.gameplayOk) {
+            if (gRt.gameplayOk && gMf.pouch[gMf.pouchSel] > 0) {
                 Pouch_Use(play, gMf.pouchSel);
             }
         }
         if (gRt.btnPress & BTN_DUP) {
-            // L + D-Up jumps to the next item you actually own.
-            s32 i;
-            for (i = 1; i <= NUM_POUCH_ITEMS; i++) {
-                s32 idx = (gMf.pouchSel + i) % NUM_POUCH_ITEMS;
-                if (gMf.pouch[idx] > 0) {
-                    gMf.pouchSel = idx;
-                    break;
-                }
-            }
             gRt.lHeldCombo = true;
-            Mf_Sfx(NA_SE_SY_CURSOR);
         }
         ClearButtons(in, comboMask);
     } else if (sLHeld) {

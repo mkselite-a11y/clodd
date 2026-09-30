@@ -375,7 +375,8 @@ static void MoveBounty(BountyRec* b, s32 idx) {
     if (!hunting && gZones[b->zone].danger == 0) {
         b->zone = before;
     }
-    if (b->zone != before && (b->claimed || Rng_Chance(15))) {
+    // Only contracts you hold are worth a rumor.
+    if (b->zone != before && b->claimed) {
         Bounty_Name(name, sizeof(name), b);
         World_Logf2(name, " moved to ", gZones[b->zone].name);
     }
@@ -408,7 +409,10 @@ static void Brawl(void) {
                 Str_Cat(buf, sBountyNames[win->nameA % ARRAY_LEN(sBountyNames)], LOG_WIDTH);
                 Str_Cat(buf, " killed ", LOG_WIDTH);
                 Str_Cat(buf, ln, LOG_WIDTH);
+                // Pop up only if one of your contracts was involved.
+                World_SetRumor(win->claimed || lose->claimed);
                 World_Log(buf);
+                World_SetRumor(true);
                 if (win->rank < 4) {
                     win->rank++;
                 }
@@ -435,7 +439,9 @@ void Bounty_WorldTick(PlayState* play) {
         } else {
             char name[40];
             Bounty_Name(name, sizeof(name), b);
+            World_SetRumor(b->claimed);
             World_Logf2(b->claimed ? "Your contract expired: " : "Bounty withdrawn: ", name, NULL);
+            World_SetRumor(true);
             Bounty_Generate(b, -1);
         }
     }
