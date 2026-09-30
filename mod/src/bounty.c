@@ -19,6 +19,19 @@ static const char* sBountyNames[] = {
 s32 gCompassTimer = 0;
 static s32 sSpawnCooldown[MAX_BOUNTIES];
 static s32 sBlockedNotice = 0;
+static s32 sMoveTimers[MAX_BOUNTIES];
+
+static s32 NextMoveInterval(BountyRec* b) {
+    if (b->motive == MOTIVE_HUNT || (b->claimed && Curse_Active(CURSE_HUNTED))) {
+        return SEC(Rng_Range(20, 50));
+    }
+    switch (b->motive) {
+        case MOTIVE_MIGRATE: return SEC(Rng_Range(30, 70));
+        case MOTIVE_FLEE: return SEC(Rng_Range(30, 80));
+        case MOTIVE_NEST: return SEC(Rng_Range(60, 150));
+        default: return SEC(Rng_Range(40, 110));
+    }
+}
 
 void Bounty_Name(char* out, s32 max, BountyRec* b) {
     out[0] = '\0';
@@ -205,8 +218,35 @@ static void Spawn(PlayState* play, s32 i) {
     }
 }
 
+static void MoveBounty(BountyRec* b, s32 idx);
+
+// Every target walks on its own clock rather than all at once.
+static void TravelUpdate(void) {
+    s32 i;
+    for (i = 0; i < MAX_BOUNTIES; i++) {
+        BountyRec* b = &gMf.bounties[i];
+        if (!b->active) {
+            continue;
+        }
+        if (sMoveTimers[i] <= 0) {
+            sMoveTimers[i] = NextMoveInterval(b);
+        }
+        if (--sMoveTimers[i] == 0) {
+            World_SetRumor(true);
+            MoveBounty(b, i);
+            World_SetRumor(false);
+            sMoveTimers[i] = NextMoveInterval(b);
+            Save_MarkDirty();
+        }
+    }
+}
+
 void Bounty_Update(PlayState* play) {
     s32 i;
+
+    if (gMf.settings.bountiesEnabled) {
+        TravelUpdate();
+    }
 
     if (gCompassTimer > 0) {
         gCompassTimer--;
@@ -382,7 +422,6 @@ void Bounty_WorldTick(PlayState* play) {
             Bounty_Generate(b, -1);
             continue;
         }
-        MoveBounty(b, i);
         decay = (b->claimed && Curse_Active(CURSE_BRITTLE)) ? 2 : 1;
         if (b->expireMins > decay) {
             b->expireMins -= decay;

@@ -1,5 +1,7 @@
 #include "mf.h"
 
+#define NEM (gMf.nemesis)
+
 // ---------------------------------------------------------------------------
 // Nemesis system. One nemesis at a time. It is promoted from an ordinary
 // enemy that earned it, remembers what it did to you, grows a stat point
@@ -57,8 +59,49 @@ static s32 sManifestCooldown = 0;
 static s32 sPresentLastFrame = false;
 static s32 sBlockedNotice = 0;
 static s32 sPoisonTick = 0;
+static s32 sMoveTimer = -1;
 
-#define NEM (gMf.nemesis)
+// Each hunter keeps its own travel clock, so things don't all move at once.
+// Base 60-140 seconds per zone, faster with Tracking, Relentless and Vendetta.
+static s32 NextTravelInterval(void) {
+    s32 secs = Rng_Range(60, 140) * 10 / (10 + 5 * NEM.stats[STAT_TRACKING]);
+    if (HAS_TRAIT(NEM.traits, TR_RELENTLESS)) {
+        secs /= 2;
+    }
+    if (Curse_Active(CURSE_VENDETTA)) {
+        secs /= 2;
+    }
+    return SEC(MF_MAX(15, secs));
+}
+
+static void TravelUpdate(PlayState* play) {
+    s32 target = gRt.lastZone;
+    char name[48];
+
+    if (NEM.state != NEM_HUNTING) {
+        sMoveTimer = -1;
+        return;
+    }
+    if (sMoveTimer < 0) {
+        sMoveTimer = NextTravelInterval();
+    }
+    if (--sMoveTimer > 0) {
+        return;
+    }
+    sMoveTimer = NextTravelInterval();
+    if (NEM.zone == target || Actors_FindTagged(TAG_NEMESIS, -1) != NULL) {
+        return;
+    }
+    NEM.zone = World_NextStepToward(NEM.zone, target);
+    Nemesis_Name(name, sizeof(name), NEM.nameA, NEM.nameB, -1);
+    World_SetRumor(true);
+    if (Rng_Chance(45) || NEM.zone == target) {
+        World_Logf2(name, " was seen in ", gZones[NEM.zone].name);
+    }
+    World_SetRumor(false);
+    Save_MarkDirty();
+}
+
 
 void Nemesis_Name(char* out, s32 max, u8 a, u8 b, s32 species) {
     out[0] = '\0';
@@ -491,6 +534,7 @@ void Nemesis_Update(PlayState* play) {
     if (!gMf.settings.nemesisEnabled || NEM.state == NEM_NONE) {
         return;
     }
+    TravelUpdate(play);
     if (sManifestCooldown > 0) {
         sManifestCooldown--;
     }
@@ -642,28 +686,6 @@ void Nemesis_WorldTick(PlayState* play) {
     if (Actors_FindTagged(TAG_NEMESIS, -1) != NULL) {
         return; // busy fighting you
     }
-    // Tracking: base 45 "steps" per tick, +50% per Tracking point.
-    rate = 45 + 22 * NEM.stats[STAT_TRACKING];
-    if (HAS_TRAIT(NEM.traits, TR_RELENTLESS)) {
-        rate *= 2;
-    }
-    if (Curse_Active(CURSE_VENDETTA)) {
-        rate *= 2;
-    }
-    NEM.travelSecs += rate;
-    target = gRt.lastZone;
-    while (NEM.travelSecs >= 120 && NEM.zone != target) {
-        s32 next = World_NextStepToward(NEM.zone, target);
-        NEM.travelSecs -= 120;
-        NEM.zone = next;
-        if (Rng_Chance(40) || next == target) {
-            World_Logf2(name, " was seen in ", gZones[next].name);
-        }
-    }
-    if (NEM.zone == target) {
-        NEM.travelSecs = 0;
-    }
-
     // Nemeses prey on bounty targets they cross paths with.
     {
         s32 i;

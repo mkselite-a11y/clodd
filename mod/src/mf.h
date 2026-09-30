@@ -81,6 +81,7 @@ s32 World_Distance(s32 from, s32 to);
 s32 World_RandomNeighbour(s32 zone);
 void World_Tick(PlayState* play);
 void World_Log(const char* text);
+void World_SetRumor(s32 on);
 void World_Logf2(const char* a, const char* b, const char* c);
 
 // ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ static ActorExtensionId sTagExt;
 static u8 sExtReady = false;
 
 // Objects we added as persistent entries for this scene (tail of the list).
-static s16 sPreloaded[2];
+static s16 sPreloaded[3];
 static s32 sPreloadedCount = 0;
 static u8 sPreloadStart = 0;
 
@@ -152,7 +152,7 @@ static void TryPreload(PlayState* play, s16 objectId) {
             return;
         }
     }
-    if (sPreloadedCount >= 2 || ctx->numEntries >= ARRAY_COUNT(ctx->slots) - 8) {
+    if (sPreloadedCount >= 3 || ctx->numEntries >= ARRAY_COUNT(ctx->slots) - 8) {
         return;
     }
     size = ObjectSize(objectId);
@@ -191,6 +191,12 @@ void Actors_PreloadForScene(PlayState* play) {
                 TryPreload(play, gSpecies[b->species].objectId);
             }
         }
+    }
+    // One cheap roaming monster for the Ambush event, so it can happen in areas
+    // that have no enemies of their own. Harder monsters in wilder zones.
+    if (gMf.settings.eventsEnabled && gMf.events[20].enabled) {
+        s32 species = Roster_RandomRoaming(MF_CLAMP(2 + gZones[zone].danger, 2, 6));
+        TryPreload(play, gSpecies[species].objectId);
     }
 }
 

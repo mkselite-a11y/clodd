@@ -57,12 +57,15 @@ static void Sparkle(PlayState* play, Vec3f* pos, u8 r, u8 g, u8 b) {
     EffectSsKirakira_SpawnDispersed(play, pos, &vel, &acc, &prim, &env, 2500, 30);
 }
 
+// A moon strike. (The game's own lightning effect is an unused leftover that
+// crashes, so this uses a hit flash, a shockwave and sparks instead.)
 static void Lightning(PlayState* play, Vec3f* pos) {
-    Color_RGBA8 prim = { 255, 255, 220, 255 };
-    Color_RGBA8 env = { 180, 120, 255, 255 };
     Vec3f p = *pos;
-    p.y += 10.0f;
-    EffectSsLightning_Spawn(play, &p, &prim, &env, 60, 0, 8, 3);
+    Vec3f zero = { 0.0f, 0.0f, 0.0f };
+    p.y += 30.0f;
+    EffectSsHitmark_SpawnFixedScale(play, 0, &p);
+    EffectSsBlast_SpawnWhiteShockwave(play, pos, &zero, &zero);
+    Sparkle(play, &p, 200, 160, 255);
     Audio_PlaySfx_AtPos(pos, NA_SE_EV_LIGHTNING);
 }
 
@@ -128,36 +131,57 @@ static void Festival_Draw2D(PlayState* play) {
     }
 }
 
-// E1 Lunar Serenade: moon dust drifts down and the stars come close.
-static void Serenade_Update(PlayState* play) {
+// E1 Moon's Whisper: the moon lets slip a few secrets. Nothing to fear.
+static char sWhisper[3][48];
+
+static void Whisper_Start(PlayState* play) {
+    s32 i;
+    gEv.duration = SEC(MF_MAX(6, P(0)));
+    sWhisper[0][0] = sWhisper[1][0] = sWhisper[2][0] = '\0';
+    Str_Cat(sWhisper[0], "Next omen: ", 48);
+    Str_Cat(sWhisper[0], (gEv.omenId >= 0) ? gEvents[gEv.omenId].name : "unclear...", 48);
+    if (gMf.nemesis.state != NEM_NONE) {
+        Str_Cat(sWhisper[1], "Your nemesis lurks in ", 48);
+        Str_Cat(sWhisper[1], gZones[gMf.nemesis.zone % gZoneCount].name, 48);
+    } else {
+        Str_Cat(sWhisper[1], "No nemesis hunts you. Yet.", 48);
+    }
+    for (i = 0; i < MAX_BOUNTIES; i++) {
+        BountyRec* b = &gMf.bounties[(i + gRt.frame) % MAX_BOUNTIES];
+        if (b->active && (b->claimed || i == MAX_BOUNTIES - 1)) {
+            char name[40];
+            Bounty_Name(name, sizeof(name), b);
+            Str_Copy(sWhisper[2], name, 48);
+            Str_Cat(sWhisper[2], " is in ", 48);
+            Str_Cat(sWhisper[2], gZones[b->zone % gZoneCount].name, 48);
+            break;
+        }
+    }
+    for (i = 0; i < 3; i++) {
+        if (sWhisper[i][0] != '\0') {
+            World_Log(sWhisper[i]);
+        }
+    }
+}
+
+static void Whisper_Update(PlayState* play) {
     Player* p = Pl(play);
-    if (Every(MF_MAX(1, 8 - P(0) / 2))) {
+    if (Every(MF_MAX(1, 10 - P(1)))) {
         Vec3f pos = p->actor.world.pos;
-        pos.x += Rng_Range(-300, 300);
-        pos.z += Rng_Range(-300, 300);
-        pos.y += 250.0f;
+        pos.x += Rng_Range(-200, 200);
+        pos.z += Rng_Range(-200, 200);
+        pos.y += 150.0f;
         Sparkle(play, &pos, 170, 170, 255);
     }
 }
 
-static void Serenade_Draw2D(PlayState* play) {
+static void Whisper_Draw2D(PlayState* play) {
+    MfColor bg = { 20, 10, 50, 170 };
     s32 i;
-    u32 seed = 1234567;
-    s32 stars = P(1) * 4;
-    for (i = 0; i < stars; i++) {
-        s32 x;
-        s32 y;
-        s32 tw;
-        MfColor c = { 220, 220, 255, 0 };
-        seed = seed * 1103515245 + 12345;
-        x = (seed >> 8) % SCREEN_WIDTH;
-        seed = seed * 1103515245 + 12345;
-        y = (seed >> 8) % 90;
-        tw = (gRt.frame * 7 + i * 37) % 64;
-        c.a = (u8)(60 + (tw < 32 ? tw : 64 - tw) * 5);
-        Draw2D_Rect(x, y + 32, 2, 2, c);
+    Draw2D_Rect(24, 150, SCREEN_WIDTH - 48, 40, bg);
+    for (i = 0; i < 3; i++) {
+        Draw2D_TextCentered(154 + i * 12, (MfColor){ 210, 200, 255, 255 }, sWhisper[i]);
     }
-    Draw2D_TextCentered(206, cText, "The moon hums an old lullaby...");
 }
 
 // ===========================================================================
@@ -1038,6 +1062,11 @@ static void Ambush_Start(PlayState* play) {
             gEv.hits++;
         }
     }
+    if (gEv.hits == 0) {
+        MfColor c = { 200, 200, 200, 255 };
+        Hud_Notify("No monsters answered the moon's call.", c);
+        gEv.duration = 1;
+    }
 }
 
 static void Ambush_Update(PlayState* play) {
@@ -1721,9 +1750,9 @@ const EventDef gEvents[NUM_EVENTS] = {
     { "Festival of Masks", "Nothing to fear. Enjoy the show!", "Carnival colours burst across the sky.",
       EVK_HARMLESS, 0, { 6, 1, 1 }, PN("Confetti", "Screen tint", "Music"), { 10, 1, 1 },
       AlwaysEligible, NULL, Festival_Update, NULL, Festival_Draw2D, NULL },
-    { "Lunar Serenade", "Just listen. The moon is singing.", "Moon dust drifts down like snow.",
-      EVK_HARMLESS, 0, { 6, 10, 0 }, PN("Dust", "Stars", "-"), { 12, 30, 0 },
-      AlwaysEligible, NULL, Serenade_Update, NULL, Serenade_Draw2D, NULL },
+    { "Moon's Whisper", "Listen. The moon is spilling secrets.", "The moon lets slip where things are.",
+      EVK_HARMLESS, 0, { 15, 5, 0 }, PN("Length (s)", "Sparkles", "-"), { 45, 9, 0 },
+      AlwaysEligible, Whisper_Start, Whisper_Update, NULL, Whisper_Draw2D, NULL },
     { "Starfall Bounty", "Stand where the stars land to catch them!", "Falling stars scatter Moon Marks.",
       EVK_BENEFIT, 0, { 6, 30, 3 }, PN("Star rate", "Fall time (0.1s)", "Marks/star"), { 9, 60, 10 },
       AlwaysEligible, Starfall_Start, Starfall_Update, Starfall_Draw3D, Starfall_Draw2D, Starfall_End },

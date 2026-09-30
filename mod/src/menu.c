@@ -266,6 +266,11 @@ static void Activate(PlayState* play, s32 row) {
             break;
         case PG_EVENT_DETAIL:
             if (row == 5) {
+                const EventDef* e = &gEvents[sDetailEvent];
+                if (e->eligible != NULL && !e->eligible(play)) {
+                    Flash("That event can't happen here right now.");
+                    break;
+                }
                 Menu_Close();
                 Events_Start(play, sDetailEvent, true, NULL);
             } else if (row == 6) {

@@ -119,6 +119,10 @@ s32 World_RandomNeighbour(s32 zone) {
 // goes quietly into the chronicle.
 static u8 sRumorMode = false;
 
+void World_SetRumor(s32 on) {
+    sRumorMode = on;
+}
+
 void World_Log(const char* text) {
     s32 slot = gMf.logHead;
     Str_Copy(gMf.log[slot], text, LOG_WIDTH);

@@ -35,7 +35,7 @@ Every event can be switched off, reweighted, tuned and force-triggered from
 | # | Event | Type | Risk | Counter | Settings (default) |
 |---|---|---|---|---|---|
 | 0 | Festival of Masks | Harmless | - | Nothing to fear. Enjoy the show! | Confetti (6), Screen tint (1), Music (1) |
-| 1 | Lunar Serenade | Harmless | - | Just listen. The moon is singing. | Dust (6), Stars (10) |
+| 1 | Moon's Whisper | Harmless | - | Listen. The moon is spilling secrets. |  |
 | 2 | Starfall Bounty | Benefit | - | Stand where the stars land to catch them! | Star rate (6) |
 | 3 | Dowsing Moon | Benefit | - | Follow the warmth, then press A to dig. |  |
 | 4 | Moonfall | Danger | 3 | Step out of the red circles before impact! | Impacts/10s (7) |
@@ -119,8 +119,9 @@ Pyromaniac, Blinker, Ambusher, Relentless, Thief, Mark-Hungry, Moonblessed, Gian
 Swift, Hexcaller, Coward, Warlord, Grudge-Bearer. Descriptions are in the Nemesis page
 of the Moon Menu.
 
-**Hunting.** The nemesis lives on a graph of 27 Termina zones. Every world tick (45s of
-play) it walks toward the last outdoor zone you stood in. When you're in the same
+**Hunting.** The nemesis lives on a graph of 27 Termina zones. It keeps its own travel
+clock: every 60-140 seconds of play (faster with Tracking, Relentless or Vendetta) it
+walks one zone toward the last outdoor zone you stood in. When you're in the same
 zone, it appears 400-600 units behind you (Ambushers appear right behind you, without
 a banner). It remembers its wounds between fights. Killing it pays
 `40 + 15 x level + 5 x traits` Moon Marks; there is a 25% chance (60% for Cowards)
@@ -145,7 +146,8 @@ Examples: a D-rank Stalchild pays about 5, a C-rank Peahat about 30, an S-rank I
 Knuckle about 135.
 
 Targets have motives (Roaming, Migrating, Nesting, Hunting you, Fleeing) and move
-between zones on their own. Targets that share a zone can fight; the winner ranks up
+between zones on their own, each on its own random timer (20-50s when hunting you,
+up to 150s when nesting), so the world never moves in lockstep. Targets that share a zone can fight; the winner ranks up
 and takes part of the loser's bounty. Contracts expire after 22-40 minutes of play.
 
 ### Enemy roster
