@@ -1,0 +1,81 @@
+# Moonfall Mayhem: a chaos/roguelite layer for Majora's Mask: Recompiled.
+
+[manifest]
+id = "clodd_moonfall_mayhem"
+version = "0.1.0"
+display_name = "Moonfall Mayhem"
+description = """
+Global Events, a Nemesis system, Bounties, Moon Marks and a Moon Pouch, plus a website \
+that lets your friends meddle with your run.
+
+Talk to the rainbow carpenter in South Clock Town (press L near him), or play \
+C-Up C-Up C-Down C-Down on the ocarina anywhere, to open the Moon Menu. \
+The South Clock Town owl statue is the Bounty Board.
+
+Built to sit on top of a randomizer: nothing in this mod grants items, rupees, \
+movement upgrades or anything else that could break randomizer logic."""
+short_description = "Events, nemeses, bounties and friends that mess with your run."
+authors = [ "mkselite" ]
+game_id = "mm"
+minimum_recomp_version = "1.2.2"
+dependencies = [ ]
+optional_dependencies = [ ]
+
+native_libraries = [
+    { name = "moonfall_net", funcs = [
+        "mfn_init", "mfn_configure", "mfn_push_state", "mfn_poll_command", "mfn_status",
+        "mfn_save_blob", "mfn_load_blob", "mfn_log"
+    ] }
+]
+
+[inputs]
+elf_path = "build/mod.elf"
+mod_filename = "moonfall_mayhem"
+func_reference_syms_file = "Zelda64RecompSyms/mm.us.rev1.syms.toml"
+data_reference_syms_files = [ "Zelda64RecompSyms/mm.us.rev1.datasyms.toml", "Zelda64RecompSyms/mm.us.rev1.datasyms_static.toml" ]
+additional_files = [ ]
+
+[[manifest.config_options]]
+id = "friends_enabled"
+name = "Friend Website"
+description = "Connect to your Moonfall friend server so friends can watch and meddle. Needs a Server URL, Room Code and Host Key."
+type = "Enum"
+options = [ "Off", "On" ]
+default = "Off"
+
+[[manifest.config_options]]
+id = "server_url"
+name = "Server URL"
+description = "Base URL of your Cloudflare Worker, for example https://moonfall.yourname.workers.dev"
+type = "String"
+default = ""
+
+[[manifest.config_options]]
+id = "room_code"
+name = "Room Code"
+description = "Short code your friends type on the website to join your room (letters and numbers)."
+type = "String"
+default = "TERMINA"
+
+[[manifest.config_options]]
+id = "host_key"
+name = "Host Key"
+description = "Secret password that proves the game is the room owner. Never share it. The first game to connect claims the room with this key."
+type = "String"
+default = ""
+
+[[manifest.config_options]]
+id = "master_difficulty"
+name = "Master Difficulty"
+description = "Scales all damage dealt by events, nemeses and bounty targets."
+type = "Enum"
+options = [ "Gentle", "Normal", "Cruel", "Merciless" ]
+default = "Normal"
+
+[[manifest.config_options]]
+id = "debug_menu"
+name = "Debug Menu"
+description = "Shows the Debug page in the Moon Menu (force events, add Moon Marks, spawn a nemesis, and so on)."
+type = "Enum"
+options = [ "Hidden", "Shown" ]
+default = "Shown"

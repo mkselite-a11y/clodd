@@ -1,0 +1,19 @@
+name = "moonfall-mayhem"
+main = "src/worker.js"
+compatibility_date = "2025-06-01"
+
+# The friend website (index.html, app.js, style.css) is served from ./public.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# One Durable Object per room holds the live game state, friends and votes.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

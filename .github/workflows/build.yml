@@ -1,0 +1,45 @@
+name: Build Moonfall Mayhem
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-18 lld-18 mingw-w64 cmake ninja-build zip
+
+      - name: Build RecompModTool
+        run: |
+          git clone --depth 1 https://github.com/N64Recomp/N64Recomp tools/N64Recomp
+          git -C tools/N64Recomp submodule update --init --recursive --depth 1
+          cmake -S tools/N64Recomp -B tools/N64Recomp/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
+          cmake --build tools/N64Recomp/build --target RecompModTool
+
+      - name: Build mod
+        working-directory: mod
+        run: |
+          make -j4 CC=clang-18 LD=ld.lld-18
+          ../tools/N64Recomp/build/RecompModTool mod.toml build
+
+      - name: Build native library
+        working-directory: native
+        run: make
+
+      - name: Collect release files
+        run: |
+          mkdir -p dist/mods
+          cp mod/build/moonfall_mayhem.nrm native/moonfall_net.dll dist/mods/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moonfall-mayhem
+          path: dist/

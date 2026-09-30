@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moon Court</title>
+  <meta name="description" content="Watch and meddle with a friend's Moonfall Mayhem run of Majora's Mask.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="moon" aria-hidden="true"></span>
+      <div>
+        <h1>Moon Court</h1>
+        <p class="sub">Moonfall Mayhem companion</p>
+      </div>
+    </div>
+    <div class="conn">
+      <span id="roomLabel" class="room hidden"></span>
+      <span id="connPill" class="pill off">Not connected</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Join -->
+    <section id="join" class="join card">
+      <h2>Join a hero's run</h2>
+      <p class="muted">Ask the player for their room code. Your nickname is shown to them in game.</p>
+      <form id="joinForm">
+        <label>Room code
+          <input id="roomInput" autocomplete="off" maxlength="24" placeholder="TERMINA" required>
+        </label>
+        <label>Your nickname
+          <input id="nameInput" autocomplete="off" maxlength="12" placeholder="Tingle" required>
+        </label>
+        <button class="btn primary" type="submit">Enter the Moon Court</button>
+      </form>
+      <ul class="howto">
+        <li><strong>Watch</strong> the hero's hearts, area, nemesis and bounties live.</li>
+        <li><strong>Earn favor</strong> just by watching (1 every 15 seconds, up to 20).</li>
+        <li><strong>Spend it</strong> to help, to cause chaos, or to vote on the next event.</li>
+      </ul>
+    </section>
+
+    <!-- Live view -->
+    <section id="app" class="grid hidden">
+      <div class="col">
+        <article class="card hero">
+          <div class="hero-top">
+            <div id="hearts" class="hearts" aria-label="Hearts"></div>
+            <div class="marks"><span id="marks">0</span><small>Moon Marks</small></div>
+          </div>
+          <div class="facts">
+            <div><small>Area</small><span id="zone">-</span></div>
+            <div><small>Time</small><span id="clock">-</span></div>
+            <div><small>Form</small><span id="form">-</span></div>
+          </div>
+          <p id="heroStatus" class="status"></p>
+        </article>
+
+        <article id="eventCard" class="card event">
+          <div class="card-head"><h3>Global Event</h3><span id="eventBadge" class="badge"></span></div>
+          <p id="eventName" class="big">Quiet, for now...</p>
+          <p id="eventCounter" class="muted"></p>
+          <div class="bar"><span id="eventBar"></span></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h3>Nemesis</h3><span id="nemBadge" class="badge"></span></div>
+          <div id="nemesis"><p class="muted">No enemy has earned the title yet.</p></div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h3>Curse of the cycle</h3></div>
+          <p id="curseName" class="big">-</p>
+          <p id="curseDesc" class="muted"></p>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h3>Bounty Board</h3></div>
+          <ul id="bounties" class="list"></ul>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h3>Chronicle of Termina</h3></div>
+          <ul id="chronicle" class="list small"></ul>
+        </article>
+      </div>
+
+      <div class="col">
+        <article class="card favor">
+          <div class="card-head"><h3>Your favor</h3><span id="favorNum" class="badge gold">0</span></div>
+          <div id="favorPips" class="pips"></div>
+          <p id="cooldown" class="muted small"></p>
+        </article>
+
+        <article id="voteCard" class="card vote hidden">
+          <div class="card-head"><h3>The Court votes</h3><span id="voteTimer" class="badge"></span></div>
+          <p class="muted small">The winning event hits the hero when the vote closes. Voting is free.</p>
+          <div id="voteOptions" class="vote-options"></div>
+        </article>
+
+        <article class="card">
+          <nav class="tabs" role="tablist">
+            <button class="tab active" data-tab="help">Help</button>
+            <button class="tab" data-tab="chaos">Chaos</button>
+            <button class="tab" data-tab="nemesis">Nemesis</button>
+            <button class="tab" data-tab="bounty">Bounty</button>
+            <button class="tab" data-tab="talk">Talk</button>
+          </nav>
+          <p id="hurtNote" class="note hidden">The hero only allows helpful meddling right now.</p>
+
+          <div class="panel" data-panel="help">
+            <button class="act" data-a="heal"><b>Heal</b><span>+1 heart</span><i data-cost="heal"></i></button>
+            <button class="act" data-a="shield"><b>Moonshield</b><span>6s of no damage</span><i data-cost="shield"></i></button>
+            <button class="act" data-a="marks"><b>Send Moon Marks</b><span>+5 Marks</span><i data-cost="marks"></i></button>
+            <div class="row">
+              <select id="giftSelect" aria-label="Pouch item"></select>
+              <button class="act compact" data-a="gift"><b>Gift item</b><i data-cost="gift"></i></button>
+            </div>
+            <div class="row">
+              <select id="weakSelect" aria-label="Stat to weaken">
+                <option value="0">Health</option><option value="1">Power</option>
+                <option value="2">Tracking</option><option value="3">Speed</option>
+              </select>
+              <button class="act compact" data-a="nemweak"><b>Weaken nemesis</b><i data-cost="nemweak"></i></button>
+            </div>
+          </div>
+
+          <div class="panel hidden" data-panel="chaos">
+            <button class="act hurt" data-a="randevent"><b>Random event</b><span>Let the moon decide</span><i data-cost="randevent"></i></button>
+            <div class="row">
+              <select id="eventSelect" aria-label="Event"></select>
+              <button class="act compact" data-a="event"><b>Summon</b><i id="eventCost"></i></button>
+            </div>
+            <button class="act hurt" data-a="chill"><b>Freeze their feet</b><span>5s of slow steps</span><i data-cost="chill"></i></button>
+            <button class="act hurt" data-a="curse"><b>Reroll the curse</b><span>Roll a new curse</span><i data-cost="curse"></i></button>
+          </div>
+
+          <div class="panel hidden" data-panel="nemesis">
+            <div class="row">
+              <select id="buffSelect" aria-label="Stat to empower">
+                <option value="0">Health</option><option value="1">Power</option>
+                <option value="2">Tracking</option><option value="3">Speed</option>
+              </select>
+              <button class="act compact hurt" data-a="nembuff"><b>Empower</b><i data-cost="nembuff"></i></button>
+            </div>
+            <button class="act hurt" data-a="nemsummon"><b>Send it hunting</b><span>It heads straight for the hero</span><i data-cost="nemsummon"></i></button>
+            <div class="row">
+              <select id="crownSelect" aria-label="Species"></select>
+              <button class="act compact hurt" data-a="nemcrown"><b>Crown nemesis</b><i data-cost="nemcrown"></i></button>
+            </div>
+            <div class="row">
+              <select id="nameA" aria-label="First name"></select>
+              <select id="nameB" aria-label="Title"></select>
+              <button class="act compact" data-a="rename"><b>Rename</b><i data-cost="rename"></i></button>
+            </div>
+          </div>
+
+          <div class="panel hidden" data-panel="bounty">
+            <p class="muted small">Post a bounty on the hero's board. Tougher targets pay more.</p>
+            <label class="stack">Target<select id="bountySpecies"></select></label>
+            <label class="stack">Where<select id="bountyZone"></select></label>
+            <button class="act" data-a="bounty"><b>Post bounty</b><span id="bountyReward"></span><i data-cost="bounty"></i></button>
+          </div>
+
+          <div class="panel hidden" data-panel="talk">
+            <form id="msgForm" class="row">
+              <input id="msgInput" maxlength="60" placeholder="Say something to the hero" autocomplete="off">
+              <button class="act compact" type="submit"><b>Send</b><i data-cost="message"></i></button>
+            </form>
+            <p class="muted small">Messages pop up on the hero's screen.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-head"><h3>In the Court</h3></div>
+          <div id="friends" class="chips"></div>
+          <ul id="feed" class="list small"></ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
