@@ -14,7 +14,7 @@ friends can watch and meddle.
   Speed) every time they kill you, evolve up to 6 of 20 traits, and walk across
   Termina to find you.
 - **Bounty Board**: named, trait-bearing targets with motives that roam, migrate,
-  nest, hunt you and fight each other off-screen. Rewards scale with how dangerous
+  nest, hunt you and fight each other off-screen, each on its own clock. Rewards scale with how dangerous
   the enemy really is (a Stalchild pays little, a Peahat a lot).
 - **Moon Marks and the Moon Pouch**: 24 items bought with Moon Marks and used with
   L + D-pad (or L + C buttons).

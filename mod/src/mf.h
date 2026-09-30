@@ -308,6 +308,7 @@ void Draw2D_Rect(s32 x, s32 y, s32 w, s32 h, MfColor c);
 void Draw2D_Text(s32 x, s32 y, MfColor c, const char* text); // pixel position
 void Draw2D_TextCentered(s32 y, MfColor c, const char* text);
 void Draw2D_End(void);
+void Draw2D_WorldMarker(PlayState* play, Vec3f* pos, MfColor c, const char* label);
 
 void Draw3D_Begin(PlayState* play);
 void Draw3D_Disk(Vec3f* pos, f32 radius, MfColor c);
@@ -508,6 +509,7 @@ Actor* Actors_FindTagged(u8 kind, s32 index);
 void Actors_KillTagged(u8 kind);
 s32 Actors_IsEnemyLike(Actor* a);
 s32 Actors_TakeFledSpecies(void);
+extern char gPreloadNote[64];
 
 // ---------------------------------------------------------------------------
 // Nemesis (nemesis.c)

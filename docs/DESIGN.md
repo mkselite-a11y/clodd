@@ -47,12 +47,12 @@ Every event can be switched off, reweighted, tuned and force-triggered from
 | 10 | Moth Swarm | Danger | 2 | Spin attack to scatter the clinging moths! | Swarm rate (4) |
 | 11 | Tatl's Warning | Danger | 2 | When Tatl shouts, press C-Up to heed her! |  |
 | 12 | Hex of Silence | Danger | 1 | Don't attack or use items. Every press hurts. | Damage/press (2) |
-| 13 | Plague Fog | Danger | 3 | Escape! Leave this area through any exit. |  |
+| 13 | Moon Crank | Danger | 2 | Spin the stick in circles to keep the ward wound! | Unwind/s (12), Charge/spin (18), Damage (2) |
 | 14 | Moon Tether | Danger | 2 | Stay inside the drifting circle! |  |
 | 15 | Moon's Grasp | Danger | 3 | When it grabs you, MASH A to break free! | Presses needed (12), Damage (6) |
 | 16 | Heartbeat Hex | Danger | 2 | Press A exactly on each heartbeat. |  |
 | 17 | Rising Moon-Tide | Danger | 3 | Climb! Get above the rising dark tide. |  |
-| 18 | Moonburn | Danger | 2 | Find cover! Stand under a roof or ledge. |  |
+| 18 | Moon's Reflex Test | Danger | 2 | Press the button that flashes up. Fast! |  |
 | 19 | Gorgon's Gaze | Danger | 2 | Keep your camera turned AWAY from the eye. |  |
 | 20 | Ambush | Danger | 4 | Defeat every ambusher before time runs out! | Ambushers (3) |
 | 21 | Dissonance | Danger | 1 | Play any 3 notes on your ocarina to answer it. |  |
@@ -63,14 +63,11 @@ Every event can be switched off, reweighted, tuned and force-triggered from
 | 26 | Tag, You're It | Danger | 2 | Chase down the wisp and touch it! |  |
 | 27 | Moon's Riddle | Danger | 1 | Answer with the D-pad. Wrong answers hurt. |  |
 | 28 | Mask Salesman's Game | Danger | 2 | Memorise the arrows, then repeat them on the D-pad. |  |
-| 29 | Moon Leeches | Danger | 2 | Get into water to wash the leeches off! | Leeches (4) |
+| 29 | Stargazer | Danger | 2 | Keep the wandering star centred in your view! |  |
 | 30 | Omen Targets | Danger | 3 | Shoot the omens down with any projectile! | Omens (3), Damage each (4) |
 | 31 | Pressure Seals | Danger | 2 | Step on the seals in order: follow the beam. | Seals (4), Wrong-step damage (3), Fail damage (8) |
 
-Eligibility notes: Moonburn needs to be outdoors, Ambush needs enemies whose models are
-already loaded in the area, Dissonance needs the ocarina, Lonely Moon needs a nearby
-NPC, Moon Leeches needs water in the area, and Omen Targets needs a projectile
-(bow with arrows, hookshot, Deku nuts, or the Zora/Deku masks).
+Eligibility notes: Ambush needs an enemy model in the area (outdoor areas load one for it), Dissonance needs the ocarina, Lonely Moon needs a nearby NPC, and Omen Targets needs a projectile (bow with arrows, hookshot, Deku nuts, or the Zora/Deku masks). Moon's Riddle draws from 63 questions.
 
 ## Curses (one per three-day cycle)
 
@@ -168,7 +165,7 @@ and takes part of the loser's bounty. Contracts expire after 22-40 minutes of pl
 
 Nemeses and claimed bounty targets can follow you into areas where their model isn't
 normally loaded: the mod loads one or two extra enemy models when the area loads
-(up to the "Enemy object budget", 160 KB by default) and drops them automatically if a
+(up to 3 extra models, as long as 320 KB stays free for the area's own) and drops them automatically if a
 room needs the memory.
 
 ## Moon Marks and the Moon Pouch
@@ -197,7 +194,7 @@ item you own).
 | Deku Bundle | 5 | 3 | Refill sticks/nuts you carry |
 | Curse Ward | 35 | 2 | Suppress the curse until dawn |
 | Mark Magnet | 15 | 3 | Next 3 payouts +50% |
-| Chronicle Spyglass | 4 | 3 | Reveal nemesis location for this cycle |
+| Moon Spyglass | 4 | 3 | Reveal your nemesis's location for this cycle |
 | Stasis Orb | 22 | 3 | 6s: all enemies frozen |
 | Riposte Charm | 16 | 3 | 60s: attackers take damage back |
 | Event Tempter | 5 | 5 | Start a random event now (+50% reward) |
@@ -215,5 +212,4 @@ item you own).
   (lures, veils, brands, compasses, wards).
 - Friends spend favor to trigger events, post bounties, crown, empower or weaken
   the nemesis, reroll the curse or help you out, and the Court votes on events.
-- Everything that happens off-screen is written to the Chronicle, and world news pops
-  up as rumors while you play.
+- News of what happens off-screen pops up as rumors while you play.

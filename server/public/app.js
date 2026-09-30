@@ -188,8 +188,6 @@
         <span class="r">${b.reward} MM</span>
       </li>`).join("");
 
-    $("chronicle").innerHTML = (g.log || []).map((l) => `<li>${esc(l)}</li>`).join("");
-
     // Favor
     $("favorNum").textContent = s.favor;
     $("favorPips").innerHTML = Array.from({ length: s.favorMax }, (_, i) => `<span class="${i < s.favor ? "on" : ""}"></span>`).join("");

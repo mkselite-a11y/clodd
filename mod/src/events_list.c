@@ -43,7 +43,7 @@ static void Quake(PlayState* play, s32 strength, s32 duration) {
 static void Boom(PlayState* play, Vec3f* pos) {
     Vec3f zero = { 0.0f, 0.0f, 0.0f };
     EffectSsBomb2_SpawnLayered(play, pos, &zero, &zero, 100, 19);
-    Audio_PlaySfx_AtPos(pos, NA_SE_IT_BOMB_EXPLOSION);
+    Mf_Sfx(NA_SE_IT_BOMB_EXPLOSION);
     Quake(play, 4, 8);
 }
 
@@ -61,12 +61,10 @@ static void Sparkle(PlayState* play, Vec3f* pos, u8 r, u8 g, u8 b) {
 // crashes, so this uses a hit flash, a shockwave and sparks instead.)
 static void Lightning(PlayState* play, Vec3f* pos) {
     Vec3f p = *pos;
-    Vec3f zero = { 0.0f, 0.0f, 0.0f };
     p.y += 30.0f;
     EffectSsHitmark_SpawnFixedScale(play, 0, &p);
-    EffectSsBlast_SpawnWhiteShockwave(play, pos, &zero, &zero);
     Sparkle(play, &p, 200, 160, 255);
-    Audio_PlaySfx_AtPos(pos, NA_SE_EV_LIGHTNING);
+    Mf_Sfx(NA_SE_EV_LIGHTNING);
 }
 
 static s32 Pressed(u16 btn) {
@@ -535,7 +533,7 @@ static void Scythe_Update(PlayState* play) {
         h->r = 0.0f;
         h->yaw = (s16)Rng_Range(0, 0xFFFF);
         h->state = 1;
-        Audio_PlaySfx_AtPos(&h->pos, NA_SE_IT_SWORD_SWING_HARD);
+        Mf_Sfx(NA_SE_IT_SWORD_SWING_HARD);
     }
     if (h->state == 1) {
         f32 prev = h->r;
@@ -721,25 +719,46 @@ static void Silence_Draw2D(PlayState* play) {
     Draw2D_Rect(0, SCREEN_HEIGHT - 2, SCREEN_WIDTH, 2, c);
 }
 
-// E13 Plague Fog: a sickening fog that only gets worse. Counter: leave the area.
-static void Plague_Update(PlayState* play) {
-    s32 ramp = gEv.timer / SEC(MF_MAX(1, P(0)));
-    if (Every(SEC(3)) && ramp > 0) {
-        Mf_DamagePlayer(MF_MIN(ramp, 4), false, 0);
+// E13 Moon Crank: a ward keeps the moon at bay only while it's wound up.
+// Counter: spin the control stick in circles to wind it.
+static void Crank_Start(PlayState* play) {
+    gEv.hits = 100; // ward charge
+    gEv.fa = 0.0f;  // accumulated rotation
+    gEv.score = -1; // last stick angle (or -1)
+}
+
+static void Crank_Update(PlayState* play) {
+    if (Mf_StickMag() > 45.0f) {
+        s16 ang = Math_Atan2S_XY(gRt.stickY, gRt.stickX);
+        if (gEv.score != -1) {
+            s16 d = ang - (s16)gEv.score;
+            gEv.fa += ABS(d);
+        }
+        gEv.score = (u16)ang;
+    } else {
+        gEv.score = -1;
+    }
+    while (gEv.fa >= 65536.0f) {
+        gEv.fa -= 65536.0f;
+        gEv.hits = MF_MIN(100, gEv.hits + MF_MAX(1, P(1)));
+        Mf_Sfx(NA_SE_SY_CURSOR);
+    }
+    if (Every(SEC(1))) {
+        gEv.hits = MF_MAX(0, gEv.hits - MF_MAX(1, P(0)));
+    }
+    if (gEv.hits == 0 && Every(SEC(1.5f))) {
+        Player* p = Pl(play);
+        Mf_DamagePlayer(MF_MAX(1, P(2)), false, 0);
+        Lightning(play, &p->actor.world.pos);
         gEv.failed = true;
     }
 }
 
-static void Plague_Draw2D(PlayState* play) {
-    s32 a = MF_MIN(150, 20 + gEv.timer * 150 / MF_MAX(1, gEv.duration));
-    MfColor fog = { 90, 120, 60, (u8)a };
-    Draw2D_Rect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30, fog);
-}
-
-static void Plague_End(PlayState* play, s32 success) {
-    if (!gEv.succeeded && !gRt.playerDead && success) {
-        Mf_DamagePlayer(MF_MAX(1, P(1)), false, 0);
-        gEv.failed = true;
+static void Crank_Draw2D(PlayState* play) {
+    MfColor c = (gEv.hits > 30) ? (MfColor){ 150, 220, 255, 230 } : (MfColor){ 255, 110, 110, 230 };
+    Bar2D(36, gEv.hits, 100, c, "Ward");
+    if (gEv.hits < 30) {
+        Draw2D_TextCentered(48, (MfColor){ 255, 200, 120, 255 }, "Spin the stick in circles!");
     }
 }
 
@@ -932,40 +951,61 @@ static void Tide_Draw2D(PlayState* play) {
     Draw2D_TextCentered(34, above >= 0 ? (MfColor){ 120, 255, 140, 255 } : (MfColor){ 255, 120, 120, 255 }, buf);
 }
 
-// E18 Moonburn: direct moonlight burns. Counter: get something over your head.
-static s32 Moonburn_Eligible(PlayState* play) {
-    return Mf_IsOutdoors(play);
+// E18 Moon's Reflex Test: a button flashes up. Counter: press that exact button, fast.
+static const u16 sReflexBtns[4] = { BTN_A, BTN_B, BTN_R, BTN_Z };
+static const char* sReflexNames[4] = { "A", "B", "R", "Z" };
+
+static void Reflex_Start(PlayState* play) {
+    gEv.hits = SEC(2);  // countdown to the next prompt
+    gEv.score = -1;     // active prompt index, -1 = none
 }
 
-static s32 Sheltered(PlayState* play) {
-    Player* p = Pl(play);
-    CollisionPoly* poly;
-    s32 bgId;
-    f32 outY;
-    Vec3f pos = p->actor.world.pos;
-    pos.y += 40.0f;
-    return BgCheck_EntityCheckCeiling(&play->colCtx, &outY, &pos, 1500.0f, &poly, &bgId, &p->actor);
-}
+static void Reflex_Update(PlayState* play) {
+    s32 window = MF_MAX(4, SEC(P(0) / 10.0f));
+    s32 i;
 
-static void Moonburn_Update(PlayState* play) {
-    Player* p = Pl(play);
-    if (Every(SEC(0.5f))) {
-        gEv.score = Sheltered(play);
+    gEv.hits--;
+    if (gEv.score < 0) {
+        if (gEv.hits <= 0) {
+            gEv.score = Rng_Range(0, 3);
+            gEv.hits = window;
+            Mf_Sfx(NA_SE_SY_WARNING_COUNT_E);
+        }
+        return;
     }
-    if (!gEv.score && Every(SEC(P(0) / 10.0f))) {
+    for (i = 0; i < 4; i++) {
+        if (Pressed(sReflexBtns[i])) {
+            if (i == gEv.score) {
+                Mf_Sfx(NA_SE_SY_CORRECT_CHIME);
+            } else {
+                Mf_DamagePlayer(MF_MAX(1, P(1)), false, 0);
+                Mf_Sfx(NA_SE_SY_ERROR);
+                gEv.failed = true;
+            }
+            gEv.score = -1;
+            gEv.hits = SEC(Rng_Range(20, 45) / 10.0f);
+            return;
+        }
+    }
+    if (gEv.hits <= 0) {
+        Player* p = Pl(play);
         Mf_DamagePlayer(MF_MAX(1, P(1)), false, 0);
-        Sparkle(play, &p->actor.world.pos, 255, 250, 200);
+        Lightning(play, &p->actor.world.pos);
         gEv.failed = true;
+        gEv.score = -1;
+        gEv.hits = SEC(Rng_Range(20, 45) / 10.0f);
     }
 }
 
-static void Moonburn_Draw2D(PlayState* play) {
-    if (!gEv.score) {
-        MfColor glare = { 255, 250, 210, (u8)(30 + (gRt.frame % 16) * 2) };
-        Draw2D_Rect(0, 30, SCREEN_WIDTH, SCREEN_HEIGHT - 30, glare);
-        Draw2D_TextCentered(34, (MfColor){ 255, 140, 90, 255 }, "EXPOSED - find cover!");
-    } else {
-        Draw2D_TextCentered(34, (MfColor){ 120, 255, 140, 255 }, "Sheltered");
+static void Reflex_Draw2D(PlayState* play) {
+    if (gEv.score >= 0) {
+        MfColor bg = { 60, 0, 30, 220 };
+        char buf[16];
+        buf[0] = '\0';
+        Str_Cat(buf, "PRESS ", sizeof(buf));
+        Str_Cat(buf, sReflexNames[gEv.score], sizeof(buf));
+        Draw2D_Rect(110, 96, 100, 22, bg);
+        Draw2D_TextCentered(103, Mf_Rainbow(gRt.frame * 20, 255), buf);
     }
 }
 
@@ -1021,11 +1061,15 @@ static void Gorgon_Update(PlayState* play) {
 }
 
 static void Gorgon_Draw3D(PlayState* play) {
-    Draw3D_Orb(&sHz[0].pos, 70.0f, (MfColor){ 255, 245, 230, 230 });
-    Draw3D_Orb(&sHz[0].pos, 30.0f, (MfColor){ 220, 0, 30, 255 });
+    Vec3f base = sHz[0].pos;
+    base.y -= 160.0f;
+    Draw3D_Orb(&sHz[0].pos, 120.0f, (MfColor){ 255, 245, 230, 255 });
+    Draw3D_Orb(&sHz[0].pos, 50.0f, (MfColor){ 220, 0, 30, 255 });
+    Draw3D_Pillar(&base, 10.0f, 160.0f, (MfColor){ 200, 0, 40, 200 });
 }
 
 static void Gorgon_Draw2D(PlayState* play) {
+    Draw2D_WorldMarker(play, &sHz[0].pos, (MfColor){ 255, 60, 60, 255 }, "(O)");
     Bar2D(36, gEv.hits, 100, (MfColor){ 170, 170, 170, 230 }, "Stone");
 }
 
@@ -1198,7 +1242,7 @@ static void Volley_Update(PlayState* play) {
         h->pos.z += Math_CosS(yaw) * 450.0f;
         h->pos.y += 70.0f;
         h->state = 1;
-        Audio_PlaySfx_AtPos(&h->pos, NA_SE_SY_WARNING_COUNT_N);
+        Mf_Sfx(NA_SE_SY_WARNING_COUNT_N);
     }
     if (gEv.hits <= 0) {
         if (h->state == 1) {
@@ -1359,6 +1403,49 @@ static const Riddle sRiddles[] = {
     { "Deku Link can fly using...", { "Flowers", "Feathers", "Bubbles", "Wind" } },
     { "12 x 12 = ?", { "144", "124", "132", "164" } },
     { "Which ends a Global Event early?", { "Its counter", "Pausing", "Crying", "Rupees" } },
+    { "Who runs the Stock Pot Inn?", { "Anju", "Cremia", "Madame Aroma", "Romani" } },
+    { "Tingle sells what?", { "Maps", "Masks", "Bombs", "Milk" } },
+    { "Who teaches the Song of Healing?", { "Mask Salesman", "Tatl", "Kaepora", "The Moon" } },
+    { "Which boss guards Woodfall Temple?", { "Odolwa", "Goht", "Gyorg", "Twinmold" } },
+    { "Which boss guards Snowhead Temple?", { "Goht", "Odolwa", "Gyorg", "Majora" } },
+    { "Which boss guards Great Bay Temple?", { "Gyorg", "Goht", "Twinmold", "Odolwa" } },
+    { "Which boss guards Stone Tower?", { "Twinmold", "Gyorg", "Odolwa", "Goht" } },
+    { "Which song calls Epona?", { "Epona's Song", "Song of Storms", "Sonata", "Elegy" } },
+    { "Who runs the Swordsman's School?", { "Swordsman", "Kafei", "Gorman", "Mutoh" } },
+    { "What falls from the observatory?", { "Moon's Tear", "A star", "Rupees", "A mask" } },
+    { "Who is the head carpenter?", { "Mutoh", "Gorman", "Toto", "Tingle" } },
+    { "Where is Zora Hall?", { "Zora Cape", "Ikana", "The Swamp", "Milk Road" } },
+    { "What sings in the Goron shrine?", { "The Goron baby", "A Deku", "A Zora", "Tatl" } },
+    { "Which mask makes you tiny and wooden?", { "Deku", "Goron", "Zora", "Bunny" } },
+    { "How many masks exist in total?", { "24", "20", "12", "30" } },
+    { "How many heart pieces make a heart?", { "4", "2", "5", "3" } },
+    { "What does the Postman fear most?", { "Being late", "Ghosts", "Dogs", "Moons" } },
+    { "Which song opens the Great Bay Temple?", { "New Wave Bossa Nova", "Oath to Order", "Sonata", "Elegy" } },
+    { "Which song opens Woodfall Temple?", { "Sonata of Awakening", "Goron Lullaby", "Elegy", "Oath" } },
+    { "Which song calls the four giants?", { "Oath to Order", "Song of Time", "Soaring", "Healing" } },
+    { "Which song makes empty shells?", { "Elegy of Emptiness", "Oath to Order", "Sonata", "Storms" } },
+    { "The Song of Soaring warps you to...", { "Owl statues", "Fairy fountains", "Clock Town only", "Shops" } },
+    { "Great Fairies were scattered into...", { "Stray Fairies", "Rupees", "Masks", "Hearts" } },
+    { "Who stole Kafei's mask?", { "Sakon", "Skull Kid", "Tingle", "Gorman" } },
+    { "Where do the Gorman brothers live?", { "Milk Road", "Ikana", "Clock Town", "Snowhead" } },
+    { "What attacks Romani Ranch at night?", { "Aliens", "Wolves", "Keese", "Skull Kid" } },
+    { "15 x 4 = ?", { "60", "45", "64", "54" } },
+    { "81 / 9 = ?", { "9", "8", "7", "11" } },
+    { "256 / 4 = ?", { "64", "54", "46", "62" } },
+    { "17 + 26 = ?", { "43", "42", "33", "53" } },
+    { "3 cubed = ?", { "27", "9", "18", "36" } },
+    { "What comes after Tuesday?", { "Wednesday", "Thursday", "Monday", "Friday" } },
+    { "A dozen plus a half-dozen = ?", { "18", "16", "24", "12" } },
+    { "How many sides does a hexagon have?", { "6", "5", "7", "8" } },
+    { "A blue rupee is worth...", { "5 rupees", "1 rupee", "20 rupees", "10 rupees" } },
+    { "A red rupee is worth...", { "20 rupees", "5 rupees", "50 rupees", "10 rupees" } },
+    { "Which dungeon is upside-down?", { "Stone Tower", "Woodfall", "Snowhead", "Great Bay" } },
+    { "Who owns the Curiosity Shop?", { "Curiosity Shop man", "Tingle", "Anju", "Mutoh" } },
+    { "The Bombers want you to find...", { "Hidden kids", "Bombs", "Masks", "Fairies" } },
+    { "Which item lets you see the invisible?", { "Lens of Truth", "Mirror Shield", "Hookshot", "Bow" } },
+    { "What does the Keaton mask summon?", { "Keaton quizzes", "Rain", "Horses", "Guards" } },
+    { "Which Moon Mark item delays events?", { "Omen Scroll", "Lunar Tonic", "Stasis Orb", "Smoke Veil" } },
+    { "Nemeses gain a stat when they...", { "Kill you", "Sleep", "Swim", "Eat bounties" } },
 };
 
 static u8 sRiddleOrder[4];
@@ -1537,40 +1624,67 @@ static void Simon_Draw2D(PlayState* play) {
     }
 }
 
-// E29 Moon Leeches: leeches latch on. Counter: get into water to wash them off.
-static s32 Leech_Eligible(PlayState* play) {
-    return Mf_HasWater(play);
-}
-
-static void Leech_Start(PlayState* play) {
-    gEv.hits = MF_CLAMP(P(0), 1, 8);
-}
-
-static void Leech_Update(PlayState* play) {
+// E29 Stargazer: a wandering star must be watched. Counter: keep it in the
+// centre of your view until it's fully charted.
+static void Star_Start(PlayState* play) {
     Player* p = Pl(play);
-    if (p->actor.depthInWater > 10.0f || (p->stateFlags1 & PLAYER_STATE1_8000000)) {
-        EffectSsGSplash_Spawn(play, &p->actor.world.pos, NULL, NULL, 0, 300);
-        Mf_Sfx(NA_SE_SY_CORRECT_CHIME);
-        gEv.succeeded = true;
-        return;
+    s16 yaw = (s16)Rng_Range(0, 0xFFFF);
+    InitHz();
+    sHz[0].pos = p->actor.world.pos;
+    sHz[0].pos.x += Math_SinS(yaw) * 450.0f;
+    sHz[0].pos.z += Math_CosS(yaw) * 450.0f;
+    sHz[0].pos.y += 220.0f;
+    sHz[0].yaw = yaw + 0x4000;
+    gEv.hits = 0;
+}
+
+static f32 CameraDot(PlayState* play, Vec3f* target) {
+    Camera* cam = GET_ACTIVE_CAM(play);
+    f32 lx = cam->at.x - cam->eye.x;
+    f32 ly = cam->at.y - cam->eye.y;
+    f32 lz = cam->at.z - cam->eye.z;
+    f32 tx = target->x - cam->eye.x;
+    f32 ty = target->y - cam->eye.y;
+    f32 tz = target->z - cam->eye.z;
+    f32 ll = sqrtf(lx * lx + ly * ly + lz * lz);
+    f32 lt = sqrtf(tx * tx + ty * ty + tz * tz);
+    return (lx * tx + ly * ty + lz * tz) / MF_MAX(1.0f, ll * lt);
+}
+
+static void Star_Update(PlayState* play) {
+    Hz* h = &sHz[0];
+    s32 need = SEC(MF_MAX(1, P(0)));
+
+    if (Every(SEC(3))) {
+        h->yaw += (s16)Rng_Range(-0x4000, 0x4000);
     }
-    if (Every(SEC(P(1) / 10.0f + 0.1f))) {
-        Mf_DamagePlayer(MF_MAX(1, gEv.hits / 2), false, 0);
+    h->pos.x += Math_SinS(h->yaw) * 2.5f;
+    h->pos.z += Math_CosS(h->yaw) * 2.5f;
+    if (CameraDot(play, &h->pos) > 0.94f) {
+        gEv.hits++;
+        if ((gEv.hits % 10) == 0) {
+            Mf_Sfx(NA_SE_SY_CURSOR);
+        }
+        if (gEv.hits >= need) {
+            Sparkle(play, &h->pos, 255, 240, 160);
+            Mf_Sfx(NA_SE_SY_CORRECT_CHIME);
+            gEv.succeeded = true;
+        }
+    } else if (Every(SEC(MF_MAX(1, P(1))))) {
+        Player* p = Pl(play);
+        Mf_DamagePlayer(MF_MAX(1, P(2)), false, 0);
+        Lightning(play, &p->actor.world.pos);
         gEv.failed = true;
     }
 }
 
-static void Leech_Draw3D(PlayState* play) {
-    Player* p = Pl(play);
-    s32 i;
-    for (i = 0; i < gEv.hits; i++) {
-        s16 a = gRt.frame * 700 + i * (0x10000 / MF_MAX(1, gEv.hits));
-        Vec3f pos = p->actor.world.pos;
-        pos.x += Math_SinS(a) * 22.0f;
-        pos.z += Math_CosS(a) * 22.0f;
-        pos.y += 20.0f + (i % 3) * 15.0f;
-        Draw3D_Orb(&pos, 9.0f, (MfColor){ 80, 30, 30, 240 });
-    }
+static void Star_Draw3D(PlayState* play) {
+    Draw3D_Orb(&sHz[0].pos, 60.0f, (MfColor){ 255, 240, 150, 240 });
+}
+
+static void Star_Draw2D(PlayState* play) {
+    Draw2D_WorldMarker(play, &sHz[0].pos, (MfColor){ 255, 230, 120, 255 }, "*");
+    Bar2D(36, gEv.hits, SEC(MF_MAX(1, P(0))), (MfColor){ 255, 230, 120, 230 }, "Charted");
 }
 
 // E30 Omen Targets: floating omens. Counter: shoot them down with any projectile.
@@ -1786,9 +1900,9 @@ const EventDef gEvents[NUM_EVENTS] = {
     { "Hex of Silence", "Don't attack or use items. Every press hurts.", "A hex seals your hands.",
       EVK_DANGER, 1, { 2, 0, 0 }, PN("Damage/press", "-", "-"), { 12, 0, 0 },
       AlwaysEligible, NULL, Silence_Update, NULL, Silence_Draw2D, NULL },
-    { "Plague Fog", "Escape! Leave this area through any exit.", "A sickly fog rolls in and thickens.",
-      EVK_DANGER, 3, { 8, 8, 0 }, PN("Worsens every (s)", "Final damage", "-"), { 20, 24, 0 },
-      AlwaysEligible, NULL, Plague_Update, NULL, Plague_Draw2D, Plague_End },
+    { "Moon Crank", "Spin the stick in circles to keep the ward wound!", "A moon-ward only turns while you crank it.",
+      EVK_DANGER, 2, { 12, 18, 2 }, PN("Unwind/s", "Charge/spin", "Damage"), { 30, 40, 12 },
+      AlwaysEligible, Crank_Start, Crank_Update, NULL, Crank_Draw2D, NULL },
     { "Moon Tether", "Stay inside the drifting circle!", "A chain of moonlight binds you.",
       EVK_DANGER, 2, { 16, 15, 3 }, PN("Radius (10u)", "Drift speed (0.1)", "Yank damage"), { 40, 50, 12 },
       AlwaysEligible, Tether_Start, Tether_Update, Tether_Draw3D, Tether_Draw2D, NULL },
@@ -1801,9 +1915,9 @@ const EventDef gEvents[NUM_EVENTS] = {
     { "Rising Moon-Tide", "Climb! Get above the rising dark tide.", "Black water rises from nowhere.",
       EVK_DANGER, 3, { 14, 4, 0 }, PN("Rise (10u)", "Damage/s", "-"), { 40, 12, 0 },
       AlwaysEligible, NULL, Tide_Update, Tide_Draw3D, Tide_Draw2D, NULL },
-    { "Moonburn", "Find cover! Stand under a roof or ledge.", "The moon's light scorches the open ground.",
-      EVK_DANGER, 2, { 15, 2, 0 }, PN("Burn every (0.1s)", "Damage", "-"), { 40, 8, 0 },
-      Moonburn_Eligible, NULL, Moonburn_Update, NULL, Moonburn_Draw2D, NULL },
+    { "Moon's Reflex Test", "Press the button that flashes up. Fast!", "The moon tests your reflexes.",
+      EVK_DANGER, 2, { 12, 3, 0 }, PN("Window (0.1s)", "Damage", "-"), { 30, 12, 0 },
+      AlwaysEligible, Reflex_Start, Reflex_Update, NULL, Reflex_Draw2D, NULL },
     { "Gorgon's Gaze", "Keep your camera turned AWAY from the eye.", "An eye of stone opens in the air.",
       EVK_DANGER, 2, { 7, 4, 6 }, PN("Moves every (s)", "Stare speed", "Petrify damage"), { 15, 10, 16 },
       AlwaysEligible, Gorgon_Start, Gorgon_Update, Gorgon_Draw3D, Gorgon_Draw2D, NULL },
@@ -1834,9 +1948,9 @@ const EventDef gEvents[NUM_EVENTS] = {
     { "Mask Salesman's Game", "Memorise the arrows, then repeat them on the D-pad.", "\"Such a fun game...\"",
       EVK_DANGER, 2, { 8, 3, 4 }, PN("Arrow time (0.1s)", "Rounds", "Damage"), { 20, 6, 16 },
       AlwaysEligible, Simon_Start, Simon_Update, NULL, Simon_Draw2D, NULL },
-    { "Moon Leeches", "Get into water to wash the leeches off!", "Leeches of moonstuff latch onto you.",
-      EVK_DANGER, 2, { 4, 30, 0 }, PN("Leeches", "Drain every (0.1s)", "-"), { 8, 80, 0 },
-      Leech_Eligible, Leech_Start, Leech_Update, Leech_Draw3D, NULL, NULL },
+    { "Stargazer", "Keep the wandering star centred in your view!", "A lost star must be charted.",
+      EVK_DANGER, 2, { 6, 3, 2 }, PN("Watch time (s)", "Punish every (s)", "Damage"), { 20, 10, 12 },
+      AlwaysEligible, Star_Start, Star_Update, Star_Draw3D, Star_Draw2D, NULL },
     { "Omen Targets", "Shoot the omens down with any projectile!", "Omens hang in the sky, ready to burst.",
       EVK_DANGER, 3, { 3, 4, 0 }, PN("Omens", "Damage each", "-"), { 8, 16, 0 },
       Omens_Eligible, Omens_Start, Omens_Update, Omens_Draw3D, Omens_Draw2D, Omens_End },

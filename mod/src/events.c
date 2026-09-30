@@ -218,9 +218,6 @@ void Events_OnSceneChange(PlayState* play) {
     // Scene-bound hazards re-anchor on the player in the new area.
     if (gEv.id >= 0) {
         gEv.origin = GET_PLAYER(play)->actor.world.pos;
-        if (gEv.id == 13) { // Plague Fog: escaping the area is the counter
-            gEv.succeeded = true;
-        }
     }
 }
 

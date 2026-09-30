@@ -189,7 +189,11 @@ static void Spawn(PlayState* play, s32 i) {
         if (sBlockedNotice <= 0) {
             char name[40];
             Bounty_Name(name, sizeof(name), b);
-            World_Logf2(name, " is here, but hiding out of reach.", NULL);
+            {
+                MfColor c = { 255, 210, 120, 255 };
+                World_Logf2(name, " is here, but hiding out of reach.", NULL);
+                Hud_Notify("A bounty target is here but can't reach you in this area.", c);
+            }
             sBlockedNotice = SEC(120);
         }
         sSpawnCooldown[i] = SEC(60);
@@ -203,6 +207,9 @@ static void Spawn(PlayState* play, s32 i) {
     Mf_FindSpawnPoint(play, &p, minD, maxD, yaw);
     actor = Actors_SpawnSpecies(play, b->species, &p, Mf_YawTo(&p, &player->actor.world.pos), TAG_BOUNTY, i);
     sSpawnCooldown[i] = SEC(45);
+    if (actor == NULL) {
+        Str_Copy(gPreloadNote, "Bounty spawn failed (the game refused it)", sizeof(gPreloadNote));
+    }
     if (actor != NULL) {
         char name[40];
         char sub[48];

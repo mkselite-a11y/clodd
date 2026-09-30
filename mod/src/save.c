@@ -42,7 +42,8 @@ void Save_Defaults(void) {
     gMf.settings.promotionChance = 60;
     gMf.settings.allowDungeons = true;
     gMf.settings.crossZoneObjects = true;
-    gMf.settings.objectBudgetKB = 160;
+    gMf.settings.objectBudgetKB = 256;
+    gMf.settings.pad[0] = 2;
     gMf.settings.hudBanners = true;
     gMf.settings.friendHurtful = true;
     gMf.settings.friendCooldownSecs = 20;
@@ -78,6 +79,23 @@ void Save_LoadForCurrentFile(void) {
     if (!ok || gMf.magic != MF_MAGIC || gMf.version != MF_SAVE_VERSION) {
         Save_Defaults();
         Save_FlushNow();
+    }
+    // Settings revision 2: events 1, 13, 18 and 29 were replaced; give them
+    // their own defaults, and raise the old small model budget.
+    if (gMf.settings.pad[0] < 2) {
+        static const u8 replaced[] = { 1, 13, 18, 29 };
+        s32 i;
+        for (i = 0; i < (s32)sizeof(replaced); i++) {
+            EventSettings* es = &gMf.events[replaced[i]];
+            es->enabled = true;
+            es->weight = 5;
+            es->p[0] = gEvents[replaced[i]].defaults[0];
+            es->p[1] = gEvents[replaced[i]].defaults[1];
+            es->p[2] = gEvents[replaced[i]].defaults[2];
+        }
+        gMf.settings.objectBudgetKB = MF_MAX(gMf.settings.objectBudgetKB, 256);
+        gMf.settings.pad[0] = 2;
+        Save_MarkDirty();
     }
     sLoadedSlot = gSaveContext.fileNum;
     gRt.loaded = true;

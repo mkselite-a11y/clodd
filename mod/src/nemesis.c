@@ -457,7 +457,11 @@ static void Manifest(PlayState* play) {
     if (!Actors_SpeciesObjectReady(play, NEM.species)) {
         if (sBlockedNotice <= 0) {
             Nemesis_Name(name, sizeof(name), NEM.nameA, NEM.nameB, -1);
-            World_Logf2(name, " prowls nearby, waiting for open ground.", NULL);
+            {
+                MfColor c = { 255, 170, 120, 255 };
+                World_Logf2(name, " is here but can't reach you in this area.", NULL);
+                Hud_Notify("Your nemesis is here but can't reach you in this area.", c);
+            }
             sBlockedNotice = SEC(120);
         }
         sManifestCooldown = SEC(30);
@@ -470,6 +474,7 @@ static void Manifest(PlayState* play) {
     }
     actor = Actors_SpawnSpecies(play, NEM.species, &p, Mf_YawTo(&p, &player->actor.world.pos), TAG_NEMESIS, 0);
     if (actor == NULL) {
+        Str_Copy(gPreloadNote, "Nemesis spawn failed (the game refused it)", sizeof(gPreloadNote));
         sManifestCooldown = SEC(20);
         return;
     }

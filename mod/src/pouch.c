@@ -25,7 +25,7 @@ const PouchItemDef gPouchItems[NUM_POUCH_ITEMS] = {
     { "Deku Bundle",        "Refills Deku sticks and nuts you already carry.",        5, 3, PC_UTILITY },
     { "Curse Ward",         "Suppresses this cycle's curse until the next dawn.",     35, 2, PC_META },
     { "Mark Magnet",        "Your next 3 Moon Mark payouts are +50%.",                15, 3, PC_META },
-    { "Chronicle Spyglass", "Reveals nemesis and bounty locations this cycle.",       4, 3, PC_META },
+    { "Moon Spyglass",      "Reveals where your nemesis is, all cycle long.",       4, 3, PC_META },
     { "Stasis Orb",         "6s: every enemy nearby is frozen in place.",             22, 3, PC_SURVIVAL },
     { "Riposte Charm",      "60s: enemies that hit you are hurt in return.",          16, 3, PC_HUNT },
     { "Event Tempter",      "Starts a random event now, +50% reward.",                5, 5, PC_META },
@@ -218,7 +218,7 @@ static s32 ApplyItem(PlayState* play, s32 item) {
             return true;
         case PI_CHRONICLE_SPYGLASS:
             gMf.spyglassCycle = gSaveContext.save.saveInfo.playerData.threeDayResetCount + 1;
-            World_Log("Through the spyglass, every hunter in Termina is revealed.");
+            World_Log("Through the spyglass, your nemesis is revealed.");
             return true;
         case PI_STASIS_ORB:
             gBuffTimers[item] = SEC(6);

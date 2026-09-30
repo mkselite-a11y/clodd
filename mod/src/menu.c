@@ -68,7 +68,7 @@ static void Flash(const char* msg) {
 
 static const char* sMainItems[] = {
     "Global Events", "This Cycle's Curse", "Your Nemesis", "Bounty Board", "Moon Pouch Shop",
-    "Chronicle of Termina", "Friends", "Settings", "Stats", "Debug", "Close",
+    "Friends", "Settings", "Stats", "Debug", "Close",
 };
 
 typedef enum {
@@ -90,7 +90,7 @@ static s32 MainCount(void) {
 
 static s32 MainItemAt(s32 row) {
     // Skip "Debug" when hidden.
-    if (!gRt.debugMenu && row >= 9) {
+    if (!gRt.debugMenu && row >= 8) {
         return row + 1;
     }
     return row;
@@ -104,7 +104,6 @@ static s32 RowCount(void) {
         case PG_CURSE: return NUM_CURSES;
         case PG_BOUNTY: return MAX_BOUNTIES;
         case PG_SHOP: return NUM_POUCH_ITEMS;
-        case PG_CHRONICLE: return MF_MAX(1, gMf.logCount);
         case PG_SETTINGS: return SET_COUNT;
         case PG_DEBUG: return ARRAY_LEN(sDebugItems);
         default: return 1;
@@ -249,7 +248,7 @@ static void DoDebug(PlayState* play, s32 row) {
 static void Activate(PlayState* play, s32 row) {
     switch (sPage) {
         case PG_MAIN: {
-            static const s32 targets[] = { PG_EVENTS, PG_CURSE, PG_NEMESIS, PG_BOUNTY, PG_SHOP, PG_CHRONICLE,
+            static const s32 targets[] = { PG_EVENTS, PG_CURSE, PG_NEMESIS, PG_BOUNTY, PG_SHOP,
                                            PG_FRIENDS, PG_SETTINGS, PG_STATS, PG_DEBUG, -1 };
             s32 t = targets[MainItemAt(row)];
             if (t < 0) {
@@ -712,29 +711,6 @@ static void DrawShop(void) {
     Footer(gPouchItems[sel].desc, "A: buy   Use in play: hold L, D-pad/C to pick, Down to use");
 }
 
-static void DrawChronicle(void) {
-    s32 i;
-    Header("CHRONICLE OF TERMINA");
-    if (gMf.logCount == 0) {
-        Draw2D_Text(20, LIST_Y, cDim, "Nothing has happened... yet.");
-    }
-    for (i = 0; i < ROWS_VISIBLE; i++) {
-        s32 idx = sScroll[PG_CHRONICLE] + i;
-        s32 slot;
-        char line[40];
-        if (idx >= gMf.logCount) {
-            break;
-        }
-        slot = (gMf.logHead - 1 - idx + LOG_LINES * 2) % LOG_LINES;
-        Str_Copy(line, gMf.log[slot], 37);
-        Row(i, sCursor[PG_CHRONICLE] == idx, (idx == 0) ? cGold : cText, line, NULL);
-    }
-    {
-        s32 slot = (gMf.logHead - 1 - sCursor[PG_CHRONICLE] + LOG_LINES * 2) % LOG_LINES;
-        Footer(gMf.logCount > 0 ? gMf.log[slot] : "", "Newest first");
-    }
-}
-
 static void DrawFriends(void) {
     char buf[64];
     s32 st = Friends_Status();
@@ -806,7 +782,8 @@ static void DrawDebug(void) {
         }
         Row(i, sCursor[PG_DEBUG] == idx, idx == 13 ? cRed : cText, sDebugItems[idx], NULL);
     }
-    Footer("Testing tools. Individual events can be", "force-triggered from Global Events.");
+    Footer(gPreloadNote[0] ? gPreloadNote : "No extra enemy models loaded here.",
+           "Events: force-trigger from Global Events.");
 }
 
 void Menu_Draw(PlayState* play) {
@@ -822,7 +799,6 @@ void Menu_Draw(PlayState* play) {
         case PG_NEMESIS: DrawNemesis(); break;
         case PG_BOUNTY: DrawBounty(); break;
         case PG_SHOP: DrawShop(); break;
-        case PG_CHRONICLE: DrawChronicle(); break;
         case PG_FRIENDS: DrawFriends(); break;
         case PG_SETTINGS: DrawSettings(); break;
         case PG_STATS: DrawStats(); break;

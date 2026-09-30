@@ -253,3 +253,37 @@ void Draw3D_Pillar(Vec3f* pos, f32 radius, f32 height, MfColor c) {
     gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
     CLOSE_DISPS(gfxCtx);
 }
+
+// Marks a world position on screen with a label, or with an arrow at the
+// screen edge when it's off-screen or behind the camera.
+void Draw2D_WorldMarker(PlayState* play, Vec3f* pos, MfColor c, const char* label) {
+    Camera* cam = GET_ACTIVE_CAM(play);
+    MfColor bg = { 0, 0, 0, 150 };
+    Vec3f proj;
+    f32 invW;
+    s16 rel;
+
+    Actor_GetProjectedPos(play, pos, &proj, &invW);
+    if (proj.z > 1.0f) {
+        s32 x = (s32)(SCREEN_WIDTH / 2 + proj.x * invW * (SCREEN_WIDTH / 2));
+        s32 y = (s32)(SCREEN_HEIGHT / 2 - proj.y * invW * (SCREEN_HEIGHT / 2));
+        if (x >= 12 && x <= SCREEN_WIDTH - 12) {
+            s32 w = Str_Len(label) * 8 + 6;
+            y = MF_CLAMP(y, 40, SCREEN_HEIGHT - 30);
+            Draw2D_Rect(x - w / 2, y - 6, w, 12, bg);
+            Draw2D_Text(x - w / 2 + 3, y - 4, c, label);
+            return;
+        }
+    }
+    rel = Math_Vec3f_Yaw(&cam->eye, pos) - Camera_GetCamDirYaw(cam);
+    if (ABS(rel) > 0x6000) {
+        Draw2D_Rect(SCREEN_WIDTH / 2 - 40, 206, 80, 12, bg);
+        Draw2D_TextCentered(208, c, "v behind v");
+    } else if (rel > 0) {
+        Draw2D_Rect(4, 112, 22, 12, bg);
+        Draw2D_Text(7, 114, c, "<<");
+    } else {
+        Draw2D_Rect(SCREEN_WIDTH - 26, 112, 22, 12, bg);
+        Draw2D_Text(SCREEN_WIDTH - 23, 114, c, ">>");
+    }
+}

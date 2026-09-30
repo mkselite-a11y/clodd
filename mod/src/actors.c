@@ -138,14 +138,34 @@ static s32 ObjectSize(s16 id) {
     return (s32)(gObjectTable[id].vromEnd - gObjectTable[id].vromStart);
 }
 
-static void TryPreload(PlayState* play, s16 objectId) {
+char gPreloadNote[64];
+
+static void PreloadNote(const char* what, s16 objectId, s32 freeKB) {
+    s32 i;
+    const char* name = "?";
+    for (i = 0; i < gSpeciesCount; i++) {
+        if (gSpecies[i].objectId == objectId) {
+            name = gSpecies[i].name;
+            break;
+        }
+    }
+    gPreloadNote[0] = '\0';
+    Str_Cat(gPreloadNote, name, sizeof(gPreloadNote));
+    Str_Cat(gPreloadNote, what, sizeof(gPreloadNote));
+    Str_CatInt(gPreloadNote, freeKB, sizeof(gPreloadNote));
+    Str_Cat(gPreloadNote, "KB free", sizeof(gPreloadNote));
+}
+
+// maxKB: largest model we're willing to add for this purpose.
+static void TryPreload(PlayState* play, s16 objectId, s32 maxKB) {
     ObjectContext* ctx = &play->objectCtx;
     s32 size;
     s32 i;
+    s32 freeKB;
     uintptr_t next;
 
     if (objectId <= 0 || Object_GetSlot(ctx, objectId) > OBJECT_SLOT_NONE) {
-        return;
+        return; // already part of this area
     }
     for (i = 0; i < sPreloadedCount; i++) {
         if (sPreloaded[i] == objectId) {
@@ -156,12 +176,16 @@ static void TryPreload(PlayState* play, s16 objectId) {
         return;
     }
     size = ObjectSize(objectId);
-    if (size <= 0 || size > gMf.settings.objectBudgetKB * 1024) {
+    next = (uintptr_t)ctx->slots[ctx->numEntries].segment;
+    freeKB = (next == 0) ? 0 : (s32)(((uintptr_t)ctx->spaceEnd - next) / 1024);
+    if (size <= 0 || size > maxKB * 1024) {
+        PreloadNote(" too big to add, ", objectId, freeKB);
         return;
     }
-    // Leave generous room for the scene's own room objects.
-    next = (uintptr_t)ctx->slots[ctx->numEntries].segment;
-    if (next == 0 || (uintptr_t)ctx->spaceEnd - next < (uintptr_t)(size + 700 * 1024)) {
+    // Keep room for the area's own models. If a room still needs more, the
+    // object-list hook below drops our extras before it loads.
+    if (next == 0 || freeKB * 1024 < size + 320 * 1024) {
+        PreloadNote(" skipped, only ", objectId, freeKB);
         return;
     }
     if (sPreloadedCount == 0) {
@@ -169,11 +193,13 @@ static void TryPreload(PlayState* play, s16 objectId) {
     }
     Object_SpawnPersistent(ctx, objectId);
     sPreloaded[sPreloadedCount++] = objectId;
+    PreloadNote(" model loaded, ", objectId, freeKB - size / 1024);
 }
 
 void Actors_PreloadForScene(PlayState* play) {
     s32 zone = World_ZoneForScene(play->sceneId);
     s32 i;
+    s32 pass;
 
     sPreloadedCount = 0;
     if (!gMf.settings.crossZoneObjects || zone == ZONE_NONE) {
@@ -182,21 +208,29 @@ void Actors_PreloadForScene(PlayState* play) {
     // Nemesis first: it is here, or one step away and likely to arrive.
     if (gMf.settings.nemesisEnabled && gMf.nemesis.state == NEM_HUNTING &&
         World_Distance(gMf.nemesis.zone, zone) <= 1) {
-        TryPreload(play, gSpecies[gMf.nemesis.species].objectId);
+        TryPreload(play, gSpecies[gMf.nemesis.species].objectId, 400);
     }
+    // Claimed bounty targets here, then ones next door that may wander in.
     if (gMf.settings.bountiesEnabled) {
-        for (i = 0; i < MAX_BOUNTIES; i++) {
-            BountyRec* b = &gMf.bounties[i];
-            if (b->active && b->claimed && b->zone == zone) {
-                TryPreload(play, gSpecies[b->species].objectId);
+        for (pass = 0; pass < 2; pass++) {
+            for (i = 0; i < MAX_BOUNTIES; i++) {
+                BountyRec* b = &gMf.bounties[i];
+                s32 d;
+                if (!b->active || !b->claimed) {
+                    continue;
+                }
+                d = World_Distance(b->zone, zone);
+                if (d == pass) {
+                    TryPreload(play, gSpecies[b->species].objectId, 400);
+                }
             }
         }
     }
-    // One cheap roaming monster for the Ambush event, so it can happen in areas
+    // One roaming monster for the Ambush event, so it can happen in areas
     // that have no enemies of their own. Harder monsters in wilder zones.
     if (gMf.settings.eventsEnabled && gMf.events[20].enabled) {
         s32 species = Roster_RandomRoaming(MF_CLAMP(2 + gZones[zone].danger, 2, 6));
-        TryPreload(play, gSpecies[species].objectId);
+        TryPreload(play, gSpecies[species].objectId, gMf.settings.objectBudgetKB);
     }
 }
 
@@ -225,6 +259,7 @@ RECOMP_HOOK("Scene_CommandObjectList") void Mf_BeforeObjectList(PlayState* play,
     }
     ctx->numPersistentEntries = sPreloadStart;
     sPreloadedCount = 0;
+    Str_Copy(gPreloadNote, "Extra models dropped: a room needed the space", sizeof(gPreloadNote));
     recomp_printf("[moonfall] dropped preloaded objects to fit room objects\n");
 }
 

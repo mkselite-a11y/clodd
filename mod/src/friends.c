@@ -210,16 +210,6 @@ static void BuildState(PlayState* play) {
     }
     J("]");
 
-    JKey("log"); J("[");
-    for (i = 0; i < MF_MIN(8, gMf.logCount); i++) {
-        s32 slot = (gMf.logHead - 1 - i + LOG_LINES * 2) % LOG_LINES;
-        if (i > 0) {
-            J(",");
-        }
-        JStr(gMf.log[slot]);
-    }
-    J("]");
-
     JKey("stats"); J("{");
     JKey("survived"); JInt(gMf.eventsSurvived);
     JKey("failed"); JInt(gMf.eventsFailed);
