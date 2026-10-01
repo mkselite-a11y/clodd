@@ -1596,6 +1596,195 @@ static s32 Link_Run(PlayState* play, char* line) {
     return true;
 }
 
+// --- Archipelago room (typed in by the player, for the friends' heatmap) ---------------
+
+static char sApAddr[80] = "";
+static char sApSlot[40] = "";
+static s32 sApLoaded = false;
+static s32 sApWanted = false;
+static RecompuiContext sApCtx;
+static RecompuiResource sApAddrIn;
+static RecompuiResource sApSlotIn;
+static s32 sApMade = false;
+static volatile s32 sApOpen = false;
+static volatile s32 sApClickSave = false;
+static volatile s32 sApClickClose = false;
+
+static void Ap_Load(void) {
+    char buf[124];
+    s32 len = ger_fetch("ap_room", buf, sizeof(buf));
+    s32 i = 0;
+    s32 k = 0;
+
+    sApLoaded = true;
+    if (len <= 0) {
+        return;
+    }
+    while ((i < len) && (buf[i] != '|') && (k < (s32)sizeof(sApAddr) - 1)) {
+        sApAddr[k++] = buf[i++];
+    }
+    sApAddr[k] = '\0';
+    k = 0;
+    if (buf[i] == '|') {
+        i++;
+    }
+    while ((i < len) && (k < (s32)sizeof(sApSlot) - 1)) {
+        sApSlot[k++] = buf[i++];
+    }
+    sApSlot[k] = '\0';
+}
+
+static const char* Link_ApValue(char* out, s32 maxLen, u8* r, u8* g, u8* b) {
+    if (!sApLoaded) {
+        Ap_Load();
+    }
+    if (sApSlot[0] == '\0') {
+        Ev_Append(out, 0, "Not set", maxLen);
+        *r = *g = *b = 150;
+    } else {
+        Ev_Append(out, 0, sApSlot, maxLen);
+        *r = 120;
+        *g = 220;
+        *b = 255;
+    }
+    return out;
+}
+
+static void Link_ApOpen(void) {
+    sApWanted = true;
+}
+
+static void ApUi_OnSave(RecompuiResource res, const RecompuiEventData* e, void* user) {
+    if (e->type == UI_EVENT_CLICK) {
+        sApClickSave = true;
+    }
+}
+
+static void ApUi_OnClose(RecompuiResource res, const RecompuiEventData* e, void* user) {
+    if (e->type == UI_EVENT_CLICK) {
+        sApClickClose = true;
+    }
+}
+
+static void ApUi_Make(void) {
+    static const RecompuiColor sBg = { 12, 10, 28, 235 };
+    static const RecompuiColor sFg = { 230, 225, 255, 255 };
+    RecompuiResource root;
+    RecompuiResource panel;
+    RecompuiResource label;
+    RecompuiResource save;
+    RecompuiResource close;
+
+    sApCtx = recompui_create_context();
+    recompui_open_context(sApCtx);
+    root = recompui_context_root(sApCtx);
+    panel = recompui_create_element(sApCtx, root);
+    recompui_set_position(panel, POSITION_ABSOLUTE);
+    recompui_set_left(panel, 20.0f, UNIT_PERCENT);
+    recompui_set_top(panel, 25.0f, UNIT_PERCENT);
+    recompui_set_width(panel, 60.0f, UNIT_PERCENT);
+    recompui_set_padding(panel, 24.0f, UNIT_DP);
+    recompui_set_border_radius(panel, 12.0f, UNIT_DP);
+    recompui_set_background_color(panel, &sBg);
+    label = recompui_create_label(sApCtx, panel,
+                                  "Your Archipelago room, for your friends' spoiler heatmap. Server address and port "
+                                  "(like archipelago.gg:38281):",
+                                  LABELSTYLE_NORMAL);
+    recompui_set_color(label, &sFg);
+    sApAddrIn = recompui_create_textinput(sApCtx, panel);
+    recompui_set_width(sApAddrIn, 100.0f, UNIT_PERCENT);
+    label = recompui_create_label(sApCtx, panel, "Your slot name:", LABELSTYLE_NORMAL);
+    recompui_set_color(label, &sFg);
+    sApSlotIn = recompui_create_textinput(sApCtx, panel);
+    recompui_set_width(sApSlotIn, 100.0f, UNIT_PERCENT);
+    save = recompui_create_button(sApCtx, panel, "Save", BUTTONSTYLE_PRIMARY);
+    close = recompui_create_button(sApCtx, panel, "Cancel", BUTTONSTYLE_SECONDARY);
+    recompui_register_callback(save, ApUi_OnSave, NULL);
+    recompui_register_callback(close, ApUi_OnClose, NULL);
+    recompui_close_context(sApCtx);
+    sApMade = true;
+}
+
+static void ApUi_Close(PlayState* play) {
+    recompui_hide_context(sApCtx);
+    sApOpen = false;
+    Player_SetCsAction(play, NULL, PLAYER_CSACTION_END);
+}
+
+// Every frame: opens the window once the menu has closed, and saves what was typed.
+static void ApUi_Update(PlayState* play) {
+    if (!sApLoaded) {
+        Ap_Load();
+    }
+    if (sApWanted && !gMenuOpen) {
+        sApWanted = false;
+        if (!sApMade) {
+            ApUi_Make();
+        }
+        recompui_open_context(sApCtx);
+        recompui_set_input_text(sApAddrIn, sApAddr);
+        recompui_set_input_text(sApSlotIn, sApSlot);
+        recompui_close_context(sApCtx);
+        recompui_set_context_captures_input(sApCtx, 1);
+        recompui_set_context_captures_mouse(sApCtx, 1);
+        recompui_show_context(sApCtx);
+        sApOpen = true;
+        sApClickSave = sApClickClose = false;
+        Player_SetCsActionWithHaltedActors(play, NULL, PLAYER_CSACTION_WAIT);
+    }
+    if (!sApOpen) {
+        return;
+    }
+    if (sApClickSave) {
+        char* addr;
+        char* slot;
+        char both[124];
+        s32 n;
+        s32 k;
+        s32 j = 0;
+
+        sApClickSave = false;
+        recompui_open_context(sApCtx);
+        addr = recompui_get_input_text(sApAddrIn);
+        slot = recompui_get_input_text(sApSlotIn);
+        recompui_close_context(sApCtx);
+        // Keep only what can go in a status line (no '|', no line breaks).
+        for (k = 0; (addr != NULL) && (addr[k] != '\0') && (j < (s32)sizeof(sApAddr) - 1); k++) {
+            if ((addr[k] > ' ') && (addr[k] != '|') && (addr[k] < 127)) {
+                sApAddr[j++] = addr[k];
+            }
+        }
+        sApAddr[j] = '\0';
+        j = 0;
+        for (k = 0; (slot != NULL) && (slot[k] != '\0') && (j < (s32)sizeof(sApSlot) - 1); k++) {
+            if ((slot[k] >= ' ') && (slot[k] != '|') && (slot[k] < 127)) {
+                sApSlot[j++] = slot[k];
+            }
+        }
+        sApSlot[j] = '\0';
+        if (addr != NULL) {
+            recomp_free(addr);
+        }
+        if (slot != NULL) {
+            recomp_free(slot);
+        }
+        n = Ev_Append(both, 0, sApAddr, sizeof(both));
+        n = Ev_Append(both, n, "|", sizeof(both));
+        Ev_Append(both, n, sApSlot, sizeof(both));
+        ger_store("ap_room", both);
+        Menu_Notify((sApSlot[0] != '\0') ? "Archipelago room saved for your friends." : "Archipelago room cleared.", NOTE_FRIEND);
+        ApUi_Close(play);
+        return;
+    }
+    if (CHECK_BTN_ANY(play->state.input[0].press.button, BTN_B | BTN_START)) {
+        sApClickClose = true;
+    }
+    if (sApClickClose) {
+        sApClickClose = false;
+        ApUi_Close(play);
+    }
+}
+
 // --- Status for the panel ----------------------------------------------------
 
 static s32 Link_Line(s32 n, const char* key, const char* value) {
@@ -1623,7 +1812,7 @@ static const char* Link_HoldReason(PlayState* play, s32 playing) {
     if (sQuizHolding) {
         return "Pop Quiz in progress";
     }
-    if (!playing || gMenuOpen || sSaveUiOpen) {
+    if (!playing || gMenuOpen || sSaveUiOpen || sApOpen) {
         return "Paused or in a menu";
     }
     return "";
@@ -1732,6 +1921,8 @@ static s32 Link_Radar(PlayState* play, s32 n) {
         n = Link_Line(n, "evplace", big);
     }
     n = Link_LineNum(n, "steer", Steer_Kind());
+    n = Link_Line(n, "ap", sApAddr);
+    n = Link_Line(n, "apslot", sApSlot);
 
     // Surprises still waiting: area:kind:from (never where exactly).
     t = 0;
@@ -2042,6 +2233,7 @@ static void Link_Update(PlayState* play, s32 playing) {
     }
     Prank_SoundUpdate();
     Beam_Update(play);
+    ApUi_Update(play);
     if ((sFakeTimer > 0) && playing && (--sFakeTimer == 0)) {
         Menu_ShowToast("...or not.");
     }

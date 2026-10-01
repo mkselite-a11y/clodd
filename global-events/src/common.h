@@ -403,7 +403,8 @@ typedef enum {
     // V3 Friend Link: one row per friend (Friends tab)
     ID_LNK_FR_FIRST,
     ID_LNK_FR_LAST = ID_LNK_FR_FIRST + 11,
-    ID_V2_LAST = ID_LNK_FR_LAST,
+    ID_LNK_APROOM, // V3.1.2: type your Archipelago room for the friends' heatmap
+    ID_V2_LAST = ID_LNK_APROOM,
     ID_MAX
 } MenuEntryId;
 

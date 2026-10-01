@@ -617,7 +617,9 @@ export default {
         await db.batch([kvSet(db, "ap_address", address), kvSet(db, "ap_slot", slot)]);
         return json({ ok: true });
       }
-      return json({ address: kv.ap_address || "", slot: kv.ap_slot || "" });
+      // What the player typed in their game wins; what a friend typed is the fallback.
+      if (st.ap && st.apslot) return json({ address: st.ap, slot: st.apslot, fromGame: true });
+      return json({ address: kv.ap_address || "", slot: kv.ap_slot || "", fromGame: false });
     }
 
     // The panel: everything it shows.

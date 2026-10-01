@@ -4687,6 +4687,8 @@ static s32 Link_FriendsOnline(void);
 static const char* Link_FriendLabel(s32 row);
 static const char* Link_FriendValue(s32 row, char* out, s32 maxLen, u8* r, u8* g, u8* b);
 static void Link_FriendCycle(s32 row);
+static const char* Link_ApValue(char* out, s32 maxLen, u8* r, u8* g, u8* b);
+static void Link_ApOpen(void);
 static const char* Events_FlavorOf(s32 ev);
 
 const char* V2_Label(s32 id) {
@@ -4694,6 +4696,9 @@ const char* V2_Label(s32 id) {
 
     if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
         return Link_FriendLabel(id - ID_LNK_FR_FIRST);
+    }
+    if (id == ID_LNK_APROOM) {
+        return "Archipelago room";
     }
     if ((id >= ID_OV_BNT_FIRST) && (id < ID_OV_BNT_FIRST + 3)) {
         s32 slot = V2_TakenBounty(id - ID_OV_BNT_FIRST);
@@ -4824,6 +4829,9 @@ const char* V2_Value(s32 id, char* out, s32 maxLen, u8* r, u8* g, u8* b) {
     *r = *g = *b = 255;
     if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
         return Link_FriendValue(id - ID_LNK_FR_FIRST, out, maxLen, r, g, b);
+    }
+    if (id == ID_LNK_APROOM) {
+        return Link_ApValue(out, maxLen, r, g, b);
     }
     if ((id >= ID_OV_BNT_FIRST) && (id < ID_OV_BNT_FIRST + 3)) {
         s32 slot = V2_TakenBounty(id - ID_OV_BNT_FIRST);
@@ -5134,6 +5142,9 @@ const char* V2_Desc(s32 id) {
     if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
         return "A: Full (anything), Helpful (only nice things), Blocked (nothing, and they see the moon's wrath).";
     }
+    if (id == ID_LNK_APROOM) {
+        return "A: type your Archipelago room address and slot, for your friends' spoiler heatmap.";
+    }
     if ((id >= ID_OV_BNT_FIRST) && (id < ID_OV_BNT_FIRST + 3)) {
         s32 slot = V2_TakenBounty(id - ID_OV_BNT_FIRST);
 
@@ -5270,6 +5281,10 @@ s32 V2_RunAction(PlayState* play, s32 id) {
     if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
         Link_FriendCycle(id - ID_LNK_FR_FIRST);
         return false;
+    }
+    if (id == ID_LNK_APROOM) {
+        Link_ApOpen();
+        return true; // the menu closes so the window can take the keyboard
     }
     if (id == ID_V2_DRAFT_REROLL) {
         s32 a = sOfferA;

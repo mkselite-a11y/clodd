@@ -97,8 +97,8 @@ s32 gMenuAtBoard = false;
 // Moon Marks: money, the board, the shop and the pouch.
 static const u16 sV2Entries[] = { ID_V2_MARKS,  ID_SUB_V2_BOUNTY, ID_SUB_V2_SHOP, ID_V2_BOUNTY,  ID_V2_POUCH,
                                   ID_V2_REMOTE, ID_V2_TRACKER,    ID_V2_AUTOSAVE, ID_V2_SAVECODE };
-static const u16 sV2LinkEntries[] = { ID_V2_LINK, ID_V2_LINKSTATE };
-static u16 sV2LinkDyn[2 + 12];
+static const u16 sV2LinkEntries[] = { ID_V2_LINK, ID_V2_LINKSTATE, ID_LNK_APROOM };
+static u16 sV2LinkDyn[3 + 12];
 static u16 sV2BountyDyn[V2_BOUNTY_SLOTS + 2 + 3];
 static const u16 sV2NemEntries[] = { ID_V2_NEMROW_FIRST,     ID_V2_NEMROW_FIRST + 1, ID_V2_NEMROW_FIRST + 2,
                                      ID_V2_NEMROW_FIRST + 3, ID_V2_NEMROW_FIRST + 4, ID_V2_NEMROW_FIRST + 5,
@@ -921,7 +921,8 @@ static EntryType Entry_Type(s32 id) {
     if (id == ID_V2_NEMDIFF) {
         return ENTRY_CHOICE;
     }
-    if ((id == ID_V2_BACCEPT) || (id == ID_V2_BUPGRADE) || ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST))) {
+    if ((id == ID_V2_BACCEPT) || (id == ID_V2_BUPGRADE) || ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) ||
+        (id == ID_LNK_APROOM)) {
         return ENTRY_ACTION;
     }
     if ((id == ID_V2_MARKS) || (id == ID_V2_STREAK) || (id == ID_V2_RANK) || (id == ID_V2_LINKSTATE) || ((id >= ID_V2_CON_FIRST) && (id < ID_V2_SHOP_FIRST)) ||
