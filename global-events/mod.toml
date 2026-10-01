@@ -1,0 +1,95 @@
+# Config file for an example Majora's Mask: Recompiled mod.
+
+# Fields that end up in the mod's manifest.
+[manifest]
+
+# Unique ID of this mod. Pick something long enough that it'll never be the same as any other mod.
+# The name displayed in the mod management menu is separate from this so this doesn't need to be human readable.
+id = "global_events"
+
+# Version of this mod.
+version = "2.9.1"
+
+# The name that will show up for this mod in the mod menu. This should be human readable.
+display_name = "Global Events Mod v2"
+
+# The description that will show up when this mod is displayed in the mod menu. This should be human readable.
+description = """\
+Every few minutes, a random event hits wherever you are in Termina. 32 events: Bomb Rain, Rupoor Rain, Blood Moon, Joke Event, Moonfall, The Stalker, Nemesis, Phantom Army, Treasure Hunt, Blood Hunger, Searchlights, Terrible Fate, Red Light Green Light, Echo, Champion Duel, Infighting, Time Moves When You Move, Imposters, Carpenter Uprising, Procession of the Dead, Poltergeist, Bullet Hell, Mirage, Mirror Dance, Swarm Night, Majora Looms, Sky Leviathan, Tingle Air Raid, Cursed Tag, Pop Quiz, Low Gravity and Moonlit Prey. Each one has its own settings.
+
+Event features: a roulette spin before each event, rare combo events (two at once), a curse rolled for every three-day cycle (20 curses), optional Moon Pressure, active hours, streaks and a run report. Events stay on across saves and the Song of Time once you turn them on.
+
+2.0 adds Moon Marks and more: a Mutator Deck (draft penalty cards each dawn and dusk), a Bounty Board with contracts and Moon Marks (take bounties and trade at the rainbow Bounty Board carpenter in South Clock Town for new Moon Pouch items, event bans and more), a Nemesis that hunts you across Termina and grows with you, and a save code to keep it all between sessions.
+
+2.4 adds Friend Link: a friend can open a web panel and pick your next event, buff your Nemesis, rig your mutator drafts, post bounties on you and more (see the README). 2.9.1 adds Auto-Save for Moon progress and a live map for your friend. This mod needs GlobalEventsRemote.dll next to it (from the same release) to load.
+
+Open the menu by talking to the rainbow carpenter carrying a plank in South Clock Town, or anywhere by playing C-Up, C-Up, C-Down, C-Down on the ocarina.
+
+Use either Global Events Mod or Global Events Mod + Cheats, not both."""
+
+# A short description that will show up in this mod's entry in the mod list. This should be human readable and kept short
+# to prevent it from being cut off due to the limited space.
+short_description = "Random events across Termina, with a menu."
+
+# Authors of this mod.
+authors = [ "mkselite" ]
+
+# ID of the target recomp game.
+game_id = "mm"
+
+# Minimum version of the target recomp (e.g. Zelda 64: Recompiled) that this mod can run on.
+minimum_recomp_version = "1.2.2"
+
+# Dependency mods. Each entry is the mod's ID and then an optional minimum version of the dependency mod.
+dependencies = [
+# Example dependency:
+#    "modname:1.0.0"
+]
+
+# Optional dependency mods. This has the same format as `dependencies`, but the game will still start if dependencies in this
+# list aren't present. You can query the presence of a given dependency by using `recomp_is_dependency_met` in recomputils.h.
+# Calling a function imported from an optional dependency that isn't present will trigger an error.
+optional_dependencies = [
+
+]
+
+# Native libraries (e.g. DLLs) and the functions they export.
+native_libraries = [
+    { name = "GlobalEventsRemote", funcs = ["ger_init", "ger_state", "ger_poll", "ger_status", "ger_store", "ger_fetch"] }
+]
+
+# Inputs to the mod tool.
+[inputs]
+
+# Input elf file to generate a mod from.
+elf_path = "build/mod.elf"
+
+# Output mod filename.
+mod_filename = "CUSTOM_global_events_v2"
+
+# Reference symbol files.
+func_reference_syms_file = "Zelda64RecompSyms/mm.us.rev1.syms.toml"
+data_reference_syms_files = [ "Zelda64RecompSyms/mm.us.rev1.datasyms.toml", "Zelda64RecompSyms/mm.us.rev1.datasyms_static.toml" ]
+
+# Additional files to include in the mod.
+additional_files = [ ]
+
+[[manifest.config_options]]
+id = "circle_radius"
+name = "Carpenter Loop Size"
+description = "How far from the Clock Tower's center the carpenter walks. 0 means measure the tower automatically."
+type = "Number"
+min = 0
+max = 2000
+step = 25
+precision = 0
+percent = false
+default = 0
+
+[[manifest.config_options]]
+id = "events_on_start"
+name = "Events On At Start"
+description = "Turn Global Events on automatically every time the game starts, so you don't have to open the menu first."
+type = "Enum"
+options = [ "Off", "On" ]
+default = "Off"

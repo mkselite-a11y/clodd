@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moon's Hand</title>
+<style>
+  :root {
+    --bg: #0f0d17; --card: #1a1726; --line: #2d2840; --text: #ece8f5; --dim: #9a93ad;
+    --moon: #f3c969; --red: #ff6b6b; --green: #6bdc8b; --blue: #8fb8ff; --purple: #c49bff;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .bar1 { padding: 10px 16px; display: flex; align-items: center; gap: 12px; }
+  .bar1 h1 { font-size: 18px; margin: 0; flex: 1; cursor: default; user-select: none; -webkit-user-select: none; }
+  .bar2 { display: flex; align-items: center; gap: 12px; padding: 0 16px 10px; max-width: 1000px; margin: 0 auto; }
+  .pts { flex: 1; min-width: 0; font-size: 13px; color: var(--dim); }
+  .pts b { color: var(--text); font-size: 15px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); display: inline-block; flex: none; }
+  .dot.on { background: var(--green); }
+  .dot.wait { background: var(--moon); }
+  #tabs { display: flex; gap: 2px; padding: 0 8px; max-width: 1000px; margin: 0 auto; overflow-x: auto; scrollbar-width: none; }
+  #tabs::-webkit-scrollbar { display: none; }
+  #tabs button { flex: 1 1 auto; background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; margin: 0; padding: 9px 8px; color: var(--dim); font-size: 14px; white-space: nowrap; cursor: pointer; }
+  #tabs button:hover { background: none; color: var(--text); }
+  #tabs button.on { color: var(--moon); border-bottom-color: var(--moon); }
+  #hold { display: none; background: #3a2f12; color: var(--moon); border-top: 1px solid #5a4a1a; padding: 8px 16px; font-size: 14px; }
+  #hold.show { display: block; }
+  .strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px 0; max-width: 1000px; margin: 0 auto; }
+  .chip { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 13px; }
+  .chip b { color: var(--dim); font-weight: 500; margin-right: 5px; }
+  .chip.ev { border-color: #6a4a2a; color: var(--moon); }
+  .chip.shield { background: #1f3350; border-color: #2f4d78; color: var(--blue); }
+  .tab { max-width: 1000px; margin: 0 auto; padding: 14px 16px 24px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); align-items: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+  .card h2 { font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--moon); margin: 0 0 10px; user-select: none; -webkit-user-select: none; }
+  .wide { grid-column: 1 / -1; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 14px; }
+  .kv b { color: var(--dim); font-weight: 500; }
+  .kv span { overflow-wrap: anywhere; }
+  .meter { height: 8px; background: #2a2540; border-radius: 6px; overflow: hidden; margin: 0 0 4px; }
+  .meter > div { height: 100%; background: linear-gradient(90deg, #a06bff, var(--moon)); width: 0; transition: width .4s; }
+  select, input[type=text], input[type=password] { width: 100%; background: #120f1c; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px; font: inherit; margin: 4px 0; min-width: 0; }
+  button { background: #2c2545; color: var(--text); border: 1px solid #463b6b; border-radius: 8px; padding: 9px 12px; font: inherit; cursor: pointer; margin: 4px 4px 4px 0; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+  button:hover:not(:disabled) { background: #3a3060; }
+  button:disabled, button.off { opacity: .45; cursor: not-allowed; }
+  button.off:hover { background: #2c2545; }
+  button .cost { color: var(--moon); font-size: 12px; margin-left: 4px; }
+  button.surprise { flex: none; margin: 0; font-weight: 600; padding: 10px 14px; background: linear-gradient(90deg, #3a2a6a, #5a3a7a); white-space: nowrap; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row > select, .row > input { flex: 1; min-width: 110px; }
+  .row > button { margin: 4px 0; }
+  .desc { color: var(--dim); font-size: 13px; min-height: 18px; margin: 2px 0 6px; }
+  .note { color: var(--moon); font-size: 13px; margin: 0 0 8px; }
+  .big-line { font-size: 16px; margin: 0 0 4px; }
+  .traits { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px; margin: 6px 0; font-size: 13px; }
+  .traits label { display: flex; gap: 6px; align-items: center; user-select: none; -webkit-user-select: none; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #2a2540; margin: 2px 4px 2px 0; font-size: 13px; }
+  .sub { color: var(--dim); font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+  .log { font-size: 13px; color: var(--dim); max-height: 320px; overflow: auto; }
+  .log div { padding: 3px 0; border-bottom: 1px solid #221e31; }
+  .log .good { color: var(--green); }
+  .log .bad { color: var(--red); }
+  #map svg { width: 100%; max-width: 560px; height: auto; display: block; margin: 0 auto; }
+  #map .edge { stroke: #3a3352; stroke-width: 2; }
+  #map .field { fill: #1c2420; stroke: #3f5a48; stroke-dasharray: 4 3; }
+  #map .node { fill: #231f33; stroke: #4a4166; stroke-width: 1.5; }
+  #map .node.here, #map .field.here { stroke: var(--green); stroke-width: 2.5; }
+  #map .lbl { fill: var(--dim); font-size: 10px; text-anchor: middle; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+  @media (max-width: 480px) { #map .lbl { font-size: 12px; } }
+  #map .mk { font-size: 10px; font-weight: 700; text-anchor: middle; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #2c2545; border: 1px solid #463b6b; padding: 10px 16px; border-radius: 10px; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90vw; z-index: 9; }
+  #toast.show { opacity: 1; }
+  #login { max-width: 360px; margin: 60px auto; }
+  body.power .bar1 h1 { color: var(--moon); text-shadow: 0 0 12px rgba(243, 201, 105, .8); }
+  body.power .meter > div { background: linear-gradient(90deg, var(--moon), #fff3c4, var(--moon)); }
+  #powerTag { display: none; color: var(--moon); font-size: 13px; }
+  body.power #powerTag { display: inline; }
+  .muted { color: var(--dim); }
+  .betbox { background: #231f33; border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 14px; }
+  [data-tip] { cursor: help; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  button[data-tip], label[data-tip] { cursor: pointer; }
+  #tip { position: fixed; z-index: 20; max-width: min(300px, calc(100vw - 16px)); background: #251f38; border: 1px solid #5a4a8a; border-radius: 10px; padding: 9px 11px; font-size: 13px; line-height: 1.4; box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none; opacity: 0; transition: opacity .12s; }
+  #tip.show { opacity: 1; }
+  #tip .x { color: var(--dim); margin-top: 5px; }
+  #tip .w { color: var(--red); margin-top: 5px; }
+  @media (max-width: 420px) { #tabs button { font-size: 13px; padding: 9px 5px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar1">
+    <span class="dot" id="dot"></span>
+    <h1 id="title">Moon's Hand</h1>
+    <span id="powerTag">MOON POWER</span>
+    <span class="muted" id="conn" data-tip="Green: live. Yellow: their game is paused or busy, and your moves land when they're back. Red: their game isn't sending anything.">Not connected</span>
+  </div>
+  <div class="bar2" id="bar2" hidden>
+    <div class="pts" data-tip="Chaos points and cooldowns are shared by everyone using this room key. Every move costs some and has a cooldown. They refill over time, and you all get a bonus every time they fall. If their game can't do a move, the points come back.">
+      <div class="meter"><div id="pointsBar"></div></div>
+      <b id="points">0</b> / <span id="pmax">100</span> chaos · +<span id="pmin">10</span>/min
+    </div>
+    <button class="surprise" data-act="surprise">Surprise me <span class="cost"></span></button>
+  </div>
+  <nav id="tabs" hidden>
+    <button data-tab="events" data-tip="Start events, pick their next one, change the timing and bet on how they do.">Events</button>
+    <button data-tab="combat" data-tip="Send bombs, enemies and their Nemesis after them, or post bounties.">Combat</button>
+    <button data-tab="pranks" data-tip="Mischief that doesn't hurt: shakes, blackouts, size changes, sounds and messages.">Pranks</button>
+    <button data-tab="curses" data-tip="Long-lasting twists: their Cycle Curse and mutators.">Curses</button>
+    <button data-tab="gifts" data-tip="Help them out (or tax them): hearts, Moon Marks and pouch items.">Gifts</button>
+    <button data-tab="info" data-tip="Everything about their run, plus your history.">Info</button>
+  </nav>
+  <div id="hold"></div>
+</header>
+
+<div id="login" class="card" hidden>
+  <h2>Room key</h2>
+  <p class="muted">Ask the player for the room key.</p>
+  <input type="password" id="keyInput" placeholder="Room key">
+  <input type="text" id="nameInput" maxlength="5" placeholder="Your name (optional, 5 letters)">
+  <button id="keyBtn">Enter</button>
+</div>
+
+<div id="app" hidden>
+  <div class="strip" id="strip"></div>
+
+  <!-- EVENTS -->
+  <section class="tab" data-tab="events">
+    <div class="card">
+      <h2 data-tip="What's happening with events right now. Events are timed challenges that hit them every few minutes.">Right now</h2>
+      <div class="note" data-need="1">They have events turned off.</div>
+      <div class="big-line" id="nowLine"></div>
+      <div class="desc" id="nowPicks"></div>
+      <div class="row">
+        <button data-act="empower">Empower the next one <span class="cost"></span></button>
+        <button data-act="ev_soon">Hurry the next one <span class="cost"></span></button>
+        <button data-act="ev_extend">+30 seconds <span class="cost"></span></button>
+        <button data-act="ev_end">End it <span class="cost"></span></button>
+      </div>
+      <div class="sub" data-tip="Bet chaos points on the event that's running. A right guess pays double. If the event gets stopped early, you get your stake back.">Wager</div>
+      <div id="betBox" class="betbox">No wager on.</div>
+      <div class="row" id="betRow">
+        <select id="stakeSel" style="max-width:110px"><option value="10">Bet 10</option><option value="25" selected>Bet 25</option><option value="50">Bet 50</option></select>
+        <button data-act="bet" data-a="0">They make it</button>
+        <button data-act="bet" data-a="1">They don't</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2 data-tip="Choose any event they have turned on, then start it now or make it their next one.">Pick an event</h2>
+      <select id="evSel"></select>
+      <div class="desc" id="evDesc"></div>
+      <div class="row"><span class="muted">Combo with</span><select id="comboSel"></select></div>
+      <div class="row">
+        <button data-act="ev_now">Start it now <span class="cost"></span></button>
+        <button data-act="ev_next">Make it the next one <span class="cost"></span></button>
+      </div>
+      <div class="desc" id="comboDesc">Combos only work with "Make it the next one".</div>
+    </div>
+  </section>
+
+  <!-- COMBAT -->
+  <section class="tab" data-tab="combat" hidden>
+    <div class="card">
+      <h2 data-tip="Direct attacks. They land right where they are.">Attack</h2>
+      <div class="row">
+        <button data-act="airstrike">Air strike <span class="cost"></span></button>
+        <button data-act="zap">Zap a heart <span class="cost"></span></button>
+      </div>
+      <div class="sub">Ambush</div>
+      <div class="row"><select id="ambPool"></select><select id="ambCount" style="max-width:80px"><option value="1">x1</option><option value="2">x2</option><option value="3">x3</option></select></div>
+      <button data-act="ambush">Ambush them <span class="cost"></span></button>
+    </div>
+    <div class="card">
+      <h2 data-tip="An enemy that beat them and now hunts them. It has its own name, level and traits.">Nemesis</h2>
+      <div class="note" data-need="8">They have Nemesis turned off.</div>
+      <div id="nemNone">
+        <div class="desc">No Nemesis yet. One appears when an enemy beats them, or you can make one now.</div>
+        <div class="row"><select id="nemPool"></select><button data-act="nem_make">Create <span class="cost"></span></button></div>
+      </div>
+      <div id="nemHas" hidden>
+        <div class="kv" id="nemKv"></div>
+        <div class="row">
+          <button data-act="nem_hunt">Send it to them <span class="cost"></span></button>
+          <button data-act="nem_level">Level up <span class="cost"></span></button>
+        </div>
+        <div class="sub" data-tip="It gets 1 skill point per level. Points you don't spend within 2 minutes spend themselves.">Skill points</div>
+        <div class="desc" id="nemStats"></div>
+        <div class="row">
+          <button data-act="nem_stat" data-a="0">+Speed <span class="cost"></span></button>
+          <button data-act="nem_stat" data-a="1">+Power <span class="cost"></span></button>
+          <button data-act="nem_stat" data-a="2">+Health <span class="cost"></span></button>
+          <button data-act="nem_stat" data-a="3">+Tracking <span class="cost"></span></button>
+        </div>
+        <div class="sub">Add a trait</div>
+        <div class="row"><select id="nemTrait"></select><button data-act="nem_trait">Add trait <span class="cost"></span></button></div>
+        <div class="desc" id="nemTraitDesc"></div>
+        <div class="row"><input type="text" id="nemName" maxlength="12" placeholder="New name"><button data-act="nem_name">Rename <span class="cost"></span></button></div>
+        <div class="sub">Too weak?</div>
+        <button data-act="nem_purge">Purge it <span class="cost"></span></button>
+        <div class="desc">The next Nemesis starts at its level (up to the new type's max) with new traits.</div>
+      </div>
+      <div class="desc" id="nemInherit"></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="A bounty is a tough enemy with traits. They get Moon Marks for beating it.">Bounties</h2>
+      <div class="note" data-need="4">They have bounties turned off.</div>
+      <div class="row"><select id="bPool"></select><select id="bStars" style="max-width:110px"></select></div>
+      <div class="desc"><span id="starPay"></span> Up to one trait per star (none = random). It shows up right where they are.</div>
+      <div class="traits" id="bTraits"></div>
+      <div class="row">
+        <button data-act="bounty">Post it <span class="cost"></span></button>
+        <button data-act="wanted">Post a WANTED poster <span class="cost"></span></button>
+      </div>
+      <div class="sub" data-tip="Bounties they accepted. Stars show how tough it is, and the area is where it waits.">They're hunting</div>
+      <div id="bountyList"></div>
+    </div>
+  </section>
+
+  <!-- PRANKS -->
+  <section class="tab" data-tab="pranks" hidden>
+    <div class="card">
+      <h2 data-tip="None of these hurt them.">Pranks</h2>
+      <div class="row">
+        <button data-act="shake">Shake the ground <span class="cost"></span></button>
+        <button data-act="blackout">Blackout <span class="cost"></span></button>
+        <button data-act="fakeout">Fake out <span class="cost"></span></button>
+      </div>
+      <div class="sub">Size (30 seconds, looks only)</div>
+      <div class="row">
+        <button data-act="size" data-a="1">Make them giant <span class="cost"></span></button>
+        <button data-act="size" data-a="2">Make them tiny <span class="cost"></span></button>
+      </div>
+      <div class="sub">Sound (no warning)</div>
+      <div class="row"><select id="sfxSel"></select><button data-act="sfx">Play it <span class="cost"></span></button></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="Your words, on their screen.">Message</h2>
+      <input type="text" id="msgText" maxlength="30" placeholder="Say something (30 letters)">
+      <button data-act="msg">Send message <span class="cost"></span></button>
+    </div>
+  </section>
+
+  <!-- CURSES -->
+  <section class="tab" data-tab="curses" hidden>
+    <div class="card">
+      <h2 data-tip="One rule that lasts their whole 3-day cycle.">Cycle Curse</h2>
+      <div class="note" data-need="32">They have the Cycle Curse turned off.</div>
+      <div class="big-line" id="curseNow"></div>
+      <div class="desc" id="curseNowDesc"></div>
+      <div class="sub">Change it</div>
+      <div class="row"><select id="curseSel"></select><button data-act="curse_set">Set it <span class="cost"></span></button></div>
+      <div class="desc" id="curseDesc"></div>
+      <button data-act="curse">Reroll randomly <span class="cost"></span></button>
+    </div>
+    <div class="card">
+      <h2 data-tip="Lasting penalties on their run. They draft one each dawn and dusk and can carry up to 6.">Mutators</h2>
+      <div class="note" data-need="2">They have mutators turned off.</div>
+      <div id="mutList"></div>
+      <div class="sub">Force one on them</div>
+      <select id="mutSel"></select>
+      <div class="desc" id="mutDesc"></div>
+      <button data-act="mut_add">Force it on them <span class="cost"></span></button>
+      <div class="sub" data-tip="At each dawn and dusk they pick one of two mutators. You choose which two.">Rig their next draft</div>
+      <div class="row"><select id="draftA"></select><select id="draftB"></select></div>
+      <div class="desc" id="draftDesc"></div>
+      <button data-act="draft">Rig it <span class="cost"></span></button>
+    </div>
+  </section>
+
+  <!-- GIFTS -->
+  <section class="tab" data-tab="gifts" hidden>
+    <div class="card">
+      <h2 data-tip="Nice things to keep them going.">Help them</h2>
+      <button data-act="heal">Heal 2 hearts <span class="cost"></span></button>
+      <div class="sub">Moon Pouch item</div>
+      <div class="note" data-need="16">They have the Moon Pouch turned off.</div>
+      <div class="row"><select id="pouchSel"></select><button data-act="pouch">Gift it <span class="cost"></span></button></div>
+      <div class="desc" id="pouchDesc"></div>
+      <div class="desc" id="pouchNow"></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="Their shop money. They earn it from bounties, contracts and Nemeses and spend it in the Moon Shop.">Moon Marks</h2>
+      <div class="big-line" id="marksNow"></div>
+      <div class="row">
+        <button data-act="gift">Gift 10 Marks <span class="cost"></span></button>
+        <button data-act="tax">Tax 15 Marks <span class="cost"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- INFO -->
+  <section class="tab" data-tab="info" hidden>
+    <div class="card wide">
+      <h2 data-tip="Where they are in Termina right now, plus their Nemesis and the bounties they've taken. Areas without a marker are empty. Inside buildings and dungeons they show at the last area they were in.">Map</h2>
+      <div id="map"></div>
+      <div class="legend"><span><i style="background:var(--green)"></i>Link (L)</span><span><i style="background:var(--red)"></i>Nemesis (N)</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#5fe0e0"></i>Your bounty</span><span><i style="background:#ff8a4c"></i>WANTED</span><span><i style="background:var(--purple)"></i>Rare</span></div>
+      <div class="desc" id="mapNote"></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="Live info from their game. Updates every few seconds.">Their game</h2>
+      <div class="kv" id="statusKv"><b>Status</b><span>Waiting for the game...</span></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="Shown in their game with everything you send, so they know who did it when several friends share a room.">Your name</h2>
+      <div class="row"><input type="text" id="nameEdit" maxlength="5" placeholder="5 letters"><button id="nameSave">Save</button></div>
+      <div class="desc">Shown in their game on your moves' messages, and in the history. Friends sharing this room key share chaos points and cooldowns.</div>
+    </div>
+    <div class="card wide">
+      <h2 data-tip="Everything everyone has done, plus wager results and refunds.">History</h2>
+      <div class="log" id="log"></div>
+      <div class="desc" id="tipHint" style="margin-top:10px">Hover over anything for details.</div>
+    </div>
+  </section>
+</div>
+<div id="toast"></div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const T = __TABLES_JS__;
+// Storage can be blocked (private windows, blocked site data): never let that break the page.
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* blocked */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } },
+};
+let key = store.get("ge_key") || "";
+let myName = store.get("ge_name") || "";
+let lastLogTop = null;
+const cleanName = (v) => String(v || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 5);
+let power = store.get("ge_power") === "1";
+let powerKey = store.get("ge_power_key") || "";
+let state = null;
+let busy = false;
+let lastDeaths = null;
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v === undefined ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function headers(extra) {
+  const h = Object.assign({ "X-Room-Key": key }, extra || {});
+  if (power) { h["X-Power"] = "1"; h["X-Power-Key"] = powerKey; }
+  return h;
+}
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast.h);
+  toast.h = setTimeout(() => t.classList.remove("show"), 3200);
+}
+
+// Secret: the Konami code, or tap the title 7 times quickly.
+async function togglePower() {
+  if (power) {
+    power = false;
+    store.del("ge_power");
+    document.body.classList.remove("power");
+    toast("The moon's power fades.");
+    return refresh();
+  }
+  let k = powerKey;
+  let r = await fetch("/api/power", { method: "POST", headers: { "X-Room-Key": key, "X-Power-Key": k } });
+  let j = await r.json();
+  if (!j.ok && j.needKey) {
+    k = prompt("Password?") || "";
+    r = await fetch("/api/power", { method: "POST", headers: { "X-Room-Key": key, "X-Power-Key": k } });
+    j = await r.json();
+  }
+  if (!j.ok) return toast("Nothing happens.");
+  power = true;
+  powerKey = k;
+  store.set("ge_power", "1");
+  store.set("ge_power_key", k);
+  document.body.classList.add("power");
+  toast("MOON POWER: no costs, no cooldowns.");
+  refresh();
+}
+(() => {
+  const code = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
+  let pos = 0;
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    pos = k === code[pos] ? pos + 1 : k === code[0] ? 1 : 0;
+    if (pos === code.length) { pos = 0; togglePower(); }
+  });
+  let taps = [];
+  $("title").addEventListener("click", () => {
+    const t = Date.now();
+    taps = taps.filter((x) => t - x < 3000).concat(t);
+    if (taps.length >= 7) { taps = []; togglePower(); }
+  });
+})();
+
+function fill(sel, items, withNone) {
+  sel.innerHTML = (withNone ? '<option value="-1">(no combo)</option>' : "") +
+    items.map((x) => `<option value="${x.id}"${x.desc ? ` title="${esc(x.desc)}"` : ""}>${esc(x.name)}${tierTag(x, sel)}</option>`).join("");
+}
+
+// "(hard)" after events and enemies, so harder picks explain their price.
+function tierTag(x, sel) {
+  if (x.tier === undefined) return "";
+  const evSel = sel.id === "evSel" || sel.id === "comboSel";
+  return " (" + (evSel ? ["mild", "medium", "hard", "brutal"] : ["easy", "medium", "hard", "brutal"])[x.tier] + ")";
+}
+
+function setup() {
+  fill($("evSel"), T.events);
+  fill($("comboSel"), T.events.filter((e) => e.second), true);
+  fill($("nemPool"), T.pools); fill($("bPool"), T.pools); fill($("ambPool"), T.pools);
+  fill($("nemTrait"), T.traits);
+  fill($("mutSel"), T.muts); fill($("draftA"), T.muts); fill($("draftB"), T.muts);
+  fill($("sfxSel"), T.sounds); fill($("pouchSel"), T.pouch); fill($("curseSel"), T.curses);
+  $("draftB").selectedIndex = 1;
+  $("bStars").innerHTML = [1, 2, 3, 4, 5].map((s) => `<option value="${s}">${"*".repeat(s)}</option>`).join("");
+  $("bStars").value = "3";
+  $("bTraits").innerHTML = T.traits.map((t) => `<label data-tip="${esc(t.desc)}"><input type="checkbox" value="${t.id}">${esc(t.name)}</label>`).join("");
+  // No more trait boxes than stars.
+  const limitTraits = () => {
+    const max = parseInt($("bStars").value, 10);
+    const boxes = [...document.querySelectorAll("#bTraits input")];
+    const on = boxes.filter((b) => b.checked).length;
+    boxes.forEach((b) => (b.disabled = !b.checked && on >= max));
+  };
+  $("bTraits").addEventListener("change", limitTraits);
+  $("bStars").addEventListener("change", () => {
+    const max = parseInt($("bStars").value, 10);
+    [...document.querySelectorAll("#bTraits input:checked")].slice(max).forEach((b) => (b.checked = false));
+    limitTraits();
+  });
+  const showDesc = () => {
+    const e = T.events.find((x) => x.id == $("evSel").value);
+    $("evDesc").textContent = e ? e.desc + (e.primary ? "" : " (can't lead a combo)") : "";
+    $("comboSel").disabled = !!e && !e.primary;
+    if (e && !e.primary) $("comboSel").value = "-1";
+    $("mutDesc").textContent = descOf(T.muts, $("mutSel").value);
+    $("nemTraitDesc").textContent = T.traits[$("nemTrait").value].desc;
+    $("pouchDesc").textContent = T.pouch[$("pouchSel").value].desc;
+    $("curseDesc").textContent = descOf(T.curses, $("curseSel").value);
+    $("draftDesc").textContent = `A: ${descOf(T.muts, $("draftA").value)} B: ${descOf(T.muts, $("draftB").value)}`;
+    const bTier = ((T.pools.find((p) => p.id == $("bPool").value)) || { tier: 1 }).tier;
+    $("starPay").textContent = `Pays them ${Math.floor((10 * parseInt($("bStars").value, 10) + 5) * [100, 115, 135, 165][bTier] / 100)} Moon Marks (+50% for the bonus goal, plus their rank bonus).`;
+    const c = T.events.find((x) => x.id == $("comboSel").value);
+    $("comboDesc").textContent = c ? "Combo: " + c.desc + " Combos only work with \"Make it the next one\"." : "Combos only work with \"Make it the next one\".";
+  };
+  ["evSel", "comboSel", "mutSel", "draftA", "draftB", "bStars", "bPool", "nemTrait", "pouchSel", "curseSel"].forEach((id) => $(id).addEventListener("change", showDesc));
+  // Prices depend on what's picked.
+  ["evSel", "comboSel", "ambPool", "ambCount", "nemPool", "bPool", "stakeSel", "nemTrait", "mutSel", "curseSel", "draftA", "draftB"]
+    .forEach((id) => $(id).addEventListener("change", () => render()));
+  showDesc();
+  document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => {
+    if (b.classList.contains("off")) return toast(blockReason(b.dataset.act, b.dataset.a) || "Not right now.");
+    act(b.dataset.act, b.dataset.a);
+  }));
+  setupTips();
+  setupTabs();
+  $("nameInput").value = myName;
+  $("nameEdit").value = myName;
+  $("nameSave").addEventListener("click", () => {
+    myName = cleanName($("nameEdit").value);
+    $("nameEdit").value = myName;
+    store.set("ge_name", myName);
+    toast(myName ? "They'll see you as " + myName + "." : "Name cleared.");
+  });
+  $("keyBtn").addEventListener("click", () => {
+    const typed = $("nameInput").value.trim();
+    myName = cleanName(typed);
+    $("nameEdit").value = myName;
+    store.set("ge_name", myName);
+    if (typed && typed !== myName) setTimeout(() => toast(myName ? "They'll see you as " + myName + "." : "Names can only use letters and numbers."), 400); key = $("keyInput").value.trim(); store.set("ge_key", key); start(); });
+  $("keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("keyBtn").click(); });
+  $("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("keyBtn").click(); });
+  $("nameEdit").addEventListener("keydown", (e) => { if (e.key === "Enter") $("nameSave").click(); });
+  $("msgText").addEventListener("keydown", (e) => { if (e.key === "Enter") document.querySelector('[data-act="msg"]').click(); });
+  $("nemName").addEventListener("keydown", (e) => { if (e.key === "Enter") document.querySelector('[data-act="nem_name"]').click(); });
+  // Only these characters can show in their game: drop the rest as you type.
+  ["msgText", "nemName"].forEach((id) => $(id).addEventListener("input", () => {
+    const el = $(id);
+    const ok = el.value.replace(/[^A-Za-z0-9 .,!?'():;+\-]/g, "");
+    if (ok !== el.value) { el.value = ok; toast("Letters, numbers and . , ! ? ' ( ) : ; + - only."); }
+  }));
+}
+
+function args(type, dataA) {
+  const v = (id) => parseInt($(id).value, 10);
+  switch (type) {
+    case "size": return { a: parseInt(dataA, 10) };
+    case "nem_stat": return { a: parseInt(dataA, 10) };
+    case "bet": return { a: parseInt(dataA, 10), b: v("stakeSel") };
+    case "sfx": return { a: v("sfxSel") };
+    case "pouch": return { a: v("pouchSel") };
+    case "curse_set": return { a: v("curseSel") };
+    case "ev_now": return { a: v("evSel") };
+    case "ev_next": return { a: v("evSel"), b: $("comboSel").disabled ? -1 : v("comboSel") };
+    case "nem_make": return { a: v("nemPool") };
+    case "nem_trait": return { a: v("nemTrait") };
+    case "nem_name": return { text: $("nemName").value };
+    case "mut_add": return { a: v("mutSel") };
+    case "draft": return { a: v("draftA"), b: v("draftB") };
+    case "bounty": {
+      let mask = 0;
+      document.querySelectorAll("#bTraits input:checked").forEach((c) => (mask |= 1 << parseInt(c.value, 10)));
+      return { a: v("bPool"), b: v("bStars"), c: mask };
+    }
+    case "ambush": return { a: v("ambPool"), b: v("ambCount") };
+    case "msg": return { text: $("msgText").value };
+    default: return {};
+  }
+}
+
+async function act(type, dataA) {
+  if (busy) return;
+  busy = true;
+  render();
+  try {
+    const r = await fetch("/api/cmd", {
+      method: "POST",
+      headers: headers({ "content-type": "application/json" }),
+      body: JSON.stringify(Object.assign({ type, from: myName }, args(type, dataA))),
+    });
+    if (r.status === 401) { toast(await r.text()); busy = false; return logout(); }
+    const j = await r.json();
+    toast(j.msg);
+    if (j.ok && type === "msg") $("msgText").value = "";
+    if (j.ok && type === "nem_name") $("nemName").value = "";
+  } catch (e) { toast("Couldn't reach the relay."); }
+  busy = false;
+  refresh();
+}
+
+function parseStatus(text) {
+  const o = {};
+  (text || "").split("\n").forEach((l) => { const i = l.indexOf("="); if (i > 0) o[l.slice(0, i)] = l.slice(i + 1); });
+  return o;
+}
+
+// Termina, as a map of areas and the paths between them (from the game's own area list).
+function drawMap(s, hasNem) {
+  const Z = T.zones || [];
+  if (!Z.length) return;
+  const inRange = (v) => (v >= 0 && v < Z.length ? v : -1);
+  const byName = (n) => Z.findIndex((z) => z.name === n);
+  // Older game versions don't send area numbers: fall back to the area names.
+  const pz = s.pz !== undefined ? inRange(parseInt(s.pz, 10)) : (s.area ? byName(s.area) : -1);
+  const lz = s.lz !== undefined ? inRange(parseInt(s.lz, 10)) : -1;
+  const nz = !hasNem ? -1 : s.nz !== undefined ? inRange(parseInt(s.nz, 10)) : byName((s.nem || "").split("|")[3]);
+  const at = pz >= 0 ? pz : lz;
+  const marks = {}; // zone -> [{color, text, tip}]
+  const add = (z, m) => { if (z >= 0 && z < Z.length) (marks[z] = marks[z] || []).push(m); };
+  if (at >= 0) add(at, { c: "var(--green)", t: pz >= 0 ? "L" : "L?", tip: pz >= 0 ? "They're here." : "Last seen here (they're inside somewhere)." });
+  if (nz >= 0) add(nz, { c: "var(--red)", t: "N", tip: "Their Nemesis is roaming here." });
+  (s.bz || "").split(",").filter(Boolean).forEach((b) => {
+    const kind = b[0], z = parseInt(b.slice(1), 10);
+    const k = { F: ["#5fe0e0", "Your bounty waits here."], W: ["#ff8a4c", "The WANTED target waits here."], R: ["var(--purple)", "A rare bounty waits here."], B: ["var(--moon)", "A bounty they took waits here."] }[kind] || ["var(--moon)", "A bounty waits here."];
+    add(z, { c: k[0], t: "★", tip: k[1] });
+  });
+  let svg = '<svg viewBox="0 0 440 354" role="img" aria-label="Map of Termina">';
+  const drawn = new Set();
+  Z.forEach((z) => z.links.forEach((o) => {
+    const key = Math.min(z.id, o) + "-" + Math.max(z.id, o);
+    if (drawn.has(key) || !Z[o]) return;
+    drawn.add(key);
+    svg += `<line class="edge" x1="${z.x}" y1="${z.y}" x2="${Z[o].x}" y2="${Z[o].y}"/>`;
+  }));
+  // Termina Field surrounds Clock Town.
+  const field = Z[1];
+  const fieldTip = field.name + ((marks[1] || []).length ? ": " + marks[1].map((m) => m.tip).join(" ") : "");
+  svg += `<ellipse class="field${at === 1 ? " here" : ""}" cx="${field.x}" cy="${field.y}" rx="62" ry="40"${tipAttr(fieldTip)}/>`;
+  svg += `<text class="lbl" x="${field.x}" y="${field.y - 20}">${esc(field.name)}</text>`;
+  Z.forEach((z) => {
+    if (z.id === 1) return;
+    const tip = z.name + ((marks[z.id] || []).length ? ": " + marks[z.id].map((m) => m.tip).join(" ") : "");
+    svg += `<circle class="node${at === z.id ? " here" : ""}" cx="${z.x}" cy="${z.y}" r="9"${tipAttr(tip)}/>`;
+    svg += `<text class="lbl" x="${z.x}" y="${z.y + 20}">${esc(z.name)}</text>`;
+  });
+  // Markers: a short row beside a small area's dot (away from its label, which sits
+  // below it), or spread along the rim of Termina Field.
+  Object.keys(marks).forEach((zk) => {
+    const z = Z[zk], list = marks[zk], n = list.length;
+    list.forEach((m, i) => {
+      let x, y;
+      if (z.id === 1) {
+        const step = Math.min(Math.PI / 3, (2 * Math.PI) / n);
+        const ang = -Math.PI / 2 + i * step - ((n - 1) * step) / 2;
+        x = z.x + Math.cos(ang) * 62;
+        y = z.y + Math.sin(ang) * 40;
+      } else {
+        const dir = z.x > 330 ? -1 : 1;
+        x = z.x + dir * (17 + (i % 3) * 14);
+        y = z.y - Math.floor(i / 3) * 14;
+      }
+      svg += `<g${tipAttr(z.name + ": " + m.tip)}><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${m.c}"/>` +
+        `<text class="mk" x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}" fill="#0f0d17">${esc(m.t.length > 2 ? m.t.slice(0, 1) : m.t)}</text></g>`;
+    });
+  });
+  svg += "</svg>";
+  setHtml($("map"), svg);
+  const note = !s.day ? "Waiting for their game." : pz >= 0 ? "" : at >= 0 ? `They're inside somewhere; last seen in ${Z[at].name}.` : "They're inside somewhere.";
+  if ($("mapNote").textContent !== note) $("mapNote").textContent = note;
+}
+
+function setHtml(el, html) {
+  if (el._html !== html) { el.innerHTML = html; el._html = html; }
+}
+
+const tipAttr = (t) => (t ? ` data-tip="${esc(t)}"` : "");
+
+// rows: [label, value, tip for the value, raw html instead of the value]
+function kv(el, rows) {
+  setHtml(el, rows.filter((r) => r[3] || (r[1] !== undefined && r[1] !== ""))
+    .map(([k, v, vt, raw]) => `<b${tipAttr(KV_TIPS[k])}>${esc(k)}</b><span${tipAttr(vt)}>${raw || esc(v)}</span>`).join(""));
+}
+
+function tags(list, tipOf) {
+  return list.length ? list.map((x) => `<span class="tag"${tipAttr(tipOf(x))}>${esc(x)}</span>`).join("") : '<span class="muted">None</span>';
+}
+
+function fmtSecs(s) {
+  s = parseInt(s, 10);
+  if (!(s >= 0)) return "";
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+function render() {
+  const live = state && state.statusAge >= 0 && state.statusAge < 15;
+  const s = parseStatus(state ? state.status : "");
+  const evRunning = !!s.ev && s.ev !== "-";
+  const hasNem = !!s.nem && s.nem !== "-";
+  const opts = s.opts !== undefined ? parseInt(s.opts, 10) : 127;
+  const on = (bit) => (opts & bit) !== 0;
+
+  $("dot").className = "dot" + (live && s.link !== "0" ? (s.hold ? " wait" : " on") : "");
+  $("conn").textContent = !state ? "Not connected" : !live ? "Game offline" : s.link === "0" ? "Friend Link off" : s.hold ? "Waiting" : "Live";
+  $("hold").textContent = live && s.hold ? "Actions wait: " + s.hold + ". They'll land when they're back in action." : "";
+  $("hold").classList.toggle("show", !!(live && s.hold && s.link !== "0"));
+  document.body.classList.toggle("power", !!(state && state.power));
+  $("points").textContent = state ? (state.power ? "∞" : state.points) : 0;
+  $("pmax").textContent = state ? state.max : 100;
+  $("pmin").textContent = state ? state.perMin : 10;
+  $("pointsBar").style.width = state ? Math.min(100, 100 * state.points / state.max) + "%" : "0";
+
+  const when = s.day ? `Day ${s.day}, ${s.clock}${s.night === "1" ? " (night)" : ""}` : "";
+  const evLine = evRunning ? s.ev + (s.evleft ? ` (${fmtSecs(s.evleft)} left)` : "") : "";
+  const nextLine = !evRunning && s.next ? "Next event in " + fmtSecs(s.next) : "";
+  const curseDesc = descOf(T.curses, s.curseid);
+  const shields = parseInt(s.shields || "0", 10);
+
+  // Always-visible strip.
+  const chip = (label, value, tip, cls) => (value ? `<span class="chip${cls ? " " + cls : ""}"${tipAttr(tip)}>${label ? `<b>${esc(label)}</b>` : ""}${esc(value)}</span>` : "");
+  setHtml($("strip"), !live ? chip("", state ? "Their game is offline." : "Connecting...", "") :
+    chip("", s.area, KV_TIPS.Where) + chip("", when, KV_TIPS.When) + chip("Hearts", s.hp ? `${s.hp} / ${s.maxhp}` : "", KV_TIPS.Hearts) +
+    (evRunning ? chip("", evLine, KV_TIPS.Event, "ev") : chip("", nextLine || (on(1) ? "" : "Events off"), on(1) ? KV_TIPS["Next event"] : "They have events turned off.")) +
+    (shields > 0 ? chip("", `Friend Shield x${shields}`, "They bought this in the Moon Shop. It blocks your next " + (shields > 1 ? shields + " mean moves" : "mean move") + ", and the points for that move are still spent. Heal, gifts, messages and sounds get through.", "shield") : ""));
+
+  try { drawMap(s, hasNem); } catch (e) { /* a bad map never stops the rest of the page */ }
+
+  // Info tab.
+  kv($("statusKv"), [
+    ["Where", s.area], ["When", when],
+    ["Hearts", s.hp ? `${s.hp} / ${s.maxhp}` : ""],
+    ["Event", !s.day ? "" : evRunning ? evLine : "None"],
+    ["Next event", nextLine.replace("Next event in", "in")],
+    [s.foresight === "1" ? "Foreseen next" : "Friend pick", s.friendnext], ["Starting soon", s.friendnow],
+    ["Curse", s.curse, curseDesc], ["Moon Marks", s.marks], ["Hunter Rank", s.rank],
+    ["This session", s.deaths !== undefined ? `${s.survived} survived, ${s.deaths} falls` : ""],
+    ["Bounties claimed", s.claimed], ["Pouch", s.pouch], ["Last", s.last],
+    ["Friend Shield", shields > 0 ? "x" + shields : ""],
+  ]);
+
+  // Events tab.
+  $("nowLine").textContent = !s.day ? "" : evRunning ? evLine : nextLine || "No event running.";
+  $("nowPicks").textContent = [s.friendnow ? "Starting soon: " + s.friendnow : "", s.friendnext ? (s.foresight === "1" ? "Locked in by Foresight: " : "Picked for next: ") + s.friendnext : "",
+    s.empower === "1" ? "The next event is empowered." : "",
+    s.foresight === "1" && !s.friendnext ? "They used Foresight: the next event is locked in." : ""].filter(Boolean).join(" · ");
+  document.querySelector('[data-act="ev_extend"]').hidden = !evRunning;
+  document.querySelector('[data-act="ev_end"]').hidden = !evRunning;
+  document.querySelector('[data-act="ev_soon"]').hidden = evRunning;
+  if (state && state.bet) {
+    $("betBox").textContent = `${state.bet.from ? state.bet.from + " bet " : ""}${state.bet.stake} on them ${state.bet.pick === "0" ? "making it through" : "not making it through"} ${state.bet.ev}.`;
+  } else {
+    $("betBox").textContent = evRunning ? "No wager on " + s.ev + " yet." : "Wagers open when an event starts.";
+  }
+  $("betRow").hidden = !evRunning || !!(state && state.bet);
+
+  // Combat tab.
+  $("nemNone").hidden = hasNem || !on(8);
+  $("nemHas").hidden = !hasNem;
+  if (hasNem) {
+    const [name, type, lvl, zone, traits, baseLvl, maxLvl] = s.nem.split("|");
+    const tr = (traits || "").split(", ").filter(Boolean);
+    kv($("nemKv"), [["Nemesis", name], ["Type", type], ["Level", (baseLvl || lvl) + (maxLvl ? " / " + maxLvl : "") + (baseLvl && baseLvl !== lvl ? (parseInt(lvl, 10) > parseInt(baseLvl, 10) ? " (acts " + lvl + ": Emboldened)" : " (acts " + lvl + " for now)") : "")], ["Area", zone],
+      ["Traits", "", "", tags(tr, (n) => (T.traits.find((t) => t.name === n) || {}).desc)]]);
+  }
+  setHtml($("bountyList"), tags((s.bounties || "").split(";").filter(Boolean), bountyTip));
+  const ns = (s.nemstats || "0,0,0,0,0").split(",").map((x) => parseInt(x, 10) || 0);
+  $("nemStats").textContent = hasNem ? `Speed ${ns[0]} · Power ${ns[1]} · Health ${ns[2]} · Tracking ${ns[3]}` +
+    (ns[4] > 0 ? ` · ${ns[4]} to spend` : " · none to spend") : "";
+  {
+    const inh = parseInt(s.neminherit || "0", 10);
+    const pool = T.pools.find((p) => p.id == $("nemPool").value) || { name: "", tier: 1 };
+    $("nemInherit").textContent = !hasNem && inh > 0
+      ? `Purged levels waiting: ${inh}. A ${pool.name} Nemesis would start at level ${Math.min(inh, [5, 10, 15, 20][pool.tier])}.` : "";
+  }
+
+  // Curses tab.
+  $("curseNow").textContent = s.curse && s.curse !== "Off" ? "Now: " + s.curse : "";
+  $("curseNowDesc").textContent = s.curse && s.curse !== "Off" ? curseDesc : "";
+  const muts = (s.muts || "").split(",").filter(Boolean);
+  setHtml($("mutList"), `<div class="muted" style="font-size:13px">They carry ${muts.length} of 6</div>` +
+    tags(muts, (m) => (T.muts.find((x) => x.name === m) || {}).desc));
+
+  // Gifts tab.
+  $("marksNow").textContent = s.marks !== undefined ? `They have ${s.marks} Moon Marks` + (s.rank ? ` (Hunter Rank: ${s.rank})` : "") : "";
+  $("pouchNow").textContent = s.pouch ? "Their pouch: " + s.pouch : "";
+
+  // "They turned this off" notes.
+  document.querySelectorAll("[data-need]").forEach((el) => { el.hidden = !live || on(parseInt(el.dataset.need, 10)); });
+
+  // Events they turned off: greyed out, and never left selected.
+  const mask = s.enabled ? BigInt("0x" + s.enabled) : null;
+  document.querySelectorAll("#evSel option, #comboSel option").forEach((o) => {
+    const id = parseInt(o.value, 10);
+    o.disabled = mask !== null && id >= 0 && !((mask >> BigInt(id)) & 1n);
+  });
+  const picked = T.events.find((x) => x.id == $("evSel").value);
+  $("comboSel").disabled = !on(64) || (!!picked && !picked.primary);
+  ["evSel", "comboSel"].forEach((id) => {
+    const sel = $(id);
+    if (sel.selectedOptions[0] && sel.selectedOptions[0].disabled) {
+      const first = [...sel.options].find((o) => !o.disabled);
+      if (first) { sel.value = first.value; sel.dispatchEvent(new Event("change")); }
+    }
+  });
+
+  // Buttons: cost, cooldown, and whether it can do anything right now.
+  view = { s, live, evRunning, hasNem, on };
+  document.querySelectorAll("button[data-act]").forEach((b) => {
+    const type = b.dataset.act;
+    const cd = state && state.cooldowns[type];
+    const costEl = b.querySelector(".cost");
+    if (costEl) costEl.textContent = cd ? `${cd}s` : state && state.power ? "" : `${costOf(type, b.dataset.a)}`;
+    b.disabled = busy;
+    b.classList.toggle("off", !!blockReason(type, b.dataset.a));
+  });
+  setHtml($("log"), state ? state.log.map((l) => {
+    const body = l.label.replace(/^[A-Za-z0-9]{1,5}: /, "");
+    const cls = /^(Won the wager|Refund|Wager refunded|They fell)/.test(body) ? "good" : /^Lost the wager/.test(body) ? "bad" : "";
+    return `<div class="${cls}">${new Date(l.t).toLocaleTimeString()} &nbsp; ${esc(l.label)}</div>`;
+  }).join("") : "");
+  refreshTip();
+}
+
+let view = { s: {}, live: false, evRunning: false, hasNem: false, on: () => true };
+
+function costOf(type, dataA) {
+  if (!state) return 0;
+  if (type === "bet") return parseInt($("stakeSel").value, 10);
+  if (state.power) return 0;
+  const v = args(type, dataA);
+  return costFor(type, v.a, v.b === undefined ? -1 : v.b, state.costs[type] || 0);
+}
+
+// The relay's own checks (copied in at build time), so what looks usable is what the relay accepts.
+const TABLES = T;
+const MUTS = new Map(T.muts.map((m) => [m.id, m]));
+const EVENTS = new Map(T.events.map((e) => [e.id, e]));
+const OPT = { events: 1, muts: 2, bounties: 4, nemesis: 8, pouch: 16, curse: 32, combos: 64 };
+/*__PRECHECK__*/
+
+// Why a button can't be used right now ("" = it can).
+function blockReason(type, dataA) {
+  const { s, live, evRunning } = view;
+  if (!state) return "Not connected yet.";
+  if (!live) return "Their game is offline.";
+  if (s.link === "0") return "They have Friend Link turned off.";
+  const cd = state.cooldowns[type];
+  if (cd) return `Cooling down: ${cd}s left.`;
+  const cost = costOf(type, dataA);
+  if (state.points < cost) return `You need ${cost} chaos points.`;
+  if (type === "bet") {
+    if (state.power) return "Wagers are off during Moon Power.";
+    if (!evRunning) return "Wait for an event to start.";
+    if (state.bet) return "There's already a wager on" + (state.bet.from ? " (by " + state.bet.from + ")." : ".");
+    return s.evleft !== undefined && parseInt(s.evleft, 10) < 15 ? "Too late to bet on this one." : "";
+  }
+  if (type === "surprise") return "";
+  const v = args(type, dataA);
+  return precheck(type, v.a === undefined ? 0 : v.a, v.b === undefined ? -1 : v.b, v.c || 0, s);
+}
+
+// --- Hover help -------------------------------------------------------------
+
+// Moves a Friend Shield blocks (matches the game).
+const MEAN = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt", "mut_add", "draft", "nem_stat",
+  "bounty", "ambush", "curse", "curse_set", "tax", "airstrike", "zap", "size", "wanted", "ev_extend", "empower", "blackout"]);
+
+const ACT_TIPS = {
+  surprise: "Spends points on a random move that works right now: a prank, an ambush, a mutator, a bounty, a Nemesis boost, a curse reroll or their next event. It has its own cooldown.",
+  "bet:0": "Bet they get through the running event without falling. A right guess pays double. If the event is stopped early, you get your stake back.",
+  "bet:1": "Bet they fall or fail during the running event. A right guess pays double. If the event is stopped early, you get your stake back.",
+  ev_now: "Starts the picked event right away. If one is running, or it can't happen where they are, it starts as soon as it can. The combo box doesn't apply.",
+  ev_next: "Their next event will be this one, plus the combo if you picked one. It still waits for the normal timer. Harder events cost more. If the combo can't happen, you get everything back.",
+  ev_soon: "Cuts the wait for their next event down to 10 seconds. Only between events.",
+  empower: "Their next event runs one step harder. One at a time.",
+  ev_extend: "Adds 30 seconds to the running event. Only for timed events.",
+  ev_end: "Ends the running event right now. It doesn't count as survived, and a wager on it gets refunded.",
+  fakeout: "Plays the warning sound and shows \"Something is coming...\" Then nothing comes.",
+  nem_make: "Turns the picked enemy type into their Nemesis. Only if they don't have one.",
+  nem_trait: "Gives their Nemesis the picked trait on top of the ones it has.",
+  nem_level: "Raises their Nemesis one level and gives it a skill point. Weak enemy types top out at 5, the toughest at 20.",
+  nem_hunt: "Sends their Nemesis to them. If it's already nearby it jumps right next to them. If there's no room yet, it keeps trying for 15 seconds.",
+  nem_name: "Renames their Nemesis, up to 12 letters. They see the new name in game.",
+  "nem_stat:0": "Spend a skill point on Speed: +12% movement per point (max 10).",
+  "nem_stat:1": "Spend a skill point on Power: +25% damage when it hits them, per point (max 10).",
+  "nem_stat:2": "Spend a skill point on Health: +15% health per point (max 10).",
+  "nem_stat:3": "Spend a skill point on Tracking: it closes in across areas faster and shows up more often. At 3+ it follows them in from next door (max 10).",
+  nem_purge: "Removes their Nemesis. The next one starts at its level with fresh random traits. It still has to be crowned the normal way (or you can Create one).",
+  mut_add: "Puts the picked mutator on them right now, no draft. They can carry up to 6.",
+  draft: "At each dawn and dusk they pick one of two mutators. This picks the two they get to choose from next time.",
+  bounty: "Spawns the enemy right next to them as a bounty, with your stars and traits. Beating it pays them Moon Marks. A new one replaces your last one.",
+  wanted: "Puts a WANTED poster on their Bounty Board: a 5-star enemy with Meteor Caller that pays triple. They have to go find it. One at a time.",
+  airstrike: "Drops 5 bombs from the sky around them.",
+  zap: "Takes 1 heart. It can't kill them: it stops at a quarter heart.",
+  shake: "Shakes their camera with a boom. Harmless.",
+  blackout: "Their world goes dark for 25 seconds. It only shows between events, so it's wasted while one is running.",
+  ambush: "Spawns 1 to 3 of the picked enemy near them.",
+  "size:1": "Makes them giant for 30 seconds. Only changes how they look.",
+  "size:2": "Makes them tiny for 30 seconds. Only changes how they look.",
+  sfx: "Plays the picked sound on their end with no message.",
+  heal: "Gives them 2 hearts back.",
+  pouch: "Adds the picked item to their Moon Pouch. They pick items with L+Left/Right and use them with L+Down.",
+  gift: "Gives them 10 Moon Marks to spend in the Moon Shop.",
+  tax: "Takes up to 15 Moon Marks from them.",
+  msg: "Shows your text on their screen, up to 30 letters.",
+  curse_set: "Swaps their Cycle Curse to the picked one. It lasts until their next cycle. Some curses can't be used with their settings.",
+  curse: "Rerolls their Cycle Curse to a random one.",
+};
+
+const KV_TIPS = {
+  Where: "The area they're in right now.",
+  When: "Day and time in their 3-day cycle.",
+  Hearts: "Their hearts right now, out of their max.",
+  Event: "The event that's running and how long it has left.",
+  "Next event": "Time until their next event starts on its own.",
+  "Friend pick": "The event a friend picked for their next one. It replaces the random pick.",
+  "Foreseen next": "They bought Foresight: they can see this event coming, and nobody can change it now.",
+  "Starting soon": "An event a friend started that's waiting for the right moment.",
+  Curse: "Their Cycle Curse: one rule that lasts the whole 3-day cycle. Hover the name for what it does.",
+  "Moon Marks": "Their shop money. They earn it from bounties, contracts and Nemeses and spend it in the Moon Shop.",
+  "Hunter Rank": "Goes up as they claim bounties: Tracker at 3, Hunter at 8, Slayer at 15, Legend at 25, Moonbane at 40. Each rank adds 5% to bounty pay.",
+  "This session": "Events they got through and times they fell since their game started. Everyone in the room gets bonus chaos points every fall.",
+  "Bounties claimed": "Bounties they've finished. This sets their Hunter Rank.",
+  Pouch: "Moon Pouch items they carry. You can gift more on the Gifts tab.",
+  Last: "What happened with the last move anyone sent on their end.",
+  Nemesis: "An enemy that beat them and now hunts them. It levels up and can gain traits.",
+  Type: "What kind of enemy their Nemesis is.",
+  Level: "Its level and its max (5 for weak enemy types, up to 20 for the toughest). Early on it acts weaker until they have more hearts and a better sword.",
+  Area: "Where their Nemesis is roaming. It moves around over time.",
+  Traits: "Special powers. Hover each one for what it does.",
+};
+
+function bountyTip(b) {
+  if (b.startsWith("Yours:")) return "The bounty you posted. It pays them normally if they win.";
+  if (b.startsWith("WANTED")) return "A WANTED target: 5 stars with Meteor Caller. Pays triple.";
+  if (b.startsWith("RARE")) return "A rare bounty. Pays double.";
+  return "A bounty from their board. Stars show how tough it is.";
+}
+
+const descOf = (arr, id) => (arr.find((x) => x.id == id) || {}).desc || "";
+const SEL_TIPS = {
+  evSel: () => descOf(T.events, $("evSel").value),
+  comboSel: () => ($("comboSel").value === "-1" ? "Pick a second event to run with it. Combos only apply to \"next event\"." : "Combo: " + descOf(T.events, $("comboSel").value)),
+  mutSel: () => descOf(T.muts, $("mutSel").value),
+  draftA: () => "First choice: " + descOf(T.muts, $("draftA").value),
+  draftB: () => "Second choice: " + descOf(T.muts, $("draftB").value),
+  nemTrait: () => descOf(T.traits, $("nemTrait").value),
+  pouchSel: () => descOf(T.pouch, $("pouchSel").value),
+  curseSel: () => descOf(T.curses, $("curseSel").value),
+  bStars: () => "More stars means a tougher enemy and more trait slots. Pay grows with stars and enemy toughness (shown below), plus their Hunter Rank bonus.",
+  stakeSel: () => "Chaos points to bet. A right guess pays double.",
+  ambCount: () => "How many to send.",
+  nemPool: () => "The enemy type for their new Nemesis.",
+  bPool: () => "The enemy type for the bounty.",
+  ambPool: () => "The enemy type for the ambush.",
+  sfxSel: () => "The sound to play.",
+};
+
+function fmtLen(sec) {
+  if (sec < 60) return sec + "s";
+  const m = Math.floor(sec / 60), r = sec % 60;
+  return r ? `${m}m ${r}s` : `${m} min`;
+}
+
+function tipFor(el) {
+  if (el.matches("button[data-act]")) {
+    const type = el.dataset.act;
+    const t = { body: ACT_TIPS[type + ":" + el.dataset.a] || ACT_TIPS[type] || "" };
+    t.warn = blockReason(type, el.dataset.a);
+    if (state && state.power) t.extra = "Moon Power: free, no cooldown.";
+    else if (state && type !== "bet") {
+      const len = (state.cdlen || {})[type] || 0;
+      t.extra = `Costs ${costOf(type, el.dataset.a)} points` + (len ? `, then a ${fmtLen(len)} cooldown.` : ".");
+    }
+    if (parseInt(view.s.shields || "0", 10) > 0 && MEAN.has(type)) t.shield = "Their Friend Shield blocks this one, and the points are still spent.";
+    if (parseInt(view.s.shields || "0", 10) > 0 && type === "surprise") t.shield = "Most surprises are mean moves, so their Friend Shield will probably eat it.";
+    return t;
+  }
+  if (el.tagName === "SELECT") return { body: SEL_TIPS[el.id] ? SEL_TIPS[el.id]() : "" };
+  return { body: el.dataset.tip || "" };
+}
+
+const TIP_SEL = "button[data-act], select, [data-tip]";
+let tipTarget = null;
+let mouse = null;
+
+function showTip(el) {
+  if (!el.getClientRects().length) return hideTip(); // hidden (other tab, or not usable right now); works for map shapes too
+  const t = tipFor(el);
+  const box = $("tip");
+  if (!t.body && !t.warn) return hideTip();
+  tipTarget = el;
+  const parts = [];
+  const add = (cls, text) => { if (text) { const d = document.createElement("div"); d.className = cls; d.textContent = text; parts.push(d); } };
+  add("", t.body); add("w", t.warn); add("w", t.shield); add("x", t.extra);
+  box.replaceChildren(...parts);
+  const r = el.getBoundingClientRect();
+  box.style.left = "0"; box.style.top = "0"; // measure at full width
+  const w = box.offsetWidth, h = box.offsetHeight;
+  const x = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 8));
+  let y = r.bottom + 8;
+  if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 8);
+  box.style.left = x + "px";
+  box.style.top = y + "px";
+  box.classList.add("show");
+}
+
+function hideTip() {
+  tipTarget = null;
+  $("tip").classList.remove("show");
+}
+
+// After a refresh: keep the tip up to date, or find what's under the mouse now.
+function refreshTip() {
+  if (!tipTarget) return;
+  if (document.body.contains(tipTarget)) return showTip(tipTarget);
+  const under = mouse && document.elementFromPoint(mouse[0], mouse[1]);
+  const el = under && under.closest(TIP_SEL);
+  if (el) showTip(el); else hideTip();
+}
+
+function setupTips() {
+  const touch = window.matchMedia("(hover: none)").matches;
+  $("tipHint").textContent = touch ? "Press and hold anything for details." : "Hover over anything for details.";
+  // Mouse: hover.
+  document.addEventListener("pointerover", (e) => {
+    if (e.pointerType !== "mouse") return;
+    mouse = [e.clientX, e.clientY];
+    const el = e.target.closest(TIP_SEL);
+    if (el === tipTarget) return;
+    if (el) showTip(el); else hideTip();
+  });
+  document.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") mouse = [e.clientX, e.clientY]; });
+  document.addEventListener("pointerout", (e) => { if (e.pointerType === "mouse" && !e.relatedTarget) hideTip(); });
+  document.addEventListener("change", (e) => { if (e.target === tipTarget) showTip(tipTarget); });
+  document.addEventListener("mousedown", (e) => { if (e.target.closest("select")) hideTip(); });
+  window.addEventListener("scroll", () => { if (tipTarget && !mouse) hideTip(); else if (tipTarget) showTip(tipTarget); }, true);
+  // Touch: press and hold. Lifting after a hold doesn't click.
+  let timer = null;
+  let held = false;
+  document.addEventListener("touchstart", (e) => {
+    const el = e.target.closest(TIP_SEL);
+    clearTimeout(timer);
+    held = false;
+    if (tipTarget && el !== tipTarget) hideTip();
+    if (!el || el.tagName === "SELECT") return;
+    timer = setTimeout(() => { held = true; showTip(el); }, 450);
+  }, { passive: true });
+  document.addEventListener("touchmove", () => clearTimeout(timer), { passive: true });
+  document.addEventListener("touchend", (e) => {
+    clearTimeout(timer);
+    if (held && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("contextmenu", (e) => { if (held) e.preventDefault(); });
+}
+
+async function refresh() {
+  if (!key) return;
+  try {
+    const r = await fetch("/api/state", { headers: headers() });
+    if (r.status === 401) { toast(await r.text()); return logout(); }
+    if (!r.ok) { $("conn").textContent = await r.text(); return; }
+    state = await r.json();
+    const s = parseStatus(state.status);
+    const deaths = s.deaths !== undefined ? parseInt(s.deaths, 10) : null;
+    if (deaths !== null && lastDeaths !== null && deaths > lastDeaths) toast("They fell! +" + ((state && state.deathBonus) || 15) + " chaos points.");
+    lastDeaths = deaths;
+    // Wager results and refunds pop up too, not just in History.
+    const top = state.log && state.log[0] ? state.log[0].t + "|" + state.log[0].label : "";
+    if (lastLogTop !== null && top && top !== lastLogTop) {
+      const fresh = [];
+      for (const l of state.log) {
+        if (l.t + "|" + l.label === lastLogTop) break;
+        if (/Won the wager|Lost the wager|Wager refunded|Refund \+/.test(l.label)) fresh.push(l.label);
+      }
+      if (fresh.length) toast(fresh[0]);
+    }
+    lastLogTop = top;
+    render();
+  } catch (e) { $("conn").textContent = "Can't reach the relay"; }
+}
+
+function showApp(on) {
+  $("app").hidden = !on; $("bar2").hidden = !on; $("tabs").hidden = !on; $("login").hidden = on;
+}
+function logout() {
+  key = ""; store.del("ge_key"); state = null; lastDeaths = null; lastLogTop = null;
+  showApp(false); render(); hideTip();
+}
+function start() {
+  if (!key) return logout();
+  showApp(true); refresh();
+  if (store.get("ge_hinted") !== "1") {
+    store.set("ge_hinted", "1");
+    setTimeout(() => toast("Tip: " + $("tipHint").textContent.toLowerCase()), 1500);
+  }
+}
+
+function setupTabs() {
+  let cur = "events";
+  cur = store.get("ge_tab") || cur;
+  const show = (t) => {
+    if (!document.querySelector(`.tab[data-tab="${t}"]`)) t = "events";
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
+    document.querySelectorAll(".tab").forEach((sec) => (sec.hidden = sec.dataset.tab !== t));
+    store.set("ge_tab", t);
+    hideTip();
+  };
+  document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.tab)));
+  show(cur);
+}
+
+setup();
+start();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

@@ -4,3 +4,9 @@
 [submodule "mod/Zelda64RecompSyms"]
 	path = mod/Zelda64RecompSyms
 	url = https://github.com/Zelda64Recomp/Zelda64RecompSyms
+[submodule "global-events/mm-decomp"]
+	path = global-events/mm-decomp
+	url = https://github.com/zeldaret/mm
+[submodule "global-events/Zelda64RecompSyms"]
+	path = global-events/Zelda64RecompSyms
+	url = https://github.com/Zelda64Recomp/Zelda64RecompSyms

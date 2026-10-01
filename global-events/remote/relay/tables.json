@@ -1,0 +1,916 @@
+{
+ "events": [
+  {
+   "id": 0,
+   "name": "Bomb Rain",
+   "desc": "Bombs fall from the sky all around you.",
+   "second": true,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 1,
+   "name": "Rupoor Rain",
+   "desc": "Rupoors rain down. Each one costs rupees.",
+   "second": true,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 2,
+   "name": "Blood Moon",
+   "desc": "A horde of one enemy type from your pool.",
+   "second": false,
+   "primary": true,
+   "tier": 3
+  },
+  {
+   "id": 3,
+   "name": "Joke Event",
+   "desc": "Harmless critters flood the area.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 4,
+   "name": "Moonfall",
+   "desc": "Boulders fall where you stand. Keep moving.",
+   "second": true,
+   "primary": true,
+   "tier": 2
+  },
+  {
+   "id": 5,
+   "name": "The Stalker",
+   "desc": "Something hunts you and hits very hard.",
+   "second": false,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 8,
+   "name": "Phantom Army",
+   "desc": "Invisible soldiers. The Lens shows them.",
+   "second": false,
+   "primary": true,
+   "tier": 2
+  },
+  {
+   "id": 9,
+   "name": "Treasure Hunt",
+   "desc": "Find the hidden rupee in time or be frozen.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 10,
+   "name": "Blood Hunger",
+   "desc": "Your health drains. Every kill heals you.",
+   "second": false,
+   "primary": true,
+   "tier": 2
+  },
+  {
+   "id": 11,
+   "name": "Searchlights",
+   "desc": "Avoid the spotlights or enemies come.",
+   "second": false,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 12,
+   "name": "Terrible Fate",
+   "desc": "Salesmen creep closer when you look away.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 13,
+   "name": "Red Light Green Light",
+   "desc": "Freeze when the moon watches or get zapped.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 14,
+   "name": "Echo",
+   "desc": "A ghost walks your old path. Don't touch it.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 18,
+   "name": "Champion Duel",
+   "desc": "Duel a mini-boss. Beat it to move on.",
+   "second": false,
+   "primary": false,
+   "tier": 3
+  },
+  {
+   "id": 19,
+   "name": "Infighting",
+   "desc": "Two enemy groups brawl right next to you.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 20,
+   "name": "Time Moves w/ You",
+   "desc": "Stand still and time stops. So does its clock.",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 21,
+   "name": "Imposters",
+   "desc": "Some carpenters are ReDeads in disguise.",
+   "second": false,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 22,
+   "name": "Carpenter Uprising",
+   "desc": "Rainbow carpenters attack. Hit them to stop.",
+   "second": false,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 23,
+   "name": "Procession of the Dead",
+   "desc": "A column of ReDeads marches. Don't cross it.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 24,
+   "name": "Poltergeist",
+   "desc": "Rocks circle you, flash red, then fly at you.",
+   "second": true,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 25,
+   "name": "Bullet Hell",
+   "desc": "Mad Scrubs surround you and fire volleys.",
+   "second": false,
+   "primary": true,
+   "tier": 2
+  },
+  {
+   "id": 26,
+   "name": "Mirage",
+   "desc": "Enemies come with fakes. Find the real one.",
+   "second": false,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 27,
+   "name": "Mirror Dance",
+   "desc": "Dancers copy your every move.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 28,
+   "name": "Swarm Night",
+   "desc": "A huge Keese swarm fills the sky.",
+   "second": true,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 29,
+   "name": "Majora Looms",
+   "desc": "Majora's Mask throws boss masks at your spot.",
+   "second": true,
+   "primary": true,
+   "tier": 2
+  },
+  {
+   "id": 30,
+   "name": "Sky Leviathan",
+   "desc": "A giant fish circles in the sky. Harmless.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 31,
+   "name": "Tingle Air Raid",
+   "desc": "Tingle drops bombs. Pop his balloon to stop him.",
+   "second": true,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 33,
+   "name": "Cursed Tag",
+   "desc": "Hit an enemy to pass the curse before it blows.",
+   "second": false,
+   "primary": true,
+   "tier": 1
+  },
+  {
+   "id": 34,
+   "name": "Pop Quiz",
+   "desc": "Name the song. Wrong costs half your hearts.",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 35,
+   "name": "Low Gravity",
+   "desc": "Link floats. Jumps and falls go floaty.",
+   "second": true,
+   "primary": true,
+   "tier": 0
+  },
+  {
+   "id": 36,
+   "name": "Moonlit Prey",
+   "desc": "Kill the glowing foe for rupees, or get hurt.",
+   "second": false,
+   "primary": true,
+   "tier": 0
+  }
+ ],
+ "pools": [
+  {
+   "id": 3,
+   "name": "Wolfos",
+   "tier": 1
+  },
+  {
+   "id": 4,
+   "name": "White Wolfos",
+   "tier": 1
+  },
+  {
+   "id": 5,
+   "name": "Stalchild",
+   "tier": 0
+  },
+  {
+   "id": 6,
+   "name": "ReDead",
+   "tier": 1
+  },
+  {
+   "id": 7,
+   "name": "Poe",
+   "tier": 1
+  },
+  {
+   "id": 9,
+   "name": "Tektite",
+   "tier": 0
+  },
+  {
+   "id": 13,
+   "name": "Dodongo",
+   "tier": 2
+  },
+  {
+   "id": 19,
+   "name": "Like Like",
+   "tier": 2
+  },
+  {
+   "id": 22,
+   "name": "Hiploop",
+   "tier": 0
+  },
+  {
+   "id": 24,
+   "name": "Snapper",
+   "tier": 1
+  },
+  {
+   "id": 28,
+   "name": "Peahat",
+   "tier": 2
+  },
+  {
+   "id": 30,
+   "name": "Garo Master",
+   "tier": 2
+  },
+  {
+   "id": 31,
+   "name": "Iron Knuckle",
+   "tier": 3
+  },
+  {
+   "id": 32,
+   "name": "Dinolfos",
+   "tier": 2
+  },
+  {
+   "id": 33,
+   "name": "Big Poe",
+   "tier": 2
+  },
+  {
+   "id": 8,
+   "name": "Chuchu",
+   "tier": 0
+  },
+  {
+   "id": 10,
+   "name": "Blue Bubble",
+   "tier": 0
+  }
+ ],
+ "traits": [
+  {
+   "id": 0,
+   "name": "Armored",
+   "desc": "Takes half damage from every hit."
+  },
+  {
+   "id": 1,
+   "name": "Swift",
+   "desc": "Moves much faster than normal."
+  },
+  {
+   "id": 2,
+   "name": "Regenerating",
+   "desc": "Slowly heals itself over time."
+  },
+  {
+   "id": 3,
+   "name": "Summoner",
+   "desc": "Calls in extra enemies every 12 seconds."
+  },
+  {
+   "id": 4,
+   "name": "Fire Aura",
+   "desc": "Burns you if you get too close."
+  },
+  {
+   "id": 5,
+   "name": "Blinker",
+   "desc": "Teleports near you if you keep your distance."
+  },
+  {
+   "id": 6,
+   "name": "Giant",
+   "desc": "50% bigger, with 50% more health."
+  },
+  {
+   "id": 7,
+   "name": "Vengeful",
+   "desc": "Drops a bomb from the sky when it dies."
+  },
+  {
+   "id": 8,
+   "name": "Brutal",
+   "desc": "You take 50% more damage while near it."
+  },
+  {
+   "id": 9,
+   "name": "Splitter",
+   "desc": "Splits into two copies when slain."
+  },
+  {
+   "id": 10,
+   "name": "Enraged",
+   "desc": "Faster and hits harder below half health."
+  },
+  {
+   "id": 11,
+   "name": "Thorned",
+   "desc": "Stings you back when you hit it with a sword."
+  },
+  {
+   "id": 12,
+   "name": "Leech",
+   "desc": "Heals itself whenever it hurts you."
+  },
+  {
+   "id": 13,
+   "name": "Second Wind",
+   "desc": "Its first killing blow leaves it at half health."
+  },
+  {
+   "id": 14,
+   "name": "Thief",
+   "desc": "Steals 10 rupees whenever it hurts you."
+  },
+  {
+   "id": 15,
+   "name": "Cloaked",
+   "desc": "Keeps fading out of sight. Lens reveals it."
+  }
+ ],
+ "muts": [
+  {
+   "id": 0,
+   "name": "Thin Skin",
+   "desc": "They take 50% more damage."
+  },
+  {
+   "id": 1,
+   "name": "Tough Crowd",
+   "desc": "Enemies have 50% more health."
+  },
+  {
+   "id": 2,
+   "name": "Vengeful Dead",
+   "desc": "Slain enemies leave a falling bomb behind."
+  },
+  {
+   "id": 3,
+   "name": "Reinforcements",
+   "desc": "Kills may call in a replacement enemy."
+  },
+  {
+   "id": 4,
+   "name": "Elite Foes",
+   "desc": "1 in 4 enemies has a random trait."
+  },
+  {
+   "id": 5,
+   "name": "Heart Lock",
+   "desc": "They can't heal within 2 hearts of their max."
+  },
+  {
+   "id": 6,
+   "name": "Open Wounds",
+   "desc": "After a hit, they can't heal for 10 seconds."
+  },
+  {
+   "id": 8,
+   "name": "Mana Tax",
+   "desc": "Magic costs double."
+  },
+  {
+   "id": 9,
+   "name": "Ammo Tax",
+   "desc": "Arrows, bombs, nuts and sticks go twice as fast."
+  },
+  {
+   "id": 10,
+   "name": "Butterfingers",
+   "desc": "Every hit they take costs 5 rupees."
+  },
+  {
+   "id": 11,
+   "name": "Rupee Rot",
+   "desc": "They lose a rupee every 20 seconds."
+  },
+  {
+   "id": 12,
+   "name": "Cold Water",
+   "desc": "Swimming drains health (not as Zora)."
+  },
+  {
+   "id": 13,
+   "name": "Restless Earth",
+   "desc": "If they stand still 4 seconds, a boulder falls on them."
+  },
+  {
+   "id": 14,
+   "name": "Dark Nights",
+   "desc": "Nights are much darker."
+  },
+  {
+   "id": 15,
+   "name": "Emboldened",
+   "desc": "Their Nemesis gains a level."
+  },
+  {
+   "id": 16,
+   "name": "Hunted",
+   "desc": "Their Nemesis turns up far more often."
+  },
+  {
+   "id": 17,
+   "name": "Moon Tears",
+   "desc": "Boulders fall on them now and then."
+  },
+  {
+   "id": 18,
+   "name": "Ambushers",
+   "desc": "New areas may greet them with enemies."
+  },
+  {
+   "id": 19,
+   "name": "Keese Escort",
+   "desc": "A few Keese follow them everywhere."
+  },
+  {
+   "id": 20,
+   "name": "Weak Recovery",
+   "desc": "All healing is halved."
+  },
+  {
+   "id": 21,
+   "name": "Bleeding",
+   "desc": "Every hit takes two more hearts a moment later."
+  }
+ ],
+ "curses": [
+  {
+   "id": 0,
+   "name": "Restless Moon",
+   "desc": "Events come a third more often."
+  },
+  {
+   "id": 1,
+   "name": "Lingering Dread",
+   "desc": "Events last half again as long."
+  },
+  {
+   "id": 2,
+   "name": "Fierce Moon",
+   "desc": "Events are one step harder."
+  },
+  {
+   "id": 3,
+   "name": "Twin Omens",
+   "desc": "Combo events are much more common."
+  },
+  {
+   "id": 4,
+   "name": "Moon's Favorite",
+   "desc": "One event comes up half the time."
+  },
+  {
+   "id": 5,
+   "name": "Blood Nights",
+   "desc": "A Blood Moon rises every night at 6 PM."
+  },
+  {
+   "id": 6,
+   "name": "Night Terrors",
+   "desc": "Events come twice as often at night."
+  },
+  {
+   "id": 7,
+   "name": "Silent Moon",
+   "desc": "No warning or roulette before events."
+  },
+  {
+   "id": 8,
+   "name": "Unseen Omen",
+   "desc": "Events hide their names."
+  },
+  {
+   "id": 9,
+   "name": "Aftershocks",
+   "desc": "A short Bomb Rain follows every event."
+  },
+  {
+   "id": 10,
+   "name": "Impending Doom",
+   "desc": "Moon Pressure is on: events get worse as the moon gets closer."
+  },
+  {
+   "id": 11,
+   "name": "Legion",
+   "desc": "Blood Moon hordes are twice as big."
+  },
+  {
+   "id": 12,
+   "name": "Glass Moon",
+   "desc": "They take double damage during events."
+  },
+  {
+   "id": 13,
+   "name": "Encore",
+   "desc": "Every event comes back a minute later."
+  },
+  {
+   "id": 14,
+   "name": "Meteor Shower",
+   "desc": "Boulders fall on them during every event."
+  },
+  {
+   "id": 15,
+   "name": "Ambush",
+   "desc": "New areas may greet them with a Blood Moon."
+  },
+  {
+   "id": 16,
+   "name": "Bell Toll",
+   "desc": "Events strike every 3 hours on the clock."
+  },
+  {
+   "id": 17,
+   "name": "Hex",
+   "desc": "Cursed Tag joins every event."
+  },
+  {
+   "id": 18,
+   "name": "Moon's Wrath",
+   "desc": "Every 5 events they survive, the next is a harder combo."
+  },
+  {
+   "id": 19,
+   "name": "Weightless Moon",
+   "desc": "Low gravity whenever an event is running."
+  }
+ ],
+ "pouch": [
+  {
+   "id": 0,
+   "name": "Portal Stones",
+   "desc": "Place two, then step in one to hop to the other."
+  },
+  {
+   "id": 1,
+   "name": "Giga Blade",
+   "desc": "Arm it: their next sword hits do triple damage."
+  },
+  {
+   "id": 2,
+   "name": "Gravity Bomb",
+   "desc": "Pulls enemies together, then blows them up."
+  },
+  {
+   "id": 3,
+   "name": "Moon Hourglass",
+   "desc": "Freezes every enemy for 8 seconds."
+  },
+  {
+   "id": 4,
+   "name": "Recall Feather",
+   "desc": "Snaps them back to where they stood 10 seconds ago."
+  },
+  {
+   "id": 5,
+   "name": "Storm Rod",
+   "desc": "Lightning strikes up to 5 nearby enemies."
+  },
+  {
+   "id": 6,
+   "name": "Moon Shield",
+   "desc": "Raise it: it absorbs their next hits."
+  },
+  {
+   "id": 7,
+   "name": "Blood Pact",
+   "desc": "60 seconds: deal double damage, take double."
+  },
+  {
+   "id": 8,
+   "name": "Nemesis Compass",
+   "desc": "60 seconds: shows where their Nemesis is."
+  },
+  {
+   "id": 9,
+   "name": "Smoke Veil",
+   "desc": "Enemies lose track of them for 10 seconds."
+  },
+  {
+   "id": 10,
+   "name": "Decoy",
+   "desc": "Drops a decoy that draws enemies for 12 seconds."
+  },
+  {
+   "id": 11,
+   "name": "Moon Dash",
+   "desc": "Blinks them a short way forward, through enemies (3 uses)."
+  }
+ ],
+ "sounds": [
+  {
+   "id": 0,
+   "name": "Item get jingle"
+  },
+  {
+   "id": 1,
+   "name": "Heart Piece jingle"
+  },
+  {
+   "id": 2,
+   "name": "Secret found"
+  },
+  {
+   "id": 3,
+   "name": "ReDead scream"
+  },
+  {
+   "id": 4,
+   "name": "Wizrobe laugh"
+  },
+  {
+   "id": 5,
+   "name": "Cucco"
+  },
+  {
+   "id": 6,
+   "name": "Cow"
+  },
+  {
+   "id": 7,
+   "name": "Tatl: Hey!"
+  },
+  {
+   "id": 8,
+   "name": "Clock Town bell"
+  },
+  {
+   "id": 9,
+   "name": "Explosion"
+  }
+ ],
+ "stats": [
+  {
+   "id": 0,
+   "name": "Speed",
+   "desc": "+12% movement per point."
+  },
+  {
+   "id": 1,
+   "name": "Power",
+   "desc": "+25% damage per point when it hits them."
+  },
+  {
+   "id": 2,
+   "name": "Health",
+   "desc": "+15% health per point."
+  },
+  {
+   "id": 3,
+   "name": "Tracking",
+   "desc": "Moves toward them faster and shows up more often. At 3+ it follows them in from next door."
+  }
+ ],
+ "zones": [
+  {
+   "id": 0,
+   "name": "Clock Town",
+   "links": [
+    1
+   ],
+   "x": 220,
+   "y": 175
+  },
+  {
+   "id": 1,
+   "name": "Termina Field",
+   "links": [
+    0,
+    2,
+    5,
+    6,
+    10,
+    12
+   ],
+   "x": 220,
+   "y": 175
+  },
+  {
+   "id": 2,
+   "name": "Swamp Road",
+   "links": [
+    1,
+    3
+   ],
+   "x": 220,
+   "y": 255
+  },
+  {
+   "id": 3,
+   "name": "Southern Swamp",
+   "links": [
+    2,
+    4
+   ],
+   "x": 220,
+   "y": 292
+  },
+  {
+   "id": 4,
+   "name": "Woodfall",
+   "links": [
+    3
+   ],
+   "x": 220,
+   "y": 326
+  },
+  {
+   "id": 5,
+   "name": "Milk Road",
+   "links": [
+    1
+   ],
+   "x": 128,
+   "y": 238
+  },
+  {
+   "id": 6,
+   "name": "Mountain Path",
+   "links": [
+    1,
+    7
+   ],
+   "x": 220,
+   "y": 100
+  },
+  {
+   "id": 7,
+   "name": "Mtn. Village",
+   "links": [
+    6,
+    8,
+    9
+   ],
+   "x": 220,
+   "y": 62
+  },
+  {
+   "id": 8,
+   "name": "Goron Village",
+   "links": [
+    7
+   ],
+   "x": 140,
+   "y": 34
+  },
+  {
+   "id": 9,
+   "name": "Snowhead",
+   "links": [
+    7
+   ],
+   "x": 300,
+   "y": 34
+  },
+  {
+   "id": 10,
+   "name": "Great Bay",
+   "links": [
+    1,
+    11
+   ],
+   "x": 100,
+   "y": 175
+  },
+  {
+   "id": 11,
+   "name": "Zora Cape",
+   "links": [
+    10
+   ],
+   "x": 38,
+   "y": 175
+  },
+  {
+   "id": 12,
+   "name": "Ikana Road",
+   "links": [
+    1,
+    13,
+    14
+   ],
+   "x": 322,
+   "y": 175
+  },
+  {
+   "id": 13,
+   "name": "Ikana Canyon",
+   "links": [
+    12,
+    15
+   ],
+   "x": 374,
+   "y": 140
+  },
+  {
+   "id": 14,
+   "name": "Graveyard",
+   "links": [
+    12
+   ],
+   "x": 374,
+   "y": 214
+  },
+  {
+   "id": 15,
+   "name": "Stone Tower",
+   "links": [
+    13
+   ],
+   "x": 394,
+   "y": 84
+  }
+ ]
+}
