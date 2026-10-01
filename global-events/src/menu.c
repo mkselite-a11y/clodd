@@ -2163,6 +2163,11 @@ static void Menu_Close(PlayState* play) {
     Player_SetCsAction(play, NULL, PLAYER_CSACTION_END);
 }
 
+// The mutator draft is a choice that has to be made: nothing forces it shut.
+s32 Menu_IsDraft(void) {
+    return gMenuOpen && (sPage == MENU_V2_DRAFT);
+}
+
 // Friend Link's Forced Ambush pulls Link out of the menu.
 void Menu_ForceClose(PlayState* play) {
     if (gMenuOpen) {

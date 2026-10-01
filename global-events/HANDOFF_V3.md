@@ -27,3 +27,6 @@ Per-friend points and cooldowns keyed by a hidden browser key + name; Blocked fr
 
 ## Versioning (from the user)
 Bump the third digit for each new build: 3.1.0 shipped, so the next build is 3.1.1, then 3.1.2, and so on. Set it in both mod.toml and mod_cheats.toml.
+
+## Building (from the user)
+Only build (and package/send a release) when the user says "go". Source changes can be made and committed in between.

@@ -2205,6 +2205,7 @@ static void Beam_Update(PlayState* play) {
 
 static char sStash[128]; // a command that came in while they were in a menu (it waits there)
 static s32 sStashed = false;
+static s32 sForcedWarned = false; // "Get ready..." shown for the stashed Forced Ambush
 
 // Every frame, from V2_Update.
 static void Link_Update(PlayState* play, s32 playing) {
@@ -2277,14 +2278,23 @@ static void Link_Update(PlayState* play, s32 playing) {
     // or while he's going down. A Forced Ambush doesn't: it pulls him out of
     // a menu (one command is looked at; anything else waits in the stash).
     if (Link_HoldReason(play, playing)[0] != '\0') {
-        if ((gMenuOpen || sSaveUiOpen || (play->pauseCtx.state != PAUSE_STATE_OFF)) &&
+        s32 ocarina = (play->msgCtx.msgMode == MSGMODE_OCARINA_PLAYING);
+
+        if ((gMenuOpen || sSaveUiOpen || ocarina || (play->pauseCtx.state != PAUSE_STATE_OFF)) &&
             (gSaveContext.save.saveInfo.playerData.health > 0) && !sQuizHolding && (sLinkGap == 0)) {
             if (!sStashed && (ger_poll(sStash, sizeof(sStash)) > 0)) {
                 sStashed = true;
             }
-            if (sStashed && Link_StartsWith(Link_Strip(sStash), "forced_ambush|")) {
+            // The mutator draft is left alone: the ambush lands right after the pick.
+            if (sStashed && Link_StartsWith(Link_Strip(sStash), "forced_ambush|") && !Menu_IsDraft()) {
                 if (gMenuOpen) {
                     Menu_ForceClose(play);
+                }
+                // Ocarina out: put away the way B does it.
+                if (ocarina) {
+                    AudioOcarina_SetInstrument(OCARINA_INSTRUMENT_OFF);
+                    play->msgCtx.ocarinaMode = OCARINA_MODE_END;
+                    Message_CloseTextbox(play);
                 }
                 if (sSaveUiOpen) {
                     sSaveClickClose = true; // closes the way its own Close button does
@@ -2296,13 +2306,17 @@ static void Link_Update(PlayState* play, s32 playing) {
                     play->pauseCtx.state = PAUSE_STATE_UNPAUSE_SETUP;
                     Audio_PlaySfx(NA_SE_SY_WIN_CLOSE);
                 }
-                Menu_ShowBanner("FORCED AMBUSH", "Get ready...");
+                if (!sForcedWarned) {
+                    sForcedWarned = true;
+                    Menu_ShowBanner("FORCED AMBUSH", "Get ready...");
+                }
             }
         }
         return;
     }
     if (sStashed) {
         sStashed = false;
+        sForcedWarned = false;
         if (Link_Run(play, sStash)) {
             sLinkGap = FPS;
         }
