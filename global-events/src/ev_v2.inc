@@ -2728,7 +2728,7 @@ static s32 Save_Load(const char* text) {
 
 // ---------------------------------------------------------------------------
 // Auto-save: your Moon progress (the same data as the save code) is kept for
-// each game file by GlobalEventsRemote.dll, in GlobalEventsSaves.txt next to it.
+// each game file by CUSTOM_GlobalEventsRemote.dll, in CUSTOM_GlobalEventsSaves.txt next to it.
 // It's written every few seconds when something changed and read back when you
 // load the file. Game files are told apart by slot and player name.
 // ---------------------------------------------------------------------------

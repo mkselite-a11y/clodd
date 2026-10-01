@@ -6,11 +6,15 @@ Randomizer-safe: nothing here gives real items, sets story flags or touches chec
 
 ## Install
 
-1. Pick **one** of the two mods from the release:
+The release has two folders: **Put in mods folder** and **Put in Cloudflare**.
+
+1. From **Put in mods folder**, pick **one** of the two mods:
    - `CUSTOM_global_events_v3.nrm`: the mod.
    - `CUSTOM_global_events_cheats_v3.nrm`: the same, plus cheat pages.
-2. Put it in your mods folder, along with `GlobalEventsRemote.dll` (the mod won't load without it, even if you never use Friend Link).
-3. Updating from v2: delete `CUSTOM_global_events_v2.nrm` (or the cheats one) first. Two versions of the same mod won't load together.
+2. Put it in your mods folder, along with `CUSTOM_GlobalEventsRemote.dll` (also in that folder) (the mod won't load without it, even if you never use Friend Link).
+3. Updating from v2: delete `CUSTOM_global_events_v2.nrm` (or the cheats one) and the old `GlobalEventsRemote.dll` first. Two versions of the same mod won't load together.
+
+Every file this mod puts in your mods folder starts with `CUSTOM_`: the mod, `CUSTOM_GlobalEventsRemote.dll`, `CUSTOM_GlobalEventsRemote.txt` (your relay settings) and `CUSTOM_GlobalEventsSaves.txt` (your Moon progress). The first time the new DLL runs, it copies your old `GlobalEventsRemote.txt` and `GlobalEventsSaves.txt` to the new names. After that, the old ones can go.
 
 Open the menu by pressing **L** near any owl statue (they glow) or the rainbow carpenter in South Clock Town, or anywhere by playing **C-Up, C-Up, C-Down, C-Down** on the ocarina. **L/R or Z** switch tabs.
 
@@ -39,10 +43,10 @@ A Friend Shield from the Moon Shop still eats the next mean move.
 Friend Link needs a small relay on Cloudflare (free plan). No installs.
 
 1. In the Cloudflare dashboard: **Storage & Databases > D1 > Create database**, name it `global-events`.
-2. **Workers & Pages > Create > Worker** ("Hello World"), then **Edit code**, replace everything with `worker.js` from the release, and **Deploy**.
+2. **Workers & Pages > Create > Worker** ("Hello World"), then **Edit code**, replace everything with `worker.js` from **Put in Cloudflare**, and **Deploy**.
 3. The worker's **Settings > Bindings > Add > D1 database**: variable name `DB`, database `global-events`. Deploy again if asked.
 4. Set your room password: change `ROOM_KEY` at the top of `worker.js`, or add a secret named `ROOM_KEY` under **Settings > Variables and Secrets**.
-5. Start the game once with the mod. It writes `GlobalEventsRemote.txt` next to the DLL. Fill it in and restart:
+5. Start the game once with the mod. It writes `CUSTOM_GlobalEventsRemote.txt` next to the DLL. Fill it in and restart:
    ```
    url=https://your-worker.your-name.workers.dev
    key=your room password
@@ -68,5 +72,5 @@ Source layout:
 
 - `src/events.c` and its includes: the events (`ev_v11.inc`, `ev_v3.inc`), the Moon systems (`ev_v2.inc`), Moonlit Prey (`ev_prey.inc`) and Friend Link (`ev_remote.inc`).
 - `src/menu.c`: the menu, pop-ups and banners. `src/mods.c`: cheats and fun options. `src/rainbow_carpenter.c`: the carpenter and owl glow.
-- `remote/native/ge_remote.c`: `GlobalEventsRemote.dll` (WinHTTP, a background thread, and the auto-save file).
+- `remote/native/ge_remote.c`: `CUSTOM_GlobalEventsRemote.dll` (WinHTTP, a background thread, and the auto-save file).
 - `remote/relay/`: the Cloudflare Worker (`worker_src.js`) and the web page (`panel.html`).

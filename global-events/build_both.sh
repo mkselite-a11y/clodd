@@ -16,8 +16,8 @@ rm -rf build
 make >/dev/null
 "$TOOL" mod.toml build
 cp build/CUSTOM_global_events_v3.nrm dist/
-"$CC_WIN" -O2 -Wall -Wno-stringop-truncation -shared -o remote/native/GlobalEventsRemote.dll remote/native/ge_remote.c -lwinhttp -s
-cp remote/native/GlobalEventsRemote.dll dist/
+"$CC_WIN" -O2 -Wall -Wno-stringop-truncation -shared -o remote/native/CUSTOM_GlobalEventsRemote.dll remote/native/ge_remote.c -lwinhttp -s
+cp remote/native/CUSTOM_GlobalEventsRemote.dll dist/
 (cd remote/relay && python3 sync_tables.py >/dev/null && python3 build_relay.py >/dev/null)
 cp remote/relay/worker.js dist/
 ls -la dist

@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // Friend Link (2.4): your friend's web panel sends commands through a relay;
-// GlobalEventsRemote.dll (next to the mod) does the networking on its own
+// CUSTOM_GlobalEventsRemote.dll (next to the mod) does the networking on its own
 // thread. Here we run the commands and report what's going on. Everything a
 // command does goes through the mod's own systems: no items, no flags.
 // Included after ev_prey.inc.

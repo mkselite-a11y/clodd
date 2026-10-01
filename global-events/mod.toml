@@ -19,7 +19,7 @@ Every couple of minutes, a random event hits wherever you are in Termina. 46 eve
 
 The Moon systems: Moon Marks from bounties, contracts and Nemeses; a Bounty Board with roaming targets that live across Termina's areas; a Nemesis that hunts you, grows, and remembers its wounds; a Moon Shop and Moon Pouch (L + D-pad); a Mutator Deck drafted at each dawn and dusk; and a Cycle Curse for every three days.
 
-Friend Link: friends open a web panel and mess with you, each with their own chaos points. They can start events, steer some of them, aim air strikes and ambushes on a live radar, and hide surprises anywhere in Termina. You decide in the Friends tab what each friend may do: Full, Helpful or Blocked. This mod needs GlobalEventsRemote.dll next to it (from the same release) to load.
+Friend Link: friends open a web panel and mess with you, each with their own chaos points. They can start events, steer some of them, aim air strikes and ambushes on a live radar, and hide surprises anywhere in Termina. You decide in the Friends tab what each friend may do: Full, Helpful or Blocked. This mod needs CUSTOM_GlobalEventsRemote.dll next to it (from the same release) to load.
 
 Open the menu by pressing L near any owl statue or the rainbow carpenter in South Clock Town, or anywhere by playing C-Up, C-Up, C-Down, C-Down on the ocarina.
 
@@ -53,7 +53,7 @@ optional_dependencies = [
 
 # Native libraries (e.g. DLLs) and the functions they export.
 native_libraries = [
-    { name = "GlobalEventsRemote", funcs = ["ger_init", "ger_state", "ger_poll", "ger_status", "ger_store", "ger_fetch", "ger_friends", "ger_map"] }
+    { name = "CUSTOM_GlobalEventsRemote", funcs = ["ger_init", "ger_state", "ger_poll", "ger_status", "ger_store", "ger_fetch", "ger_friends", "ger_map"] }
 ]
 
 # Inputs to the mod tool.

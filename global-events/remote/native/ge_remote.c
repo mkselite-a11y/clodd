@@ -1,4 +1,4 @@
-// GlobalEventsRemote.dll: the Global Events mod's link to the internet.
+// CUSTOM_GlobalEventsRemote.dll: the Global Events mod's link to the internet.
 //
 // The game can't make network calls itself, so this native library does it
 // on a background thread: every second it asks the relay (a Cloudflare
@@ -7,12 +7,12 @@
 // once per frame to hand over status and take commands; those calls never
 // wait on the network.
 //
-// Config: GlobalEventsRemote.txt next to this DLL (in the mods folder):
+// Config: CUSTOM_GlobalEventsRemote.txt next to this DLL (in the mods folder):
 //   url=https://your-worker.your-name.workers.dev
 //   key=your room password
 //
 // Built with llvm-mingw:
-//   x86_64-w64-mingw32-gcc -O2 -shared -o GlobalEventsRemote.dll ge_remote.c -lwinhttp
+//   x86_64-w64-mingw32-gcc -O2 -shared -o CUSTOM_GlobalEventsRemote.dll ge_remote.c -lwinhttp
 
 #include <windows.h>
 #include <winhttp.h>
@@ -79,6 +79,36 @@ static int sSecure = 1;
 static char sKey[128];
 
 
+// --- Files next to this DLL ----------------------------------------------------
+
+// All our files start with CUSTOM_ (so they're easy to tell apart in the mods folder).
+// Files from before v3 had no prefix: copy them over the first time, so nothing is lost.
+static void DllDirFile(wchar_t* path, const wchar_t* name) {
+    HMODULE self = NULL;
+    wchar_t* slash;
+
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       (LPCWSTR)&DllDirFile, &self);
+    GetModuleFileNameW(self, path, MAX_PATH);
+    slash = wcsrchr(path, L'\\');
+    if (slash != NULL) {
+        slash[1] = L'\0';
+    }
+    wcscat(path, name);
+}
+
+static void MigrateOld(const wchar_t* newName, const wchar_t* oldName) {
+    wchar_t newPath[MAX_PATH];
+    wchar_t oldPath[MAX_PATH];
+
+    DllDirFile(newPath, newName);
+    DllDirFile(oldPath, oldName);
+    if ((GetFileAttributesW(newPath) == INVALID_FILE_ATTRIBUTES) &&
+        (GetFileAttributesW(oldPath) != INVALID_FILE_ATTRIBUTES)) {
+        CopyFileW(oldPath, newPath, TRUE);
+    }
+}
+
 // --- Config ------------------------------------------------------------------
 
 static void Trim(char* s);
@@ -127,22 +157,14 @@ static void Trim(char* s) {
 
 static int LoadConfig(void) {
     wchar_t path[MAX_PATH];
-    HMODULE self = NULL;
-    wchar_t* slash;
     FILE* f;
     char line[512];
     char url[512] = { 0 };
     URL_COMPONENTS parts;
     wchar_t wurl[512];
 
-    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                       (LPCWSTR)&LoadConfig, &self);
-    GetModuleFileNameW(self, path, MAX_PATH);
-    slash = wcsrchr(path, L'\\');
-    if (slash != NULL) {
-        slash[1] = L'\0';
-    }
-    wcscat(path, L"GlobalEventsRemote.txt");
+    MigrateOld(L"CUSTOM_GlobalEventsRemote.txt", L"GlobalEventsRemote.txt");
+    DllDirFile(path, L"CUSTOM_GlobalEventsRemote.txt");
 
     f = _wfopen(path, L"r");
     if (f == NULL) {
@@ -515,7 +537,7 @@ __declspec(dllexport) void ger_map(uint8_t* rdram, RecompCtx* ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-save: small key=value store in GlobalEventsSaves.txt next to this DLL
+// Auto-save: small key=value store in CUSTOM_GlobalEventsSaves.txt next to this DLL
 // (one line per game file). Only the game thread calls these.
 // ---------------------------------------------------------------------------
 
@@ -549,7 +571,8 @@ static void StoreLoad(void) {
     int first = 1;
 
     sStoreCount = 0;
-    StorePath(path, L"GlobalEventsSaves.txt");
+    MigrateOld(L"CUSTOM_GlobalEventsSaves.txt", L"GlobalEventsSaves.txt");
+    StorePath(path, L"CUSTOM_GlobalEventsSaves.txt");
     f = _wfopen(path, L"r");
     if (f == NULL) {
         // No file yet is fine. A file we can't open (locked by a sync tool or antivirus)
@@ -593,8 +616,8 @@ static void StoreWrite(void) {
     FILE* f;
     int i;
 
-    StorePath(path, L"GlobalEventsSaves.txt");
-    StorePath(tmp, L"GlobalEventsSaves.tmp");
+    StorePath(path, L"CUSTOM_GlobalEventsSaves.txt");
+    StorePath(tmp, L"CUSTOM_GlobalEventsSaves.tmp");
     if (!sStoreLoaded) {
         return; // never replace a file we couldn't read
     }
