@@ -7,7 +7,7 @@ Read V3_PLAN.md first: it is the agreed spec plus a progress log.
   - Stage 1 events: src/events.c, src/ev_v11.inc, new src/ev_v3.inc (19 events ported from Moonfall Mayhem + Pop Quiz questions).
   - Stage 2 Moon systems: src/ev_v2.inc (77 zones, World_* system, traits, Nemesis, shop, payouts, save format 4).
   - Stage 3 UI: src/menu.c (tabs, pop-ups, banners), owl glow in src/rainbow_carpenter.c, Press L in ev_v2.inc Board_Update.
-- Stage 4 Friend Link is NOT started:
+- Stage 4 Friend Link is DONE (see V3_PLAN.md progress log). What it covered:
   - Game side: src/ev_remote.inc needs Link_FriendsOnline() (it is declared in ev_v2.inc and used by the Overview tab; currently undefined), per-friend modes, radar status fields, map chunks, place/steer/surprise commands, rename without pop-up.
   - DLL: remote/native/ge_remote.c needs a `friends|` line pass-through and a map POST.
   - Web: remote/relay/* (worker + panel). The full protocol spec I planned is at the bottom of this file.

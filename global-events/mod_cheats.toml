@@ -8,26 +8,24 @@
 id = "global_events_cheats"
 
 # Version of this mod.
-version = "2.9.1"
+version = "3.0.0"
 
 # The name that will show up for this mod in the mod menu. This should be human readable.
-display_name = "Global Events Mod v2 + Cheats"
+display_name = "Global Events Mod v3 + Cheats"
 
 # The description that will show up when this mod is displayed in the mod menu. This should be human readable.
 description = """\
-Every few minutes, a random event hits wherever you are in Termina. 32 events: Bomb Rain, Rupoor Rain, Blood Moon, Joke Event, Moonfall, The Stalker, Nemesis, Phantom Army, Treasure Hunt, Blood Hunger, Searchlights, Terrible Fate, Red Light Green Light, Echo, Champion Duel, Infighting, Time Moves When You Move, Imposters, Carpenter Uprising, Procession of the Dead, Poltergeist, Bullet Hell, Mirage, Mirror Dance, Swarm Night, Majora Looms, Sky Leviathan, Tingle Air Raid, Cursed Tag, Pop Quiz, Low Gravity and Moonlit Prey. Each one has its own settings.
+Every couple of minutes, a random event hits wherever you are in Termina. 46 events: Bomb Rain, Rupoor Rain, Blood Moon, Joke Event, Moonfall, The Stalker, Phantom Army, Treasure Hunt, Blood Hunger, Searchlights, Terrible Fate, Red Light Green Light, Echo, Champion Duel, Infighting, Time Moves w/ You, Carpenter Uprising, Procession of the Dead, Bullet Hell, Mirage, Mirror Dance, Sky Leviathan, Tingle Air Raid, Cursed Tag, Pop Quiz, Low Gravity, Moonlit Prey, Starfall Bounty, Dowsing Moon, Giant's Gale, Sinking Sands, Frostbite, Scythe Sweep, Moth Swarm, Hex of Silence, Moon Tether, Moon's Grasp, Heartbeat Hex, Moon's Reflex Test, Gorgon's Gaze, Dissonance, Mirror Madness, Volley of Stars, Sleeping Giant, Mask Salesman's Game, Pressure Seals. Each one has its own counter: learn it and you'll get through.
 
-Event features: a roulette spin before each event, rare combo events (two at once), a curse rolled for every three-day cycle (20 curses), optional Moon Pressure, active hours, streaks and a run report. Events stay on across saves and the Song of Time once you turn them on.
+The Moon systems: Moon Marks from bounties, contracts and Nemeses; a Bounty Board with roaming targets that live across Termina's areas; a Nemesis that hunts you, grows, and remembers its wounds; a Moon Shop and Moon Pouch (L + D-pad); a Mutator Deck drafted at each dawn and dusk; and a Cycle Curse for every three days.
 
-2.0 adds Moon Marks and more: a Mutator Deck (draft penalty cards each dawn and dusk), a Bounty Board with contracts and Moon Marks (take bounties and trade at the rainbow Bounty Board carpenter in South Clock Town for new Moon Pouch items, event bans and more), a Nemesis that hunts you across Termina and grows with you, and a save code to keep it all between sessions.
+Friend Link: friends open a web panel and mess with you, each with their own chaos points. They can start events, steer some of them, aim air strikes and ambushes on a live radar, and hide surprises anywhere in Termina. You decide in the Friends tab what each friend may do: Full, Helpful or Blocked. This mod needs GlobalEventsRemote.dll next to it (from the same release) to load.
 
-2.4 adds Friend Link: a friend can open a web panel and pick your next event, buff your Nemesis, rig your mutator drafts, post bounties on you and more (see the README). 2.9.1 adds Auto-Save for Moon progress and a live map for your friend. This mod needs GlobalEventsRemote.dll next to it (from the same release) to load.
-
-Open the menu by talking to the rainbow carpenter carrying a plank in South Clock Town, or anywhere by playing C-Up, C-Up, C-Down, C-Down on the ocarina.
+Open the menu by pressing L near any owl statue or the rainbow carpenter in South Clock Town, or anywhere by playing C-Up, C-Up, C-Down, C-Down on the ocarina.
 
 This version also has cheat pages: player (god mode, infinite magic and rupees, moon jump, super speed, low gravity), inventory (give any single item or mask, or everything at once, plus songs and upgrades), world (time speed, freeze or kill enemies) and teleports.
 
-Use either Global Events Mod or Global Events Mod + Cheats, not both."""
+Use either Global Events Mod or Global Events Mod + Cheats, not both. Updating from v2: delete the old CUSTOM_global_events_v2 file first."""
 
 # A short description that will show up in this mod's entry in the mod list. This should be human readable and kept short
 # to prevent it from being cut off due to the limited space.
@@ -67,7 +65,7 @@ native_libraries = [
 elf_path = "build/mod.elf"
 
 # Output mod filename.
-mod_filename = "CUSTOM_global_events_cheats_v2"
+mod_filename = "CUSTOM_global_events_cheats_v3"
 
 # Reference symbol files.
 func_reference_syms_file = "Zelda64RecompSyms/mm.us.rev1.syms.toml"

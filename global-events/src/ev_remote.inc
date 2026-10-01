@@ -1434,8 +1434,8 @@ static s32 Link_Run(PlayState* play, char* line) {
     } else if (Str_Eq(type, "surprise") && (a >= 0) && (a < ZONE_COUNT) && (b >= 0) && (b < SUR_KINDS)) {
         // surprise|area|kind|event or enemy|"x,z": waits in that area until they walk into it.
         Surprise* sp;
-        s32 x;
-        s32 z;
+        s32 x = 0;
+        s32 z = 0;
 
         if (sSurCount == SURPRISE_MAX) {
             Link_Fail("too many surprises waiting", "");
