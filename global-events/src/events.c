@@ -290,6 +290,8 @@ static s32 sFriendDarkTimer = 0;       // Blackout
 static const char* Link_StateDesc(void);
 static const char* Link_StateValue(char* out, s32 maxLen, u8* r, u8* g, u8* b);
 static void Link_Update(PlayState* play, s32 playing);
+// V3 Friend Link: a friend steering an event (0 tether, 1 moonfall, 2 searchlight).
+static s32 Steer_Get(s32 kind, f32* x, f32* z);
 static void Ev_NoPoeSouls(PlayState* play, Actor* actor);
 static s32 sEndOnDeath = false; // Link fell during an event: it ends
 
@@ -2244,11 +2246,12 @@ static void Rupoor_Draw(Actor* thisx, PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
+static void Rupoor_SpawnAt(PlayState* play, Vec3f* spot);
+
 static void Tick_RupoorRain(PlayState* play) {
     static const u8 sInterval[INTENSITY_MAX] = { 10, 6, 3 };
     Player* player = GET_PLAYER(play);
     Vec3f spot;
-    Actor* actor;
 
     if ((sEventFrames % sInterval[Intensity()]) != 0) {
         return;
@@ -2260,9 +2263,14 @@ static void Tick_RupoorRain(PlayState* play) {
         return;
     }
     spot.y = Ev_SkyHeight(play, &spot, 250.0f);
+    Rupoor_SpawnAt(play, &spot);
+}
 
-    actor = Ev_Spawn(play, ACTOR_EN_ITEM00, 0, &spot, 0, (s16)(Rand_ZeroOne() * 0xFFFF), 0, ITEM00_RUPEE_GREEN,
-                     TAG_RUPOOR);
+// One rupoor falling from `spot` (already up in the sky).
+static void Rupoor_SpawnAt(PlayState* play, Vec3f* spot) {
+    Actor* actor = Ev_Spawn(play, ACTOR_EN_ITEM00, 0, spot, 0, (s16)(Rand_ZeroOne() * 0xFFFF), 0, ITEM00_RUPEE_GREEN,
+                            TAG_RUPOOR);
+
     if (actor != NULL) {
         actor->update = Rupoor_Update;
         actor->draw = Rupoor_Draw;
@@ -2718,6 +2726,24 @@ static void Tick_Moonfall(PlayState* play) {
     target = player->actor.world.pos;
     target.x += player->actor.velocity.x * 15.0f + Rand_CenteredFloat(120.0f);
     target.z += player->actor.velocity.z * 15.0f + Rand_CenteredFloat(120.0f);
+    {
+        f32 sx;
+        f32 sz;
+
+        // A friend is aiming: rocks land around their mark (never too far off).
+        if (Steer_Get(1, &sx, &sz)) {
+            f32 dx = sx - player->actor.world.pos.x;
+            f32 dz = sz - player->actor.world.pos.z;
+            f32 d = sqrtf(dx * dx + dz * dz);
+
+            if (d > 900.0f) {
+                dx *= 900.0f / d;
+                dz *= 900.0f / d;
+            }
+            target.x = player->actor.world.pos.x + dx + Rand_CenteredFloat(80.0f);
+            target.z = player->actor.world.pos.z + dz + Rand_CenteredFloat(80.0f);
+        }
+    }
     target.y += 50.0f;
     floorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &poly, &bgId, &target);
     target.y = (floorY > BGCHECK_Y_MIN) ? floorY : player->actor.world.pos.y;
@@ -3544,6 +3570,23 @@ static s32 Treasure_Place(PlayState* play) {
     return true;
 }
 
+// V3 Friend Link: a friend hides it somewhere else (not right under Link's feet).
+static s32 Treasure_PlaceAt(PlayState* play, f32 x, f32 z) {
+    Player* player = GET_PLAYER(play);
+    Vec3f p;
+
+    if (!sTreasureValid || (player == NULL) ||
+        !Treasure_Ground(play, x, player->actor.world.pos.y + 400.0f, z, player->actor.world.pos.y, &p) ||
+        (Ev_DistXZ(&p, &player->actor.world.pos) < 250.0f)) {
+        return false;
+    }
+    sTreasurePos = p;
+    sTreasureStartDist = MAX(Math_Vec3f_DistXYZ(&sTreasurePos, &player->actor.world.pos), 300.0f);
+    Lights_PointGlowSetInfo(&sTreasureLightInfo, sTreasurePos.x, sTreasurePos.y + 45.0f, sTreasurePos.z, 255, 210, 60,
+                            320);
+    return true;
+}
+
 static void Treasure_RemoveLight(PlayState* play) {
     if (sTreasureLight != NULL) {
         LightContext_RemoveLight(play, &play->lightCtx, sTreasureLight);
@@ -3782,6 +3825,37 @@ static void Tick_Search(PlayState* play) {
 
         probe.x = sSpotCenter.x + Math_SinS((s16)(spot->phaseX + (s32)(spot->freqX * sSpotTime))) * spot->ampX;
         probe.z = sSpotCenter.z + Math_SinS((s16)(spot->phaseZ + (s32)(spot->freqZ * sSpotTime))) * spot->ampZ;
+        if (i == 0) {
+            static f32 sBeamX;
+            static f32 sBeamZ;
+            static s32 sBeamHeld = false;
+            f32 sx;
+            f32 sz;
+
+            // A friend drives the first beam: it glides to their mark.
+            if (Steer_Get(2, &sx, &sz)) {
+                f32 dx;
+                f32 dz;
+                f32 d;
+
+                if (!sBeamHeld) {
+                    sBeamX = probe.x;
+                    sBeamZ = probe.z;
+                    sBeamHeld = true;
+                }
+                dx = sx - sBeamX;
+                dz = sz - sBeamZ;
+                d = sqrtf(dx * dx + dz * dz);
+                if (d > 9.0f) {
+                    sBeamX += dx * 9.0f / d;
+                    sBeamZ += dz * 9.0f / d;
+                }
+                probe.x = sBeamX;
+                probe.z = sBeamZ;
+            } else {
+                sBeamHeld = false;
+            }
+        }
         probe.y = player->actor.world.pos.y + 250.0f;
         floorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &spot->floorPoly, &bgId, &probe);
 
@@ -5513,16 +5587,90 @@ static void Proc_PointAt(PlayState* play, f32 s, f32 nearY, Vec3f* out) {
     out->y = (floorY > BGCHECK_Y_MIN) ? floorY : nearY;
 }
 
+static void Proc_SpawnOnPath(PlayState* play);
+
 static void Proc_Spawn(PlayState* play) {
+    if (!Proc_FindPath(play)) {
+        sProcTurned = false;
+        sProcCount = 0;
+        return;
+    }
+    Proc_SpawnOnPath(play);
+}
+
+// V3 Friend Link: a friend picks a spot the column marches through (across their path).
+static s32 Proc_PlaceAt(PlayState* play, f32 x, f32 z) {
+    Player* player = GET_PLAYER(play);
+    Actor* actor;
+    f32 dx;
+    f32 dz;
+    f32 d;
+    s32 pass;
+
+    if (player == NULL) {
+        return false;
+    }
+    dx = x - player->actor.world.pos.x;
+    dz = z - player->actor.world.pos.z;
+    d = sqrtf(dx * dx + dz * dz);
+    if (d < 1.0f) {
+        dx = Math_SinS(player->actor.shape.rot.y);
+        dz = Math_CosS(player->actor.shape.rot.y);
+        d = 1.0f;
+    }
+    // March sideways across the line from Link to the mark.
+    {
+        f32 t = dx / d;
+
+        dx = -dz / d;
+        dz = t;
+    }
+    for (pass = 0; pass < 2; pass++) {
+        f32 len = (pass == 0) ? 1500.0f : 900.0f;
+        Vec3f start;
+        CollisionPoly* poly;
+        s32 bgId;
+        f32 floorY;
+
+        start.x = x - dx * len * 0.5f;
+        start.y = player->actor.world.pos.y + 150.0f;
+        start.z = z - dz * len * 0.5f;
+        floorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &poly, &bgId, &start);
+        if ((floorY <= BGCHECK_Y_MIN) || (fabsf(floorY - player->actor.world.pos.y) > 200.0f)) {
+            continue;
+        }
+        start.y = floorY;
+        if (!Proc_PathOk(play, &start, dx, dz, len)) {
+            continue;
+        }
+        // The old column goes; the new one walks the friend's line.
+        actor = play->actorCtx.actorLists[ACTORCAT_ENEMY].first;
+        while (actor != NULL) {
+            Actor* next = actor->next;
+
+            if ((actor->update != NULL) && (Tag_Of(actor) == TAG_PROCESSION)) {
+                Ev_Poof(play, &actor->world.pos, 1);
+                Actor_Kill(actor);
+            }
+            actor = next;
+        }
+        sProcStart = start;
+        sProcDirX = dx;
+        sProcDirZ = dz;
+        sProcLen = len;
+        Proc_SpawnOnPath(play);
+        return sProcCount > 0;
+    }
+    return false;
+}
+
+static void Proc_SpawnOnPath(PlayState* play) {
     s32 n = LVL3(ID_PR_LENGTH, 8, 12, 16);
     s32 i;
 
     sProcTurned = false;
     sProcCount = 0;
     sProcHead = (n - 1) * PROC_SPACING;
-    if (!Proc_FindPath(play)) {
-        return;
-    }
     for (i = 0; i < n; i++) {
         f32 s = sProcHead - i * PROC_SPACING;
         Vec3f pos;

@@ -400,7 +400,10 @@ typedef enum {
     ID_OV_FRIENDS,
     ID_EVD_TIER,
     ID_EVD_HOW,
-    ID_V2_LAST = ID_EVD_HOW,
+    // V3 Friend Link: one row per friend (Friends tab)
+    ID_LNK_FR_FIRST,
+    ID_LNK_FR_LAST = ID_LNK_FR_FIRST + 11,
+    ID_V2_LAST = ID_LNK_FR_LAST,
     ID_MAX
 } MenuEntryId;
 
@@ -443,6 +446,8 @@ void Menu_ShowToast(const char* text);
 typedef enum { NOTE_PLAIN, NOTE_MARKS, NOTE_FRIEND, NOTE_WARN, NOTE_NEMESIS, NOTE_NEWS } NoteKind;
 void Menu_Notify(const char* text, s32 kind);
 void Menu_ShowBanner(const char* title, const char* sub);
+// Friend Link (ev_remote.inc): friends listed on the Friends tab.
+s32 Link_FriendRows(void);
 void Menu_PlaySfx(u16 sfxId);
 Gfx* Ui_DrawRect(Gfx* gfx, s32 x1, s32 y1, s32 x2, s32 y2, u8 r, u8 g, u8 b, u8 a);
 void Ui_Print(GfxPrint* printer, s32 x, s32 y, const char* text);

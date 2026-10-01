@@ -98,6 +98,7 @@ s32 gMenuAtBoard = false;
 static const u16 sV2Entries[] = { ID_V2_MARKS,  ID_SUB_V2_BOUNTY, ID_SUB_V2_SHOP, ID_V2_BOUNTY,  ID_V2_POUCH,
                                   ID_V2_REMOTE, ID_V2_TRACKER,    ID_V2_AUTOSAVE, ID_V2_SAVECODE };
 static const u16 sV2LinkEntries[] = { ID_V2_LINK, ID_V2_LINKSTATE };
+static u16 sV2LinkDyn[2 + 12];
 static u16 sV2BountyDyn[V2_BOUNTY_SLOTS + 2 + 3];
 static const u16 sV2NemEntries[] = { ID_V2_NEMROW_FIRST,     ID_V2_NEMROW_FIRST + 1, ID_V2_NEMROW_FIRST + 2,
                                      ID_V2_NEMROW_FIRST + 3, ID_V2_NEMROW_FIRST + 4, ID_V2_NEMROW_FIRST + 5,
@@ -431,9 +432,21 @@ static const u16* Menu_Entries(s32 page, s32* count) {
         case MENU_V2_MUTS:
             *count = ARRAY_COUNT(sV2MutEntries);
             return sV2MutEntries;
-        case MENU_V2_LINK:
-            *count = ARRAY_COUNT(sV2LinkEntries);
-            return sV2LinkEntries;
+        case MENU_V2_LINK: {
+            // The switch, the connection, then a row per friend (A changes what they may do).
+            s32 n = 0;
+            s32 k;
+            s32 rows = Link_FriendRows();
+
+            for (k = 0; k < (s32)ARRAY_COUNT(sV2LinkEntries); k++) {
+                sV2LinkDyn[n++] = sV2LinkEntries[k];
+            }
+            for (k = 0; k < rows; k++) {
+                sV2LinkDyn[n++] = ID_LNK_FR_FIRST + k;
+            }
+            *count = n;
+            return sV2LinkDyn;
+        }
         case MENU_V2_DRAFT:
             *count = ARRAY_COUNT(sV2DraftEntries);
             return sV2DraftEntries;
@@ -898,7 +911,7 @@ static EntryType Entry_Type(s32 id) {
     if (id == ID_V2_NEMDIFF) {
         return ENTRY_CHOICE;
     }
-    if ((id == ID_V2_BACCEPT) || (id == ID_V2_BUPGRADE)) {
+    if ((id == ID_V2_BACCEPT) || (id == ID_V2_BUPGRADE) || ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST))) {
         return ENTRY_ACTION;
     }
     if ((id == ID_V2_MARKS) || (id == ID_V2_STREAK) || (id == ID_V2_RANK) || (id == ID_V2_LINKSTATE) || ((id >= ID_V2_CON_FIRST) && (id < ID_V2_SHOP_FIRST)) ||

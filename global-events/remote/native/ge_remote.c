@@ -45,7 +45,10 @@ static void SetReturn(RecompCtx* ctx, int32_t value) {
 
 #define QUEUE_LEN 32
 #define CMD_LEN 128
-#define STATUS_LEN 2048
+#define STATUS_LEN 4096
+#define FRIENDS_LEN 128
+#define MAP_LEN 400
+#define MAP_QUEUE 6
 
 enum { ST_NO_CONFIG = 0, ST_CONNECTING = 1, ST_OK = 2, ST_BAD_KEY = 3, ST_NET_ERROR = 4, ST_BAD_URL = 5 };
 
@@ -61,6 +64,13 @@ static char sStatus[STATUS_LEN];
 static int sStatusLen = 0;
 static int sStatusDirty = 0;
 static ULONGLONG sStatusTick = 0; // when the mod last handed us a status
+
+static char sFriends[FRIENDS_LEN];   // "NAME,NAME": who has the panel open
+static ULONGLONG sFriendsTick = 0;   // when the relay last told us
+
+static char sMaps[MAP_QUEUE][MAP_LEN]; // map blocks waiting to go up
+static int sMapLen[MAP_QUEUE];
+static int sMapCount = 0;
 
 static wchar_t sHost[256];
 static wchar_t sBasePath[256];
@@ -293,6 +303,7 @@ static DWORD WINAPI NetThread(LPVOID unused) {
         int linkOff = 0; // Friend Link switched off in the game
         ULONGLONG now = GetTickCount64();
         int fresh;
+        int steering;
         int len = 0;
 
         // Commands
@@ -309,6 +320,12 @@ static DWORD WINAPI NetThread(LPVOID unused) {
                     newCursor = _atoi64(line + 7);
                 } else if (strncmp(line, "idle|", 5) == 0) {
                     idle = (line[5] == '1');
+                } else if (strncmp(line, "friends|", 8) == 0) {
+                    EnterCriticalSection(&sLock);
+                    strncpy(sFriends, line + 8, FRIENDS_LEN - 1);
+                    sFriends[FRIENDS_LEN - 1] = '\0';
+                    sFriendsTick = now;
+                    LeaveCriticalSection(&sLock);
                 } else if ((line[0] != '\0') && !full) {
                     if (Enqueue(line)) {
                         cursor = _atoi64(line); // "id|..." : this one is ours now
@@ -334,13 +351,33 @@ static DWORD WINAPI NetThread(LPVOID unused) {
             len = sStatusLen;
         }
         linkOff = (strncmp(sStatus, "link=0", 6) == 0);
+        // A friend is steering an event: keep the radar quick.
+        steering = (strstr(sStatus, "\nsteer=-1") == NULL) && (strstr(sStatus, "\nsteer=") != NULL);
         LeaveCriticalSection(&sLock);
-        if (fresh && (now - lastPost >= (ULONGLONG)((idle || linkOff) ? 8000 : 2000))) {
+        if (fresh && (now - lastPost >= (ULONGLONG)((idle || linkOff) ? 8000 : steering ? 1000 : 2000))) {
             Http(L"POST", L"/api/status", body, len, NULL, 0);
             lastPost = now;
         }
+        // Map blocks, one per round so commands never wait long.
+        if ((code == 200) && !linkOff) {
+            static char map[MAP_LEN];
+            int mapLen = 0;
+
+            EnterCriticalSection(&sLock);
+            if (sMapCount > 0) {
+                mapLen = sMapLen[0];
+                memcpy(map, sMaps[0], mapLen);
+                memmove(sMaps[0], sMaps[1], sizeof(sMaps[0]) * (MAP_QUEUE - 1));
+                memmove(&sMapLen[0], &sMapLen[1], sizeof(sMapLen[0]) * (MAP_QUEUE - 1));
+                sMapCount--;
+            }
+            LeaveCriticalSection(&sLock);
+            if (mapLen > 0) {
+                Http(L"POST", L"/api/map", map, mapLen, NULL, 0);
+            }
+        }
         // Ease off when nobody's watching or the link is off.
-        Sleep(((code != 200) || idle || linkOff) ? 4000 : 1000);
+        Sleep(((code != 200) || (idle && !steering) || linkOff) ? 4000 : 1000);
     }
     return 0;
 }
@@ -426,6 +463,56 @@ __declspec(dllexport) void ger_status(uint8_t* rdram, RecompCtx* ctx) {
     LeaveCriticalSection(&sLock);
 }
 
+// s32 ger_friends(char* out, u32 max): who has the panel open ("NAME,NAME"), or "" if
+// the relay hasn't said in a while. Returns the length.
+__declspec(dllexport) void ger_friends(uint8_t* rdram, RecompCtx* ctx) {
+    uint64_t out = ctx->r4;
+    uint32_t max = (uint32_t)ctx->r5;
+    char copy[FRIENDS_LEN];
+    uint32_t len = 0;
+    uint32_t i;
+
+    copy[0] = '\0';
+    if (sStarted && (max >= 1)) {
+        EnterCriticalSection(&sLock);
+        if ((sFriendsTick != 0) && (GetTickCount64() - sFriendsTick < 15000)) {
+            strcpy(copy, sFriends);
+        }
+        LeaveCriticalSection(&sLock);
+        len = (uint32_t)strlen(copy);
+        if (len > max - 1) {
+            len = max - 1;
+        }
+        for (i = 0; i < len; i++) {
+            *RamByte(rdram, out, i) = (uint8_t)copy[i];
+        }
+        *RamByte(rdram, out, len) = 0;
+    }
+    SetReturn(ctx, (int32_t)len);
+}
+
+// void ger_map(const char* text, u32 len): a block of the area's floor for the panel's map.
+__declspec(dllexport) void ger_map(uint8_t* rdram, RecompCtx* ctx) {
+    uint64_t in = ctx->r4;
+    uint32_t len = (uint32_t)ctx->r5;
+    uint32_t i;
+
+    if (!sStarted || (sState == ST_NO_CONFIG) || (len == 0)) {
+        return;
+    }
+    if (len >= MAP_LEN) {
+        len = MAP_LEN - 1;
+    }
+    EnterCriticalSection(&sLock);
+    if (sMapCount < MAP_QUEUE) {
+        for (i = 0; i < len; i++) {
+            sMaps[sMapCount][i] = (char)*RamByte(rdram, in, i);
+        }
+        sMapLen[sMapCount] = (int)len;
+        sMapCount++;
+    }
+    LeaveCriticalSection(&sLock);
+}
 
 // ---------------------------------------------------------------------------
 // Auto-save: small key=value store in GlobalEventsSaves.txt next to this DLL

@@ -791,9 +791,13 @@ static void AFrost_Draw2D(PlayState* play) {
 }
 
 // E9 Scythe Sweep: expanding shockwaves. Counter: jump them (or stand in the gap).
+static Vec3f sScythePlaced; // V3 Friend Link: where a friend put the next sweep
+static s32 sScytheHasPlace = false;
+
 static void AScythe_Start(PlayState* play) {
     InitHz();
     sAHz[0].state = 0;
+    sScytheHasPlace = false;
 }
 
 static void AScythe_Update(PlayState* play) {
@@ -801,7 +805,12 @@ static void AScythe_Update(PlayState* play) {
     Hz* h = &sAHz[0];
 
     if (h->state == 0 && Every(SEC(MF_MAX(2, P(0))))) {
-        V3_FindSpot(play, &h->pos, 150.0f, 280.0f, (s16)Rng_Range(0, 0xFFFF));
+        if (sScytheHasPlace) {
+            h->pos = sScythePlaced;
+            sScytheHasPlace = false;
+        } else {
+            V3_FindSpot(play, &h->pos, 150.0f, 280.0f, (s16)Rng_Range(0, 0xFFFF));
+        }
         h->r = 0.0f;
         h->yaw = (s16)Rng_Range(0, 0xFFFF);
         h->state = 1;
@@ -957,17 +966,28 @@ static void ATether_Update(PlayState* play) {
     Hz* h = &sAHz[0];
     f32 radius = P(0) * 10.0f;
     Vec3f next = h->pos;
+    s32 hold = false;
+    f32 sx;
+    f32 sz;
 
-    if (Every(SEC(4))) {
+    if (Steer_Get(0, &sx, &sz)) {
+        // A friend drags the circle toward their mark (at its normal pace).
+        Vec3f mark = { sx, h->pos.y, sz };
+
+        hold = Mf_DistXZ(&h->pos, &mark) < 15.0f;
+        h->yaw = Mf_YawTo(&h->pos, &mark);
+    } else if (Every(SEC(4))) {
         h->yaw += (s16)Rng_Range(-0x5000, 0x5000);
     }
-    next.x += Math_SinS(h->yaw) * (P(1) / 10.0f);
-    next.z += Math_CosS(h->yaw) * (P(1) / 10.0f);
-    next.y = Mf_FloorY(&(Vec3f){ next.x, next.y + 80.0f, next.z }, BGCHECK_Y_MIN);
-    if (next.y > BGCHECK_Y_MIN + 1.0f && fabsf(next.y - h->pos.y) < 60.0f) {
-        h->pos = next;
-    } else {
-        h->yaw += 0x8000;
+    if (!hold) {
+        next.x += Math_SinS(h->yaw) * (P(1) / 10.0f);
+        next.z += Math_CosS(h->yaw) * (P(1) / 10.0f);
+        next.y = Mf_FloorY(&(Vec3f){ next.x, next.y + 80.0f, next.z }, BGCHECK_Y_MIN);
+        if (next.y > BGCHECK_Y_MIN + 1.0f && fabsf(next.y - h->pos.y) < 60.0f) {
+            h->pos = next;
+        } else {
+            h->yaw += 0x8000;
+        }
     }
     if (gEv.timer > SEC(5) && Mf_DistXZ(&h->pos, &p->actor.world.pos) > radius) {
         if (Every(SEC(1))) {
@@ -2010,3 +2030,39 @@ static s32 V3_QuizQuestion(PlayState* play, char* q, char opts[4][30]) {
 
 #undef P
 #undef SEC
+
+// V3 Friend Link: a friend moves this event's spot (Dowsing cache, a Seal, the next Scythe sweep).
+static s32 V3_Place(PlayState* play, s32 ev, Vec3f* at, s32 extra) {
+    Player* p = Pl(play);
+    f32 d = Mf_DistXZ(at, &p->actor.world.pos);
+
+    switch (ev) {
+        case EV_DOWSING:
+            if (d < 200.0f) {
+                return false;
+            }
+            sAHz[0].pos = *at;
+            gEv.fa = d;
+            return true;
+        case EV_SEALS:
+            if ((extra < 0) || (extra >= sAHzN) || (sAHz[extra].state != 1) || (d > 1200.0f)) {
+                return false;
+            }
+            sAHz[extra].pos = *at;
+            return true;
+        case EV_SCYTHE:
+            if (d > 800.0f) {
+                return false;
+            }
+            sScythePlaced = *at;
+            sScytheHasPlace = true;
+            return true;
+        default:
+            return false;
+    }
+}
+
+// How many spots a friend can place for the running event (the Pressure Seals).
+static s32 V3_PlaceCount(void) {
+    return MF_MAX(sAHzN, 1);
+}

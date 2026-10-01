@@ -4650,11 +4650,17 @@ s32 V2_TakenBounty(s32 k) {
 }
 
 static s32 Link_FriendsOnline(void);
+static const char* Link_FriendLabel(s32 row);
+static const char* Link_FriendValue(s32 row, char* out, s32 maxLen, u8* r, u8* g, u8* b);
+static void Link_FriendCycle(s32 row);
 static const char* Events_FlavorOf(s32 ev);
 
 const char* V2_Label(s32 id) {
     s32 n;
 
+    if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
+        return Link_FriendLabel(id - ID_LNK_FR_FIRST);
+    }
     if ((id >= ID_OV_BNT_FIRST) && (id < ID_OV_BNT_FIRST + 3)) {
         s32 slot = V2_TakenBounty(id - ID_OV_BNT_FIRST);
 
@@ -4782,6 +4788,9 @@ const char* V2_Value(s32 id, char* out, s32 maxLen, u8* r, u8* g, u8* b) {
 
     out[0] = '\0';
     *r = *g = *b = 255;
+    if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
+        return Link_FriendValue(id - ID_LNK_FR_FIRST, out, maxLen, r, g, b);
+    }
     if ((id >= ID_OV_BNT_FIRST) && (id < ID_OV_BNT_FIRST + 3)) {
         s32 slot = V2_TakenBounty(id - ID_OV_BNT_FIRST);
 
@@ -5088,6 +5097,9 @@ const char* V2_Desc(s32 id) {
     static char sDesc[64];
     s32 n;
 
+    if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
+        return "A: Full (anything), Helpful (only nice things), Blocked (nothing, and they see the moon's wrath).";
+    }
     if ((id >= ID_OV_BNT_FIRST) && (id < ID_OV_BNT_FIRST + 3)) {
         s32 slot = V2_TakenBounty(id - ID_OV_BNT_FIRST);
 
@@ -5129,7 +5141,7 @@ const char* V2_Desc(s32 id) {
         case ID_V2_DRAFT_REROLL: return "Swap both offers for two new ones.";
         case ID_V2_TRACKER: return "Arrow to a bounty you took, when it's near.";
         case ID_V2_REMOTE: return "Take bounties and shop from anywhere.";
-        case ID_V2_LINK: return "Your friend's web panel can mess with you.";
+        case ID_V2_LINK: return "Friends' web panels can mess with you. Set each friend below.";
         case ID_V2_LINKSTATE: return Link_StateDesc();
         case ID_V2_STREAK: return "Claim 3 in a cycle: bonus Marks + a rare bounty.";
         case ID_V2_BELITE: return "Drops bombs from the sky near you every 10s.";
@@ -5221,6 +5233,10 @@ const char* V2_Desc(s32 id) {
 
 // Actions. Returns true if the menu should close.
 s32 V2_RunAction(PlayState* play, s32 id) {
+    if ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) {
+        Link_FriendCycle(id - ID_LNK_FR_FIRST);
+        return false;
+    }
     if (id == ID_V2_DRAFT_REROLL) {
         s32 a = sOfferA;
         s32 b = sOfferB;

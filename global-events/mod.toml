@@ -55,7 +55,7 @@ optional_dependencies = [
 
 # Native libraries (e.g. DLLs) and the functions they export.
 native_libraries = [
-    { name = "GlobalEventsRemote", funcs = ["ger_init", "ger_state", "ger_poll", "ger_status", "ger_store", "ger_fetch"] }
+    { name = "GlobalEventsRemote", funcs = ["ger_init", "ger_state", "ger_poll", "ger_status", "ger_store", "ger_fetch", "ger_friends", "ger_map"] }
 ]
 
 # Inputs to the mod tool.
