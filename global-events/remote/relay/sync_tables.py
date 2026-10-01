@@ -121,7 +121,7 @@ old_tier = {p["id"]: p.get("tier", 1) for p in old["pools"]}
 pools = [{"id": i, "name": pool_names[i], "tier": old_tier.get(i, 1), "desc": next((p.get("desc", "") for p in old["pools"] if p["id"] == i), "")} for i in hunt]
 
 # --- zones: the game's 77 areas, drawn as a map of the outdoor ones ---------------------
-LAYOUT = {  # outdoor area: x, y on a 480 x 400 map, short label
+LAYOUT = {  # area: x, y on a 480 x 430 map, short label
     0: (240, 222, "S. Town"), 1: (276, 200, "E. Town"), 2: (204, 200, "W. Town"), 3: (240, 178, "N. Town"),
     4: (280, 228, "Laundry"), 5: (240, 200, "Termina Field"), 6: (240, 292, "Swamp Road"),
     7: (240, 335, "Southern Swamp"), 8: (165, 362, "Deku Palace"), 9: (240, 382, "Woodfall"),
@@ -130,7 +130,9 @@ LAYOUT = {  # outdoor area: x, y on a 480 x 400 map, short label
     16: (400, 26, "Snowhead"), 17: (340, 272, "Milk Road"), 18: (405, 320, "Romani Ranch"),
     19: (92, 212, "Great Bay Coast"), 20: (52, 285, "Zora Cape"), 21: (52, 140, "Pirates' Fortress"),
     22: (60, 345, "Zora Hall"), 23: (380, 200, "Road to Ikana"), 24: (430, 252, "Graveyard"),
-    25: (432, 150, "Ikana Canyon"), 26: (445, 88, "Stone Tower"),
+    25: (432, 158, "Ikana Canyon"), 26: (445, 105, "Stone Tower"),
+    # The four temples hang off their areas on the map.
+    49: (300, 408, "WF Temple"), 55: (455, 58, "SH Temple"), 65: (118, 302, "GB Temple"), 76: (385, 100, "ST Temple"),
 }
 zone_block = v2[v2.index("static const ZoneDef sZones[] = {"):v2.index("#undef ZL")]
 zones = []

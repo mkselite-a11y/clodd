@@ -36,6 +36,16 @@ What's new in v3:
 - **Surprises**: a friend can hide a surprise (an event, an ambush, a bomb drop, rupoor rain or your Nemesis) in any area of Termina. You get a pop-up that they placed one, never where. It gives off a faint shimmer and goes off when you walk into it. It's never placed right by a door or a loading zone.
 - **Merged moves**: "start an event" also covers "hurry the next one", "set their curse" also covers "reroll", and the bounty stars include WANTED. Renaming your Nemesis is cheap and quiet: you find out when you meet it. Zap and Force a Mutator are gone.
 
+New in 3.1:
+
+- **Forced Ambush**: an expensive move that pulls you out of any menu (even the pause menu) and surrounds you.
+- **One button for what's urgent**: when a friend can place or steer something, or an event is about to start, a big glowing button at the top takes them straight there.
+- **Look here**: on the radar, a friend can click anywhere for free to put a column of light in your world.
+- Air strikes and ambushes live on the Radar tab (Auto, or Aim). Curses and the mutator draft moved into Events; Gifts and Pranks are one tab. Enemies are listed easiest to hardest. The four temples have their own spots on the map.
+- New pranks: Cucco party, disco lights, confetti, and more sounds (the music dips so they're heard).
+- Friends type the room key and their name every time they open the page.
+- In game: the next-event countdown runs in real time, even while you're paused or in a menu. Searchlights' backup shows up close and sticks around 10 seconds after the lights go out. Big Poes are gone. Event settings are at the top of Choose Events, and Call/Ban an Event are Moon Services.
+
 A Friend Shield from the Moon Shop still eats the next mean move.
 
 ### Setting up the relay (once, free)

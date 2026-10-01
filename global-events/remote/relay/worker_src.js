@@ -66,14 +66,18 @@ const COMMANDS = {
   place:     [5,    2, "Place"],
   steer:     [0,    1, "Steer"],
   surprise:  [20,  30, "Plant a surprise"],
-  random:    [20,  20, "Surprise me"],
+  cuccos:    [10,  45, "Cucco party"],
+  disco:     [8,   45, "Disco lights"],
+  confetti:  [3,   15, "Confetti"],
+  beam:      [0,    1, "Look here"],
+  forced_ambush: [60, 300, "FORCED AMBUSH"],
   bet:       [0,    0, "Wager"],
 };
 
 // What a Helpful friend can't do (matches the game's own list).
 const HARMFUL = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt", "draft", "nem_stat",
   "bounty", "ambush", "curse", "curse_set", "tax", "airstrike", "size", "wanted", "ev_extend", "empower", "blackout",
-  "surprise", "place", "steer", "random", "bet"]);
+  "surprise", "place", "steer", "forced_ambush", "bet"]);
 
 // Events a friend can place things for, and the surprise kinds.
 const PLACEABLE = { 9: "the treasure", 23: "the procession's path", 38: "the buried cache", 42: "the next sweep", 55: "a seal" };
@@ -361,6 +365,13 @@ function validate(type, a, b, c, text) {
     case "steer":
       if (!(a >= 0 && a <= 2) || !(Math.abs(b) < 40000) || !(Math.abs(c) < 40000)) return "Pick a spot.";
       return [a, b, c, "", STEER_KINDS[a]];
+    case "beam":
+      if (!(Math.abs(a) < 40000) || !(Math.abs(b) < 40000)) return "Pick a spot.";
+      return [a, b, 0, "", ""];
+    case "forced_ambush":
+      if (!POOL_IDS.has(a)) return "Pick an enemy.";
+      if (!(b >= 3 && b <= 6)) return "3 to 6 enemies.";
+      return [a, b, 0, "", b + " " + poolName(a)];
     case "surprise": {
       const zone = TABLES.zones[a];
       if (!zone) return "Pick an area.";
@@ -387,48 +398,14 @@ function costFor(type, a, b, base, c) {
     case "nem_make": return [20, 30, 40, 55][poolT(a)];
     case "bounty": return [15, 20, 25, 35][poolT(a)];
     case "airstrike": return c === 1 ? base + 5 : base;
+    // Never cheaper than sending the same thing straight at them.
+    case "forced_ambush": return Math.min(POINTS_MAX, Math.max(base, [12, 18, 27, 45][poolT(a)] * Math.max(3, b)));
     case "surprise":
-      if (b === 0) return [20, 28, 36, 48][evT(c)];
-      if (b === 1) return [15, 20, 28, 40][poolT(c)];
-      return [base, base, 20, 15, 25][b] || base;
+      if (b === 0) return [25, 35, 45, 60][evT(c)];         // = start it now
+      if (b === 1) return [8, 12, 18, 30][poolT(c)] * 3;    // = an ambush of 3
+      return [base, base, 30, 15, 25][b] || base;           // bombs: more than an aimed air strike
     default: return base;
   }
-}
-
-// Surprise me: a random move that can actually happen right now.
-function pickRandom(st, mode) {
-  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
-  const pools = TABLES.pools.map((p) => p.id);
-  const options = mode === 1 ? [
-    () => ["heal", 0, 0, 0, ""],
-    () => ["gift", 0, 0, 0, ""],
-    () => ["pouch", pick(TABLES.pouch.map((p) => p.id)), 0, 0, ""],
-    () => ["sfx", Math.floor(Math.random() * TABLES.sounds.length), 0, 0, ""],
-    () => ["shake", 0, 0, 0, ""],
-    () => ["fakeout", 0, 0, 0, ""],
-  ] : [
-    () => ["airstrike", 0, 0, 0, ""],
-    () => ["ambush", pick(pools), 1 + Math.floor(Math.random() * 2), 0, ""],
-    () => ["sfx", Math.floor(Math.random() * TABLES.sounds.length), 0, 0, ""],
-    () => ["fakeout", 0, 0, 0, ""],
-    () => ["shake", 0, 0, 0, ""],
-    () => ["blackout", 0, 0, 0, ""],
-    () => ["empower", 0, 0, 0, ""],
-    () => ["size", pick([1, 2]), 0, 0, ""],
-    () => ["ev_next", pick(TABLES.events.map((e) => e.id)), -1, 0, ""],
-    () => ["nem_level", 0, 0, 0, ""],
-    () => ["nem_trait", pick(TABLES.traits.map((t) => t.id)), 0, 0, ""],
-    () => ["bounty", pick(pools), 2 + Math.floor(Math.random() * 3), 0, ""],
-    () => ["curse", 0, 0, 0, ""],
-  ];
-  for (let tries = 0; tries < 30; tries++) {
-    const [type, a, b, c, text] = pick(options)();
-    if (precheck(type, a, b, c, st)) continue;
-    const v = validate(type, a, b, c, text);
-    if (typeof v === "string") continue;
-    return [type, v];
-  }
-  return ["fakeout", [0, 0, 0, "", ""]];
 }
 
 function json(obj, status = 200) {
@@ -669,23 +646,16 @@ export default {
         return json({ ok: true, msg: "Wager placed. Good luck!", points: Math.floor(points - stake) });
       }
 
-      if (!power && points < def[0] && type === "random") return json({ ok: false, msg: "Not enough chaos points." });
-      let a = int(body.a), b = int(body.b), c = int(body.c), text = body.text;
-      let prefix = "";
-      if (type === "random") {
-        const [t, v] = pickRandom(st, mode);
-        type = t;
-        [a, b, c, text] = v;
-        prefix = "Surprise! ";
-      }
+      const a = int(body.a), b = int(body.b), c = int(body.c), text = body.text;
+      const prefix = "";
       const v = validate(type, a, b, c, text);
       if (typeof v === "string") return json({ ok: false, msg: v });
       const why = precheck(type, v[0], v[1], v[2], st);
       if (why) return json({ ok: false, msg: why });
-      const cost = power ? 0 : prefix ? def[0] : costFor(type, v[0], v[1], def[0], v[2]);
+      const cost = power ? 0 : costFor(type, v[0], v[1], def[0], v[2]);
       if (points < cost) return json({ ok: false, msg: "Not enough chaos points." });
       // Claim the cooldown in one step, so a double-click can't slip through.
-      const cdType = prefix ? "random" : type;
+      const cdType = type;
       const cd = COMMANDS[cdType][1];
       if (!power && cd > 0) {
         const claim = await db.prepare(
@@ -699,7 +669,8 @@ export default {
       const [va, vb, vc, vtext, extra] = v;
       const line = [type, va, vb, vc, vtext, myName].join("|");
       // Steering is many small moves: it reaches the game but stays out of the history.
-      const label = type === "steer" ? "" : who + prefix + COMMANDS[type][2] + (extra ? ": " + extra : "");
+      const quiet = type === "steer" || type === "beam";
+      const label = quiet ? "" : who + prefix + COMMANDS[type][2] + (extra ? ": " + extra : "");
       const writes = [
         db.prepare("INSERT INTO cmds (t, line, label, cost, refunded, fid) VALUES (?, ?, ?, ?, 0, ?)").bind(now, line, label, cost, fid),
         db.prepare("DELETE FROM cmds WHERE id < (SELECT MAX(id) - 300 FROM cmds)"),
@@ -707,7 +678,7 @@ export default {
       if (!power && cost > 0) writes.push(...pointsSet(db, kv, fid, now, points - cost));
       await db.batch(writes);
       const wait = st.hold ? " (waits: " + st.hold.toLowerCase() + ")" : "";
-      return json({ ok: true, msg: type === "steer" ? "" : "Sent: " + label + wait, points: Math.floor(points - cost) });
+      return json({ ok: true, msg: quiet ? "" : "Sent: " + label + wait, points: Math.floor(points - cost) });
     }
 
     return new Response("Not found", { status: 404 });
