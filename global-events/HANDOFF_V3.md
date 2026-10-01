@@ -24,3 +24,6 @@ Map chunks: POST /api/map with scene, bx, bz, base, cells (16x16 cells of 128 un
 Pull adds a line `friends|NAME,NAME` (online in last 30 s).
 Commands (id|type|a|b|c|text|from): remove zap, mut_add; panel merges ev_now+ev_soon, curse+curse_set, bounty+wanted; nem_name cheap and silent; airstrike a,b = x,z, c = 1 targeted; ambush text "x,z;x,z"; place|ev|x|z|extra (treasure 9, dowsing 38, seals 55, scythe 42, procession 23), 15 s window after the event starts; steer|kind|x|z (live, auto after 5 s idle); surprise|zone|kind|arg|"x,z" (kinds: event, ambush, bomb, rupoors, nemesis), pop-up "NAME has placed a surprise...", faint shimmer, never within 400 units of an exit.
 Per-friend points and cooldowns keyed by a hidden browser key + name; Blocked friends see a frightening dead page.
+
+## Versioning (from the user)
+Bump the third digit for each new build: 3.1.0 shipped, so the next build is 3.1.1, then 3.1.2, and so on. Set it in both mod.toml and mod_cheats.toml.
