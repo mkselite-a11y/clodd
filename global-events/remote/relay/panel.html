@@ -89,6 +89,40 @@
   #tip .x { color: var(--dim); margin-top: 5px; }
   #tip .w { color: var(--red); margin-top: 5px; }
   @media (max-width: 420px) { #tabs button { font-size: 13px; padding: 9px 5px; } }
+  .me { font-size: 13px; color: var(--dim); white-space: nowrap; }
+  .me b { color: var(--text); }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-left: 4px; vertical-align: 1px; }
+  .badge.help { background: #1d3a28; color: var(--green); border: 1px solid #2f6a45; }
+  .chip.friend { border-color: #3f5a48; color: var(--green); }
+  .chip.place { border-color: #6a4a2a; background: #3a2f12; color: var(--moon); }
+  #radarWrap, .mini { position: relative; width: 100%; max-width: 560px; margin: 0 auto; }
+  #radar, .mini canvas { width: 100%; aspect-ratio: 1; display: block; background: #0b0a12; border: 1px solid var(--line); border-radius: 10px; touch-action: none; cursor: crosshair; }
+  .seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .seg button { margin: 2px 0; padding: 6px 10px; font-size: 13px; }
+  .seg button.on { background: #5a3a7a; border-color: var(--purple); }
+  #termina svg { width: 100%; max-width: 620px; height: auto; display: block; margin: 0 auto; }
+  #termina .edge { stroke: #3a3352; stroke-width: 2; }
+  #termina .node { fill: #231f33; stroke: #4a4166; stroke-width: 1.5; cursor: pointer; }
+  #termina .field { fill: #1c2420; stroke: #3f5a48; stroke-dasharray: 4 3; cursor: pointer; }
+  #termina .here { stroke: var(--green); stroke-width: 2.5; }
+  #termina .sel { stroke: var(--moon); stroke-width: 3; }
+  #termina .lbl { fill: var(--dim); font-size: 10px; text-anchor: middle; paint-order: stroke; stroke: var(--card); stroke-width: 3px; pointer-events: none; }
+  #termina .mk { font-size: 9px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+  .rooms { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+  .rooms button { margin: 0; padding: 4px 9px; font-size: 13px; }
+  .rooms button.on { background: #5a3a7a; border-color: var(--purple); }
+  /* Blocked: the moon has turned its face away. */
+  #dead { position: fixed; inset: 0; z-index: 50; background: radial-gradient(ellipse at center, #2a0505 0%, #050000 70%); color: #ff3b2f; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 16px; overflow: hidden; font-family: Georgia, serif; }
+  #dead::before { content: ""; position: absolute; inset: -50%; background: repeating-radial-gradient(circle at 30% 40%, rgba(255,0,0,.04) 0 2px, transparent 2px 5px); animation: grain .25s steps(3) infinite; pointer-events: none; }
+  #dead svg { width: min(70vw, 340px); height: auto; animation: loom 9s ease-in-out infinite alternate; filter: drop-shadow(0 0 40px rgba(255,40,0,.45)); }
+  #dead h1 { font-size: clamp(22px, 6vw, 40px); letter-spacing: .12em; margin: 18px 0 6px; animation: flicker 3.3s infinite; text-shadow: 0 0 18px #ff1a00; }
+  #dead p { color: #b33; margin: 4px 0; letter-spacing: .08em; animation: flicker 5.1s infinite; }
+  #dead .count { color: #ff6b4a; font-size: 13px; margin-top: 18px; opacity: .7; }
+  @keyframes loom { from { transform: scale(1) rotate(-2deg); } to { transform: scale(1.12) rotate(2deg); } }
+  @keyframes flicker { 0%, 100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .2; } 50% { opacity: .9; } 52% { opacity: .1; } 54% { opacity: 1; } }
+  @keyframes grain { 0% { transform: translate(0, 0); } 33% { transform: translate(-3%, 2%); } 66% { transform: translate(2%, -3%); } }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+  #dead .eye { transform-origin: center; transform-box: fill-box; animation: blink 6s infinite; }
 </style>
 </head>
 <body>
@@ -97,31 +131,34 @@
     <span class="dot" id="dot"></span>
     <h1 id="title">Moon's Hand</h1>
     <span id="powerTag">MOON POWER</span>
+    <span class="me" id="meTag"></span>
     <span class="muted" id="conn" data-tip="Green: live. Yellow: their game is paused or busy, and your moves land when they're back. Red: their game isn't sending anything.">Not connected</span>
   </div>
   <div class="bar2" id="bar2" hidden>
-    <div class="pts" data-tip="Chaos points and cooldowns are shared by everyone using this room key. Every move costs some and has a cooldown. They refill over time, and you all get a bonus every time they fall. If their game can't do a move, the points come back.">
+    <div class="pts" data-tip="Your own chaos points and cooldowns (each friend has their own). Every move costs some and has a cooldown. They refill over time, and every friend gets a bonus each time they fall. If their game can't do a move, the points come back.">
       <div class="meter"><div id="pointsBar"></div></div>
       <b id="points">0</b> / <span id="pmax">100</span> chaos · +<span id="pmin">10</span>/min
     </div>
-    <button class="surprise" data-act="surprise">Surprise me <span class="cost"></span></button>
+    <button class="surprise" data-act="random">Surprise me <span class="cost"></span></button>
   </div>
   <nav id="tabs" hidden>
     <button data-tab="events" data-tip="Start events, pick their next one, change the timing and bet on how they do.">Events</button>
     <button data-tab="combat" data-tip="Send bombs, enemies and their Nemesis after them, or post bounties.">Combat</button>
+    <button data-tab="radar" data-tip="A live view around them. Aim air strikes and ambushes, steer events and place things.">Radar</button>
+    <button data-tab="map" data-tip="All of Termina: where they are, and where you hide surprises for them.">Map</button>
     <button data-tab="pranks" data-tip="Mischief that doesn't hurt: shakes, blackouts, size changes, sounds and messages.">Pranks</button>
-    <button data-tab="curses" data-tip="Long-lasting twists: their Cycle Curse and mutators.">Curses</button>
+    <button data-tab="curses" data-tip="Long-lasting twists: their Cycle Curse and their next mutator draft.">Curses</button>
     <button data-tab="gifts" data-tip="Help them out (or tax them): hearts, Moon Marks and pouch items.">Gifts</button>
-    <button data-tab="info" data-tip="Everything about their run, plus your history.">Info</button>
+    <button data-tab="info" data-tip="Everything about their run, who's here, and the history.">Info</button>
   </nav>
   <div id="hold"></div>
 </header>
 
 <div id="login" class="card" hidden>
   <h2>Room key</h2>
-  <p class="muted">Ask the player for the room key.</p>
+  <p class="muted">Ask the player for the room key, and pick a name they'll know you by (up to 5 letters, nobody else in the room can use it).</p>
   <input type="password" id="keyInput" placeholder="Room key">
-  <input type="text" id="nameInput" maxlength="5" placeholder="Your name (optional, 5 letters)">
+  <input type="text" id="nameInput" maxlength="5" placeholder="Your name (5 letters)">
   <button id="keyBtn">Enter</button>
 </div>
 
@@ -137,7 +174,6 @@
       <div class="desc" id="nowPicks"></div>
       <div class="row">
         <button data-act="empower">Empower the next one <span class="cost"></span></button>
-        <button data-act="ev_soon">Hurry the next one <span class="cost"></span></button>
         <button data-act="ev_extend">+30 seconds <span class="cost"></span></button>
         <button data-act="ev_end">End it <span class="cost"></span></button>
       </div>
@@ -158,6 +194,7 @@
         <button data-act="ev_now">Start it now <span class="cost"></span></button>
         <button data-act="ev_next">Make it the next one <span class="cost"></span></button>
       </div>
+      <div class="desc" id="placeHint">Treasure Hunt, Procession, Dowsing Moon, Scythe Sweep and Pressure Seals: you get 15 seconds at the start to place them on the Radar.</div>
       <div class="desc" id="comboDesc">Combos only work with "Make it the next one".</div>
     </div>
   </section>
@@ -165,14 +202,14 @@
   <!-- COMBAT -->
   <section class="tab" data-tab="combat" hidden>
     <div class="card">
-      <h2 data-tip="Direct attacks. They land right where they are.">Attack</h2>
+      <h2 data-tip="Direct attacks. They land right where they are. Aim them on the Radar tab instead.">Attack</h2>
       <div class="row">
-        <button data-act="airstrike">Air strike <span class="cost"></span></button>
-        <button data-act="zap">Zap a heart <span class="cost"></span></button>
+        <button data-act="airstrike">Air strike on them <span class="cost"></span></button>
       </div>
       <div class="sub">Ambush</div>
       <div class="row"><select id="ambPool"></select><select id="ambCount" style="max-width:80px"><option value="1">x1</option><option value="2">x2</option><option value="3">x3</option></select></div>
       <button data-act="ambush">Ambush them <span class="cost"></span></button>
+      <div class="desc">Want to pick where? Use the Radar tab.</div>
     </div>
     <div class="card">
       <h2 data-tip="An enemy that beat them and now hunts them. It has its own name, level and traits.">Nemesis</h2>
@@ -201,22 +238,69 @@
         <div class="row"><input type="text" id="nemName" maxlength="12" placeholder="New name"><button data-act="nem_name">Rename <span class="cost"></span></button></div>
         <div class="sub">Too weak?</div>
         <button data-act="nem_purge">Purge it <span class="cost"></span></button>
-        <div class="desc">The next Nemesis starts at its level (up to the new type's max) with new traits.</div>
+        <div class="desc">The next Nemesis starts at its level (up to 200) with new traits.</div>
       </div>
       <div class="desc" id="nemInherit"></div>
     </div>
     <div class="card">
       <h2 data-tip="A bounty is a tough enemy with traits. They get Moon Marks for beating it.">Bounties</h2>
       <div class="note" data-need="4">They have bounties turned off.</div>
-      <div class="row"><select id="bPool"></select><select id="bStars" style="max-width:110px"></select></div>
-      <div class="desc"><span id="starPay"></span> Up to one trait per star (none = random). It shows up right where they are.</div>
+      <div class="row"><select id="bPool"></select><select id="bStars" style="max-width:130px"></select></div>
+      <div class="desc"><span id="starPay"></span> Up to one trait per star (none = random). It shows up right where they are. WANTED goes on their board instead: a 5-star with Meteor Caller they have to go find.</div>
       <div class="traits" id="bTraits"></div>
       <div class="row">
         <button data-act="bounty">Post it <span class="cost"></span></button>
-        <button data-act="wanted">Post a WANTED poster <span class="cost"></span></button>
       </div>
       <div class="sub" data-tip="Bounties they accepted. Stars show how tough it is, and the area is where it waits.">They're hunting</div>
       <div id="bountyList"></div>
+    </div>
+  </section>
+
+  <!-- RADAR -->
+  <section class="tab" data-tab="radar" hidden>
+    <div class="card wide">
+      <h2 data-tip="Their surroundings, live. North is up. The arrow is them, the pale wedge is where their camera looks. The ground fills in as they explore.">Radar</h2>
+      <div class="row" id="placeBox" hidden><span class="chip place" id="placeLine"></span><select id="sealSel" style="max-width:120px" hidden></select></div>
+      <div class="seg" id="aimSeg">
+        <button data-aim="look" class="on">Just look</button>
+        <button data-aim="airstrike">Air strike here</button>
+        <button data-aim="ambush">Ambush here</button>
+        <button data-aim="steer" id="steerBtn" hidden>Steer</button>
+        <button data-aim="place" id="placeBtn" hidden>Place</button>
+      </div>
+      <div class="desc" id="aimDesc">Pick what a click does.</div>
+      <div id="radarWrap"><canvas id="radar" width="560" height="560"></canvas></div>
+      <div class="row" style="justify-content:space-between">
+        <div class="seg" id="zoomSeg"><button data-zoom="1200">Close</button><button data-zoom="2400" class="on">Medium</button><button data-zoom="5000">Far</button></div>
+        <span class="muted" id="radarNote"></span>
+      </div>
+      <div class="legend"><span><i style="background:var(--green)"></i>Them</span><span><i style="background:var(--red)"></i>Enemy</span><span><i style="background:#ff2a5a"></i>Nemesis</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#8fa3c4"></i>People</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section class="tab" data-tab="map" hidden>
+    <div class="card wide">
+      <h2 data-tip="Where they are in Termina, plus their Nemesis, the bounties they took and the surprises waiting. Click an area to look closer or hide a surprise there.">Termina</h2>
+      <div id="termina"></div>
+      <div class="legend"><span><i style="background:var(--green)"></i>Them (L)</span><span><i style="background:var(--red)"></i>Nemesis (N)</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#5fe0e0"></i>Posted by a friend</span><span><i style="background:#ff8a4c"></i>WANTED</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
+      <div class="desc" id="mapNote"></div>
+    </div>
+    <div class="card">
+      <h2 id="zoneTitle" data-tip="The area you clicked on the map.">Pick an area</h2>
+      <div class="desc" id="zoneInfo">Click an area on the map.</div>
+      <div class="sub" id="roomsSub" hidden>Places inside</div>
+      <div class="rooms" id="rooms"></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="It waits in the area you picked until they walk into it. They get a pop-up that someone placed a surprise (not where), and it gives off a faint shimmer. Never right by a door or a loading zone.">Hide a surprise</h2>
+      <div class="note" id="surZone">Pick an area on the map first.</div>
+      <div class="row"><select id="surKind"><option value="0">An event</option><option value="1">An ambush (3 enemies)</option><option value="2">A bomb drop</option><option value="3">Rupoor rain</option><option value="4">Their Nemesis</option></select></div>
+      <div class="row" id="surArgRow"><select id="surEv"></select><select id="surPool" hidden></select></div>
+      <div class="desc" id="surSpotNote">Spot: anywhere in the area (not by a door).</div>
+      <div class="mini" id="surMiniWrap" hidden><canvas id="surMini" width="420" height="420"></canvas></div>
+      <div class="row"><button data-act="surprise">Hide it <span class="cost"></span></button><button id="surClear" hidden>Any spot</button></div>
+      <div class="desc" id="surWaiting"></div>
     </div>
   </section>
 
@@ -254,16 +338,11 @@
       <div class="sub">Change it</div>
       <div class="row"><select id="curseSel"></select><button data-act="curse_set">Set it <span class="cost"></span></button></div>
       <div class="desc" id="curseDesc"></div>
-      <button data-act="curse">Reroll randomly <span class="cost"></span></button>
     </div>
     <div class="card">
       <h2 data-tip="Lasting penalties on their run. They draft one each dawn and dusk and can carry up to 6.">Mutators</h2>
       <div class="note" data-need="2">They have mutators turned off.</div>
       <div id="mutList"></div>
-      <div class="sub">Force one on them</div>
-      <select id="mutSel"></select>
-      <div class="desc" id="mutDesc"></div>
-      <button data-act="mut_add">Force it on them <span class="cost"></span></button>
       <div class="sub" data-tip="At each dawn and dusk they pick one of two mutators. You choose which two.">Rig their next draft</div>
       <div class="row"><select id="draftA"></select><select id="draftB"></select></div>
       <div class="desc" id="draftDesc"></div>
@@ -294,20 +373,16 @@
 
   <!-- INFO -->
   <section class="tab" data-tab="info" hidden>
-    <div class="card wide">
-      <h2 data-tip="Where they are in Termina right now, plus their Nemesis and the bounties they've taken. Areas without a marker are empty. Inside buildings and dungeons they show at the last area they were in.">Map</h2>
-      <div id="map"></div>
-      <div class="legend"><span><i style="background:var(--green)"></i>Link (L)</span><span><i style="background:var(--red)"></i>Nemesis (N)</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#5fe0e0"></i>Your bounty</span><span><i style="background:#ff8a4c"></i>WANTED</span><span><i style="background:var(--purple)"></i>Rare</span></div>
-      <div class="desc" id="mapNote"></div>
-    </div>
     <div class="card">
       <h2 data-tip="Live info from their game. Updates every few seconds.">Their game</h2>
       <div class="kv" id="statusKv"><b>Status</b><span>Waiting for the game...</span></div>
     </div>
     <div class="card">
-      <h2 data-tip="Shown in their game with everything you send, so they know who did it when several friends share a room.">Your name</h2>
+      <h2 data-tip="Friends with this panel open right now. The player decides in game what each friend may do.">Who's here</h2>
+      <div id="friendList" class="muted">Just you.</div>
+      <div class="sub">Your name</div>
       <div class="row"><input type="text" id="nameEdit" maxlength="5" placeholder="5 letters"><button id="nameSave">Save</button></div>
-      <div class="desc">Shown in their game on your moves' messages, and in the history. Friends sharing this room key share chaos points and cooldowns.</div>
+      <div class="desc">Shown in their game on your moves, and in the history. The player sets what each friend may do by name: Full, Helpful (only nice things) or Blocked. You have your own chaos points and cooldowns.</div>
     </div>
     <div class="card wide">
       <h2 data-tip="Everything everyone has done, plus wager results and refunds.">History</h2>
@@ -315,6 +390,22 @@
       <div class="desc" id="tipHint" style="margin-top:10px">Hover over anything for details.</div>
     </div>
   </section>
+</div>
+<div id="dead" hidden>
+  <svg viewBox="0 0 200 200" aria-hidden="true">
+    <defs><radialGradient id="mg" cx="45%" cy="40%" r="60%"><stop offset="0" stop-color="#d9a66a"/><stop offset=".7" stop-color="#7a3d1c"/><stop offset="1" stop-color="#2a0c04"/></radialGradient></defs>
+    <circle cx="100" cy="100" r="92" fill="url(#mg)"/>
+    <circle cx="58" cy="140" r="9" fill="#5a2a12" opacity=".6"/><circle cx="150" cy="58" r="6" fill="#5a2a12" opacity=".6"/><circle cx="140" cy="150" r="5" fill="#5a2a12" opacity=".5"/>
+    <path d="M40 72 L88 86 L84 94 Z" fill="#1a0400"/><path d="M160 72 L112 86 L116 94 Z" fill="#1a0400"/>
+    <g class="eye"><ellipse cx="68" cy="98" rx="17" ry="13" fill="#fff4c0"/><circle cx="72" cy="99" r="7" fill="#ff2a00"/><circle cx="72" cy="99" r="3" fill="#000"/></g>
+    <g class="eye"><ellipse cx="132" cy="98" rx="17" ry="13" fill="#fff4c0"/><circle cx="128" cy="99" r="7" fill="#ff2a00"/><circle cx="128" cy="99" r="3" fill="#000"/></g>
+    <path d="M58 140 L70 132 L80 142 L92 132 L100 144 L108 132 L120 142 L130 132 L142 140 L130 156 L70 156 Z" fill="#1a0400"/>
+    <path d="M70 142 L76 150 L82 142 M118 142 L124 150 L130 142" stroke="#e8d9b0" stroke-width="2" fill="none"/>
+  </svg>
+  <h1>YOU ARE NOT WELCOME</h1>
+  <p id="deadName">The moon has turned its face from you.</p>
+  <p>Your hand no longer reaches Termina.</p>
+  <div class="count" id="deadCount"></div>
 </div>
 <div id="toast"></div>
 <div id="tip" role="tooltip"></div>
@@ -329,6 +420,14 @@ const store = {
 };
 let key = store.get("ge_key") || "";
 let myName = store.get("ge_name") || "";
+// A hidden id for this browser: your points, cooldowns and name belong to it.
+let fid = store.get("ge_fid") || "";
+if (!fid) {
+  const a = new Uint8Array(12);
+  (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach((_, i) => (a[i] = Math.random() * 256));
+  fid = [...a].map((x) => "abcdefghijklmnopqrstuvwxyz0123456789"[x % 36]).join("");
+  store.set("ge_fid", fid);
+}
 let lastLogTop = null;
 const cleanName = (v) => String(v || "").replace(/[^A-Za-z0-9]/g, "").slice(0, 5);
 let power = store.get("ge_power") === "1";
@@ -340,7 +439,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v === undefined ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 function headers(extra) {
-  const h = Object.assign({ "X-Room-Key": key }, extra || {});
+  const h = Object.assign({ "X-Room-Key": key, "X-Friend-Id": fid, "X-Friend-Name": myName }, extra || {});
   if (power) { h["X-Power"] = "1"; h["X-Power-Key"] = powerKey; }
   return h;
 }
@@ -410,46 +509,50 @@ function tierTag(x, sel) {
 
 function setup() {
   fill($("evSel"), T.events);
+  $("evSel").insertAdjacentHTML("afterbegin", '<option value="-1">Any: just hurry the next one</option>');
+  $("evSel").value = String(T.events[0].id);
   fill($("comboSel"), T.events.filter((e) => e.second), true);
   fill($("nemPool"), T.pools); fill($("bPool"), T.pools); fill($("ambPool"), T.pools);
   fill($("nemTrait"), T.traits);
-  fill($("mutSel"), T.muts); fill($("draftA"), T.muts); fill($("draftB"), T.muts);
+  fill($("draftA"), T.muts); fill($("draftB"), T.muts);
   fill($("sfxSel"), T.sounds); fill($("pouchSel"), T.pouch); fill($("curseSel"), T.curses);
+  $("curseSel").insertAdjacentHTML("afterbegin", '<option value="-1">A random one (reroll)</option>');
+  fill($("surEv"), T.events); fill($("surPool"), T.pools);
   $("draftB").selectedIndex = 1;
-  $("bStars").innerHTML = [1, 2, 3, 4, 5].map((s) => `<option value="${s}">${"*".repeat(s)}</option>`).join("");
+  $("bStars").innerHTML = [1, 2, 3, 4, 5].map((s) => `<option value="${s}">${"*".repeat(s)}</option>`).join("") + '<option value="W">WANTED</option>';
   $("bStars").value = "3";
   $("bTraits").innerHTML = T.traits.map((t) => `<label data-tip="${esc(t.desc)}"><input type="checkbox" value="${t.id}">${esc(t.name)}</label>`).join("");
   // No more trait boxes than stars.
   const limitTraits = () => {
-    const max = parseInt($("bStars").value, 10);
+    const max = $("bStars").value === "W" ? 0 : parseInt($("bStars").value, 10);
     const boxes = [...document.querySelectorAll("#bTraits input")];
     const on = boxes.filter((b) => b.checked).length;
     boxes.forEach((b) => (b.disabled = !b.checked && on >= max));
   };
   $("bTraits").addEventListener("change", limitTraits);
   $("bStars").addEventListener("change", () => {
-    const max = parseInt($("bStars").value, 10);
+    const max = $("bStars").value === "W" ? 0 : parseInt($("bStars").value, 10);
     [...document.querySelectorAll("#bTraits input:checked")].slice(max).forEach((b) => (b.checked = false));
     limitTraits();
   });
   const showDesc = () => {
     const e = T.events.find((x) => x.id == $("evSel").value);
-    $("evDesc").textContent = e ? e.desc + (e.primary ? "" : " (can't lead a combo)") : "";
+    $("evDesc").textContent = e ? e.desc + (e.primary ? "" : " (can't lead a combo)") : "Cuts the wait for their next event down to 10 seconds. Only between events.";
     $("comboSel").disabled = !!e && !e.primary;
     if (e && !e.primary) $("comboSel").value = "-1";
-    $("mutDesc").textContent = descOf(T.muts, $("mutSel").value);
     $("nemTraitDesc").textContent = T.traits[$("nemTrait").value].desc;
     $("pouchDesc").textContent = T.pouch[$("pouchSel").value].desc;
-    $("curseDesc").textContent = descOf(T.curses, $("curseSel").value);
+    $("curseDesc").textContent = $("curseSel").value === "-1" ? "Rerolls their Cycle Curse to a random one." : descOf(T.curses, $("curseSel").value);
     $("draftDesc").textContent = `A: ${descOf(T.muts, $("draftA").value)} B: ${descOf(T.muts, $("draftB").value)}`;
     const bTier = ((T.pools.find((p) => p.id == $("bPool").value)) || { tier: 1 }).tier;
-    $("starPay").textContent = `Pays them ${Math.floor((10 * parseInt($("bStars").value, 10) + 5) * [100, 115, 135, 165][bTier] / 100)} Moon Marks (+50% for the bonus goal, plus their rank bonus).`;
+    $("starPay").textContent = $("bStars").value === "W" ? "A WANTED poster pays them triple." :
+      `Pays them ${Math.floor((10 * parseInt($("bStars").value, 10) + 5) * [100, 115, 135, 165][bTier] / 100)} Moon Marks (+50% for the bonus goal, plus their rank bonus).`;
     const c = T.events.find((x) => x.id == $("comboSel").value);
     $("comboDesc").textContent = c ? "Combo: " + c.desc + " Combos only work with \"Make it the next one\"." : "Combos only work with \"Make it the next one\".";
   };
-  ["evSel", "comboSel", "mutSel", "draftA", "draftB", "bStars", "bPool", "nemTrait", "pouchSel", "curseSel"].forEach((id) => $(id).addEventListener("change", showDesc));
+  ["evSel", "comboSel", "draftA", "draftB", "bStars", "bPool", "nemTrait", "pouchSel", "curseSel"].forEach((id) => $(id).addEventListener("change", showDesc));
   // Prices depend on what's picked.
-  ["evSel", "comboSel", "ambPool", "ambCount", "nemPool", "bPool", "stakeSel", "nemTrait", "mutSel", "curseSel", "draftA", "draftB"]
+  ["evSel", "comboSel", "ambPool", "ambCount", "nemPool", "bPool", "bStars", "stakeSel", "nemTrait", "curseSel", "draftA", "draftB", "surKind", "surEv", "surPool"]
     .forEach((id) => $(id).addEventListener("change", () => render()));
   showDesc();
   document.querySelectorAll("button[data-act]").forEach((b) => b.addEventListener("click", () => {
@@ -458,20 +561,27 @@ function setup() {
   }));
   setupTips();
   setupTabs();
+  setupRadar();
+  setupSurprise();
   $("nameInput").value = myName;
   $("nameEdit").value = myName;
   $("nameSave").addEventListener("click", () => {
-    myName = cleanName($("nameEdit").value);
+    const want = cleanName($("nameEdit").value);
+    if (!want) return toast("You need a name (letters and numbers).");
+    myName = want;
     $("nameEdit").value = myName;
     store.set("ge_name", myName);
-    toast(myName ? "They'll see you as " + myName + "." : "Name cleared.");
+    toast("They'll see you as " + myName + ".");
+    refresh();
   });
   $("keyBtn").addEventListener("click", () => {
     const typed = $("nameInput").value.trim();
     myName = cleanName(typed);
+    if (!myName) return toast("Pick a name: up to 5 letters or numbers.");
     $("nameEdit").value = myName;
     store.set("ge_name", myName);
-    if (typed && typed !== myName) setTimeout(() => toast(myName ? "They'll see you as " + myName + "." : "Names can only use letters and numbers."), 400); key = $("keyInput").value.trim(); store.set("ge_key", key); start(); });
+    if (typed !== myName) setTimeout(() => toast("They'll see you as " + myName + "."), 400);
+    key = $("keyInput").value.trim() || key; store.set("ge_key", key); start(); });
   $("keyInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("keyBtn").click(); });
   $("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("keyBtn").click(); });
   $("nameEdit").addEventListener("keydown", (e) => { if (e.key === "Enter") $("nameSave").click(); });
@@ -485,9 +595,22 @@ function setup() {
   }));
 }
 
+// The merged controls: one button, a different move depending on what's picked.
+function resolve(type) {
+  if (type === "ev_now" && $("evSel").value === "-1") return "ev_soon";
+  if (type === "curse_set" && $("curseSel").value === "-1") return "curse";
+  if (type === "bounty" && $("bStars").value === "W") return "wanted";
+  return type;
+}
+
 function args(type, dataA) {
   const v = (id) => parseInt($(id).value, 10);
   switch (type) {
+    case "surprise": {
+      const kind = v("surKind");
+      return { a: surZone, b: kind, c: kind === 0 ? v("surEv") : kind === 1 ? v("surPool") : 0, text: surSpot ? surSpot.join(",") : "" };
+    }
+    case "airstrike": return { a: 0, b: 0, c: 0 };
     case "size": return { a: parseInt(dataA, 10) };
     case "nem_stat": return { a: parseInt(dataA, 10) };
     case "bet": return { a: parseInt(dataA, 10), b: v("stakeSel") };
@@ -499,7 +622,6 @@ function args(type, dataA) {
     case "nem_make": return { a: v("nemPool") };
     case "nem_trait": return { a: v("nemTrait") };
     case "nem_name": return { text: $("nemName").value };
-    case "mut_add": return { a: v("mutSel") };
     case "draft": return { a: v("draftA"), b: v("draftB") };
     case "bounty": {
       let mask = 0;
@@ -512,19 +634,23 @@ function args(type, dataA) {
   }
 }
 
-async function act(type, dataA) {
-  if (busy) return;
-  busy = true;
-  render();
+// over: exact arguments (the radar's aimed moves); otherwise they come from the page.
+async function act(type, dataA, over, quiet) {
+  if (busy && !quiet) return;
+  if (!over) type = resolve(type);
+  if (!quiet) { busy = true; render(); }
   try {
     const r = await fetch("/api/cmd", {
       method: "POST",
       headers: headers({ "content-type": "application/json" }),
-      body: JSON.stringify(Object.assign({ type, from: myName }, args(type, dataA))),
+      body: JSON.stringify(Object.assign({ type }, over || args(type, dataA))),
     });
     if (r.status === 401) { toast(await r.text()); busy = false; return logout(); }
     const j = await r.json();
-    toast(j.msg);
+    if (j.blocked) { busy = false; return refresh(); }
+    if (j.msg) toast(j.msg);
+    if (quiet) return;
+    if (j.ok && type === "surprise") { surSpot = null; drawMini(); }
     if (j.ok && type === "msg") $("msgText").value = "";
     if (j.ok && type === "nem_name") $("nemName").value = "";
   } catch (e) { toast("Couldn't reach the relay."); }
@@ -536,71 +662,6 @@ function parseStatus(text) {
   const o = {};
   (text || "").split("\n").forEach((l) => { const i = l.indexOf("="); if (i > 0) o[l.slice(0, i)] = l.slice(i + 1); });
   return o;
-}
-
-// Termina, as a map of areas and the paths between them (from the game's own area list).
-function drawMap(s, hasNem) {
-  const Z = T.zones || [];
-  if (!Z.length) return;
-  const inRange = (v) => (v >= 0 && v < Z.length ? v : -1);
-  const byName = (n) => Z.findIndex((z) => z.name === n);
-  // Older game versions don't send area numbers: fall back to the area names.
-  const pz = s.pz !== undefined ? inRange(parseInt(s.pz, 10)) : (s.area ? byName(s.area) : -1);
-  const lz = s.lz !== undefined ? inRange(parseInt(s.lz, 10)) : -1;
-  const nz = !hasNem ? -1 : s.nz !== undefined ? inRange(parseInt(s.nz, 10)) : byName((s.nem || "").split("|")[3]);
-  const at = pz >= 0 ? pz : lz;
-  const marks = {}; // zone -> [{color, text, tip}]
-  const add = (z, m) => { if (z >= 0 && z < Z.length) (marks[z] = marks[z] || []).push(m); };
-  if (at >= 0) add(at, { c: "var(--green)", t: pz >= 0 ? "L" : "L?", tip: pz >= 0 ? "They're here." : "Last seen here (they're inside somewhere)." });
-  if (nz >= 0) add(nz, { c: "var(--red)", t: "N", tip: "Their Nemesis is roaming here." });
-  (s.bz || "").split(",").filter(Boolean).forEach((b) => {
-    const kind = b[0], z = parseInt(b.slice(1), 10);
-    const k = { F: ["#5fe0e0", "Your bounty waits here."], W: ["#ff8a4c", "The WANTED target waits here."], R: ["var(--purple)", "A rare bounty waits here."], B: ["var(--moon)", "A bounty they took waits here."] }[kind] || ["var(--moon)", "A bounty waits here."];
-    add(z, { c: k[0], t: "★", tip: k[1] });
-  });
-  let svg = '<svg viewBox="0 0 440 354" role="img" aria-label="Map of Termina">';
-  const drawn = new Set();
-  Z.forEach((z) => z.links.forEach((o) => {
-    const key = Math.min(z.id, o) + "-" + Math.max(z.id, o);
-    if (drawn.has(key) || !Z[o]) return;
-    drawn.add(key);
-    svg += `<line class="edge" x1="${z.x}" y1="${z.y}" x2="${Z[o].x}" y2="${Z[o].y}"/>`;
-  }));
-  // Termina Field surrounds Clock Town.
-  const field = Z[1];
-  const fieldTip = field.name + ((marks[1] || []).length ? ": " + marks[1].map((m) => m.tip).join(" ") : "");
-  svg += `<ellipse class="field${at === 1 ? " here" : ""}" cx="${field.x}" cy="${field.y}" rx="62" ry="40"${tipAttr(fieldTip)}/>`;
-  svg += `<text class="lbl" x="${field.x}" y="${field.y - 20}">${esc(field.name)}</text>`;
-  Z.forEach((z) => {
-    if (z.id === 1) return;
-    const tip = z.name + ((marks[z.id] || []).length ? ": " + marks[z.id].map((m) => m.tip).join(" ") : "");
-    svg += `<circle class="node${at === z.id ? " here" : ""}" cx="${z.x}" cy="${z.y}" r="9"${tipAttr(tip)}/>`;
-    svg += `<text class="lbl" x="${z.x}" y="${z.y + 20}">${esc(z.name)}</text>`;
-  });
-  // Markers: a short row beside a small area's dot (away from its label, which sits
-  // below it), or spread along the rim of Termina Field.
-  Object.keys(marks).forEach((zk) => {
-    const z = Z[zk], list = marks[zk], n = list.length;
-    list.forEach((m, i) => {
-      let x, y;
-      if (z.id === 1) {
-        const step = Math.min(Math.PI / 3, (2 * Math.PI) / n);
-        const ang = -Math.PI / 2 + i * step - ((n - 1) * step) / 2;
-        x = z.x + Math.cos(ang) * 62;
-        y = z.y + Math.sin(ang) * 40;
-      } else {
-        const dir = z.x > 330 ? -1 : 1;
-        x = z.x + dir * (17 + (i % 3) * 14);
-        y = z.y - Math.floor(i / 3) * 14;
-      }
-      svg += `<g${tipAttr(z.name + ": " + m.tip)}><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="${m.c}"/>` +
-        `<text class="mk" x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}" fill="#0f0d17">${esc(m.t.length > 2 ? m.t.slice(0, 1) : m.t)}</text></g>`;
-    });
-  });
-  svg += "</svg>";
-  setHtml($("map"), svg);
-  const note = !s.day ? "Waiting for their game." : pz >= 0 ? "" : at >= 0 ? `They're inside somewhere; last seen in ${Z[at].name}.` : "They're inside somewhere.";
-  if ($("mapNote").textContent !== note) $("mapNote").textContent = note;
 }
 
 function setHtml(el, html) {
@@ -642,6 +703,9 @@ function render() {
   $("pmax").textContent = state ? state.max : 100;
   $("pmin").textContent = state ? state.perMin : 10;
   $("pointsBar").style.width = state ? Math.min(100, 100 * state.points / state.max) + "%" : "0";
+  setHtml($("meTag"), state && state.me ? `You: <b>${esc(state.me)}</b>` + (state.mode === 1 ? '<span class="badge help" data-tip="The player only lets you help them: heals, gifts, messages and harmless pranks.">Helpful</span>' : "") : "");
+  const others = state && state.friends ? state.friends.filter((f) => f.name !== state.me) : [];
+  setHtml($("friendList"), !state ? "" : others.length ? others.map((f) => `<span class="tag">${esc(f.name)}${f.mode === 1 ? " (helpful)" : f.mode === 0 ? " (blocked)" : ""}</span>`).join("") : '<span class="muted">Just you.</span>');
 
   const when = s.day ? `Day ${s.day}, ${s.clock}${s.night === "1" ? " (night)" : ""}` : "";
   const evLine = evRunning ? s.ev + (s.evleft ? ` (${fmtSecs(s.evleft)} left)` : "") : "";
@@ -654,9 +718,12 @@ function render() {
   setHtml($("strip"), !live ? chip("", state ? "Their game is offline." : "Connecting...", "") :
     chip("", s.area, KV_TIPS.Where) + chip("", when, KV_TIPS.When) + chip("Hearts", s.hp ? `${s.hp} / ${s.maxhp}` : "", KV_TIPS.Hearts) +
     (evRunning ? chip("", evLine, KV_TIPS.Event, "ev") : chip("", nextLine || (on(1) ? "" : "Events off"), on(1) ? KV_TIPS["Next event"] : "They have events turned off.")) +
+    (others.length ? chip("", "+" + others.length + (others.length > 1 ? " friends" : " friend"), others.map((f) => f.name).join(", ") + " also here.", "friend") : "") +
+    (s.evplace ? chip("", "Place it now! (Radar)", "This event lets you place its spot for 15 seconds. Open the Radar tab.", "place") : "") +
     (shields > 0 ? chip("", `Friend Shield x${shields}`, "They bought this in the Moon Shop. It blocks your next " + (shields > 1 ? shields + " mean moves" : "mean move") + ", and the points for that move are still spent. Heal, gifts, messages and sounds get through.", "shield") : ""));
 
-  try { drawMap(s, hasNem); } catch (e) { /* a bad map never stops the rest of the page */ }
+  try { drawTermina(s, hasNem); } catch (e) { /* a bad map never stops the rest of the page */ }
+  try { radarState(s); drawRadar(); } catch (e) { /* same for the radar */ }
 
   // Info tab.
   kv($("statusKv"), [
@@ -678,9 +745,8 @@ function render() {
     s.foresight === "1" && !s.friendnext ? "They used Foresight: the next event is locked in." : ""].filter(Boolean).join(" · ");
   document.querySelector('[data-act="ev_extend"]').hidden = !evRunning;
   document.querySelector('[data-act="ev_end"]').hidden = !evRunning;
-  document.querySelector('[data-act="ev_soon"]').hidden = evRunning;
   if (state && state.bet) {
-    $("betBox").textContent = `${state.bet.from ? state.bet.from + " bet " : ""}${state.bet.stake} on them ${state.bet.pick === "0" ? "making it through" : "not making it through"} ${state.bet.ev}.`;
+    $("betBox").textContent = `${state.bet.mine ? "You bet " : state.bet.from ? state.bet.from + " bet " : ""}${state.bet.stake} on them ${state.bet.pick === "0" ? "making it through" : "not making it through"} ${state.bet.ev}.`;
   } else {
     $("betBox").textContent = evRunning ? "No wager on " + s.ev + " yet." : "Wagers open when an event starts.";
   }
@@ -703,7 +769,7 @@ function render() {
     const inh = parseInt(s.neminherit || "0", 10);
     const pool = T.pools.find((p) => p.id == $("nemPool").value) || { name: "", tier: 1 };
     $("nemInherit").textContent = !hasNem && inh > 0
-      ? `Purged levels waiting: ${inh}. A ${pool.name} Nemesis would start at level ${Math.min(inh, [5, 10, 15, 20][pool.tier])}.` : "";
+      ? `Purged levels waiting: ${inh}. A ${pool.name} Nemesis would start at level ${Math.min(inh, 200)}.` : "";
   }
 
   // Curses tab.
@@ -739,7 +805,7 @@ function render() {
   // Buttons: cost, cooldown, and whether it can do anything right now.
   view = { s, live, evRunning, hasNem, on };
   document.querySelectorAll("button[data-act]").forEach((b) => {
-    const type = b.dataset.act;
+    const type = resolve(b.dataset.act);
     const cd = state && state.cooldowns[type];
     const costEl = b.querySelector(".cost");
     if (costEl) costEl.textContent = cd ? `${cd}s` : state && state.power ? "" : `${costOf(type, b.dataset.a)}`;
@@ -748,20 +814,27 @@ function render() {
   });
   setHtml($("log"), state ? state.log.map((l) => {
     const body = l.label.replace(/^[A-Za-z0-9]{1,5}: /, "");
-    const cls = /^(Won the wager|Refund|Wager refunded|They fell)/.test(body) ? "good" : /^Lost the wager/.test(body) ? "bad" : "";
+    const cls = /^(Won the wager|Refund|Wager refunded|They fell)/.test(body) ? "good" : /^Lost the wager/.test(body) ? "bad" : l.mine ? "" : "muted";
     return `<div class="${cls}">${new Date(l.t).toLocaleTimeString()} &nbsp; ${esc(l.label)}</div>`;
   }).join("") : "");
+  {
+    const waiting = (s.surprises || "").split(";").filter(Boolean).map((x) => x.split(":"));
+    $("surWaiting").textContent = waiting.length ? "Waiting for them: " + waiting.map(([z, k, f]) => `${SURPRISE_KINDS[k] || "?"} in ${(T.zones[z] || {}).name || "?"}${f ? " (" + f + ")" : ""}`).join(", ") : "";
+  }
   refreshTip();
 }
 
+const SURPRISE_KINDS = ["An event", "An ambush", "A bomb drop", "Rupoor rain", "The Nemesis"];
+
 let view = { s: {}, live: false, evRunning: false, hasNem: false, on: () => true };
 
-function costOf(type, dataA) {
+function costOf(type, dataA, over) {
   if (!state) return 0;
+  if (!over) type = resolve(type);
   if (type === "bet") return parseInt($("stakeSel").value, 10);
   if (state.power) return 0;
-  const v = args(type, dataA);
-  return costFor(type, v.a, v.b === undefined ? -1 : v.b, state.costs[type] || 0);
+  const v = over || args(type, dataA);
+  return costFor(type, v.a, v.b === undefined ? -1 : v.b, state.costs[type] || 0, v.c);
 }
 
 // The relay's own checks (copied in at build time), so what looks usable is what the relay accepts.
@@ -772,14 +845,18 @@ const OPT = { events: 1, muts: 2, bounties: 4, nemesis: 8, pouch: 16, curse: 32,
 /*__PRECHECK__*/
 
 // Why a button can't be used right now ("" = it can).
-function blockReason(type, dataA) {
+function blockReason(type, dataA, over) {
   const { s, live, evRunning } = view;
+  if (!over) type = resolve(type);
   if (!state) return "Not connected yet.";
   if (!live) return "Their game is offline.";
   if (s.link === "0") return "They have Friend Link turned off.";
+  if (state.mode === 1 && MEAN.has(type)) return "They only let you help them (heals, gifts, messages, harmless pranks).";
   const cd = state.cooldowns[type];
   if (cd) return `Cooling down: ${cd}s left.`;
-  const cost = costOf(type, dataA);
+  if (type === "ev_next" && $("evSel").value === "-1") return "Pick an event to make it the next one.";
+  if (type === "surprise" && surZone < 0) return "Pick an area on the map first.";
+  const cost = costOf(type, dataA, over);
   if (state.points < cost) return `You need ${cost} chaos points.`;
   if (type === "bet") {
     if (state.power) return "Wagers are off during Moon Power.";
@@ -787,47 +864,47 @@ function blockReason(type, dataA) {
     if (state.bet) return "There's already a wager on" + (state.bet.from ? " (by " + state.bet.from + ")." : ".");
     return s.evleft !== undefined && parseInt(s.evleft, 10) < 15 ? "Too late to bet on this one." : "";
   }
-  if (type === "surprise") return "";
-  const v = args(type, dataA);
+  if (type === "random") return "";
+  const v = over || args(type, dataA);
   return precheck(type, v.a === undefined ? 0 : v.a, v.b === undefined ? -1 : v.b, v.c || 0, s);
 }
 
 // --- Hover help -------------------------------------------------------------
 
-// Moves a Friend Shield blocks (matches the game).
-const MEAN = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt", "mut_add", "draft", "nem_stat",
-  "bounty", "ambush", "curse", "curse_set", "tax", "airstrike", "zap", "size", "wanted", "ev_extend", "empower", "blackout"]);
+// Moves a Friend Shield blocks, and that Helpful friends can't send (matches the game).
+const MEAN = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt", "draft", "nem_stat",
+  "bounty", "ambush", "curse", "curse_set", "tax", "airstrike", "size", "wanted", "ev_extend", "empower", "blackout",
+  "surprise", "place", "steer", "random", "bet"]);
 
 const ACT_TIPS = {
-  surprise: "Spends points on a random move that works right now: a prank, an ambush, a mutator, a bounty, a Nemesis boost, a curse reroll or their next event. It has its own cooldown.",
+  random: "Spends points on a random move that works right now: a prank, an ambush, a bounty, a Nemesis boost, a curse reroll or their next event. It has its own cooldown.",
+  surprise: "Hides your surprise in the picked area. It waits there until they walk into it, then goes off. They get a pop-up that you placed something, never where.",
   "bet:0": "Bet they get through the running event without falling. A right guess pays double. If the event is stopped early, you get your stake back.",
   "bet:1": "Bet they fall or fail during the running event. A right guess pays double. If the event is stopped early, you get your stake back.",
   ev_now: "Starts the picked event right away. If one is running, or it can't happen where they are, it starts as soon as it can. The combo box doesn't apply.",
   ev_next: "Their next event will be this one, plus the combo if you picked one. It still waits for the normal timer. Harder events cost more. If the combo can't happen, you get everything back.",
-  ev_soon: "Cuts the wait for their next event down to 10 seconds. Only between events.",
+  ev_soon: "\"Any\" picked: cuts the wait for their next event down to 10 seconds. Only between events.",
   empower: "Their next event runs one step harder. One at a time.",
   ev_extend: "Adds 30 seconds to the running event. Only for timed events.",
   ev_end: "Ends the running event right now. It doesn't count as survived, and a wager on it gets refunded.",
   fakeout: "Plays the warning sound and shows \"Something is coming...\" Then nothing comes.",
   nem_make: "Turns the picked enemy type into their Nemesis. Only if they don't have one.",
   nem_trait: "Gives their Nemesis the picked trait on top of the ones it has.",
-  nem_level: "Raises their Nemesis one level and gives it a skill point. Weak enemy types top out at 5, the toughest at 20.",
+  nem_level: "Raises their Nemesis one level and gives it a skill point (up to level 200).",
   nem_hunt: "Sends their Nemesis to them. If it's already nearby it jumps right next to them. If there's no room yet, it keeps trying for 15 seconds.",
-  nem_name: "Renames their Nemesis, up to 12 letters. They see the new name in game.",
-  "nem_stat:0": "Spend a skill point on Speed: +12% movement per point (max 10).",
-  "nem_stat:1": "Spend a skill point on Power: +25% damage when it hits them, per point (max 10).",
-  "nem_stat:2": "Spend a skill point on Health: +15% health per point (max 10).",
-  "nem_stat:3": "Spend a skill point on Tracking: it closes in across areas faster and shows up more often. At 3+ it follows them in from next door (max 10).",
+  nem_name: "Renames their Nemesis, up to 12 letters. No pop-up: they find out when they meet it.",
+  "nem_stat:0": "Spend a skill point on Speed: +12% movement per point (max 50).",
+  "nem_stat:1": "Spend a skill point on Power: +25% damage when it hits them, per point (max 50).",
+  "nem_stat:2": "Spend a skill point on Health: +15% health per point (max 50).",
+  "nem_stat:3": "Spend a skill point on Tracking: it closes in across areas faster and shows up more often. At 3+ it follows them in from next door (max 50).",
   nem_purge: "Removes their Nemesis. The next one starts at its level with fresh random traits. It still has to be crowned the normal way (or you can Create one).",
-  mut_add: "Puts the picked mutator on them right now, no draft. They can carry up to 6.",
   draft: "At each dawn and dusk they pick one of two mutators. This picks the two they get to choose from next time.",
   bounty: "Spawns the enemy right next to them as a bounty, with your stars and traits. Beating it pays them Moon Marks. A new one replaces your last one.",
   wanted: "Puts a WANTED poster on their Bounty Board: a 5-star enemy with Meteor Caller that pays triple. They have to go find it. One at a time.",
-  airstrike: "Drops 5 bombs from the sky around them.",
-  zap: "Takes 1 heart. It can't kill them: it stops at a quarter heart.",
+  airstrike: "Drops 5 bombs from the sky around them. Aim it on the Radar tab (a little extra).",
   shake: "Shakes their camera with a boom. Harmless.",
   blackout: "Their world goes dark for 25 seconds. It only shows between events, so it's wasted while one is running.",
-  ambush: "Spawns 1 to 3 of the picked enemy near them.",
+  ambush: "Spawns 1 to 3 of the picked enemy near them. Pick the spots on the Radar tab.",
   "size:1": "Makes them giant for 30 seconds. Only changes how they look.",
   "size:2": "Makes them tiny for 30 seconds. Only changes how they look.",
   sfx: "Plays the picked sound on their end with no message.",
@@ -837,7 +914,7 @@ const ACT_TIPS = {
   tax: "Takes up to 15 Moon Marks from them.",
   msg: "Shows your text on their screen, up to 30 letters.",
   curse_set: "Swaps their Cycle Curse to the picked one. It lasts until their next cycle. Some curses can't be used with their settings.",
-  curse: "Rerolls their Cycle Curse to a random one.",
+  curse: "\"A random one\" picked: rerolls their Cycle Curse.",
 };
 
 const KV_TIPS = {
@@ -858,7 +935,7 @@ const KV_TIPS = {
   Last: "What happened with the last move anyone sent on their end.",
   Nemesis: "An enemy that beat them and now hunts them. It levels up and can gain traits.",
   Type: "What kind of enemy their Nemesis is.",
-  Level: "Its level and its max (5 for weak enemy types, up to 20 for the toughest). Early on it acts weaker until they have more hearts and a better sword.",
+  Level: "Its level and its max (200). Early on it acts weaker until they have more hearts and a better sword.",
   Area: "Where their Nemesis is roaming. It moves around over time.",
   Traits: "Special powers. Hover each one for what it does.",
 };
@@ -874,12 +951,11 @@ const descOf = (arr, id) => (arr.find((x) => x.id == id) || {}).desc || "";
 const SEL_TIPS = {
   evSel: () => descOf(T.events, $("evSel").value),
   comboSel: () => ($("comboSel").value === "-1" ? "Pick a second event to run with it. Combos only apply to \"next event\"." : "Combo: " + descOf(T.events, $("comboSel").value)),
-  mutSel: () => descOf(T.muts, $("mutSel").value),
   draftA: () => "First choice: " + descOf(T.muts, $("draftA").value),
   draftB: () => "Second choice: " + descOf(T.muts, $("draftB").value),
   nemTrait: () => descOf(T.traits, $("nemTrait").value),
   pouchSel: () => descOf(T.pouch, $("pouchSel").value),
-  curseSel: () => descOf(T.curses, $("curseSel").value),
+  curseSel: () => ($("curseSel").value === "-1" ? "Rerolls their curse to a random one." : descOf(T.curses, $("curseSel").value)),
   bStars: () => "More stars means a tougher enemy and more trait slots. Pay grows with stars and enemy toughness (shown below), plus their Hunter Rank bonus.",
   stakeSel: () => "Chaos points to bet. A right guess pays double.",
   ambCount: () => "How many to send.",
@@ -897,7 +973,7 @@ function fmtLen(sec) {
 
 function tipFor(el) {
   if (el.matches("button[data-act]")) {
-    const type = el.dataset.act;
+    const type = resolve(el.dataset.act);
     const t = { body: ACT_TIPS[type + ":" + el.dataset.a] || ACT_TIPS[type] || "" };
     t.warn = blockReason(type, el.dataset.a);
     if (state && state.power) t.extra = "Moon Power: free, no cooldown.";
@@ -987,13 +1063,423 @@ function setupTips() {
   document.addEventListener("contextmenu", (e) => { if (held) e.preventDefault(); });
 }
 
+// --- Map blocks (the floor the game sampled as they explored) ------------------------
+
+const BLOCK = 2048, CELL = 128;
+const blockCache = {}; // scene -> { t, blocks }
+let mappedScenes = null; // Set of scenes with any blocks
+let mappedT = 0;
+
+async function loadBlocks(scene, force) {
+  if (!(scene >= 0)) return null;
+  const c = blockCache[scene];
+  if (c && !force && Date.now() - c.t < 15000) return c.blocks;
+  if (c && c.loading) return c.blocks;
+  blockCache[scene] = Object.assign(c || { blocks: [] }, { loading: true });
+  try {
+    const r = await fetch("/api/map?scene=" + scene, { headers: headers() });
+    const j = await r.json();
+    blockCache[scene] = { t: Date.now(), blocks: j.blocks || [] };
+  } catch (e) { blockCache[scene].loading = false; }
+  return blockCache[scene].blocks;
+}
+
+async function loadMapped() {
+  if (mappedScenes && Date.now() - mappedT < 30000) return;
+  mappedT = Date.now();
+  try {
+    const r = await fetch("/api/map", { headers: headers() });
+    const j = await r.json();
+    mappedScenes = new Set((j.scenes || []).map((x) => x.scene));
+  } catch (e) { /* later */ }
+}
+
+// Draws the blocks into ctx. view: { cx, cz (world center), scale (world units per pixel), refY }.
+function drawBlocks(ctx, blocks, view, W, H) {
+  ctx.fillStyle = "#0b0a12";
+  ctx.fillRect(0, 0, W, H);
+  const px = CELL / view.scale + 0.6;
+  for (const b of blocks || []) {
+    const x0 = b.bx * BLOCK, z0 = b.bz * BLOCK;
+    const sx0 = W / 2 + (x0 - view.cx) / view.scale, sz0 = H / 2 + (z0 - view.cz) / view.scale;
+    if (sx0 > W || sz0 > H || sx0 + BLOCK / view.scale < 0 || sz0 + BLOCK / view.scale < 0) continue;
+    for (let i = 0; i < 256; i++) {
+      const ch = b.cells[i];
+      if (ch === ".") continue;
+      const sx = sx0 + (i % 16) * CELL / view.scale, sz = sz0 + Math.floor(i / 16) * CELL / view.scale;
+      if (ch === "~") {
+        ctx.fillStyle = "#1d4f86";
+      } else {
+        const y = b.base + (ch.charCodeAt(0) - 0x30 - 32) * 40;
+        const d = Math.max(-1, Math.min(1, (y - view.refY) / 500)); // above them: lighter
+        const l = 22 + d * 14;
+        ctx.fillStyle = `hsl(${105 - d * 40}, ${28 + Math.abs(d) * 10}%, ${l}%)`;
+      }
+      ctx.fillRect(sx, sz, px, px);
+    }
+  }
+}
+
+// --- Radar --------------------------------------------------------------------------
+
+let radar = { zoom: 2400, aim: "look", pos: null, scene: -1, acts: [], steer: -1, place: null, ambSpots: [], mark: null, markT: 0 };
+
+function radarState(s) {
+  const p = (s.pos || "").split(",").map(Number);
+  radar.pos = p.length >= 5 && p.every(Number.isFinite) ? { x: p[0], y: p[1], z: p[2], yaw: p[3], cam: p[4] } : null;
+  const scene = s.scene !== undefined ? parseInt(s.scene, 10) : -1;
+  if (scene !== radar.scene) { radar.scene = scene; radar.ambSpots = []; }
+  radar.acts = (s.acts || "").split(";").filter(Boolean).map((a) => { const [k, x, z] = a.split(":"); return { k, x: +x, z: +z }; });
+  radar.steer = s.steer !== undefined ? parseInt(s.steer, 10) : -1;
+  const ep = (s.evplace || "").split(":").map(Number);
+  radar.place = s.evplace ? { ev: ep[0], left: ep[1], count: ep[2] || 1 } : null;
+  if (!document.querySelector('.tab[data-tab="radar"]').hidden) loadBlocks(radar.scene).then(() => drawRadar());
+
+  $("steerBtn").hidden = !(radar.steer >= 0);
+  $("placeBtn").hidden = !radar.place;
+  if ((radar.aim === "steer" && radar.steer < 0) || (radar.aim === "place" && !radar.place)) setAim(radar.steer >= 0 ? "steer" : radar.place ? "place" : "look");
+  if (radar.steer >= 0) $("steerBtn").textContent = "Steer " + ["the Tether", "Moonfall", "the Searchlight"][radar.steer];
+  $("placeBox").hidden = !radar.place;
+  if (radar.place) {
+    const what = { 9: "the treasure", 23: "the procession's path", 38: "the buried cache", 42: "the next sweep", 55: "the seals" }[radar.place.ev] || "it";
+    $("placeLine").textContent = `Place ${what}: ${radar.place.left}s left`;
+    const sel = $("sealSel");
+    sel.hidden = radar.place.ev !== 55;
+    if (radar.place.ev === 55 && sel.options.length !== radar.place.count) {
+      sel.innerHTML = Array.from({ length: radar.place.count }, (_, i) => `<option value="${i}">Seal ${i + 1}</option>`).join("");
+    }
+  }
+  $("radarNote").textContent = !radar.pos ? "Waiting for their game." : (blockCache[radar.scene] && blockCache[radar.scene].blocks.length) ? "" : "The ground fills in as they explore.";
+}
+
+const AIM_DESC = {
+  look: "Pick what a click does.",
+  airstrike: "Click where the bombs should fall.",
+  ambush: "Click a spot for each enemy (the Combat tab picks which and how many).",
+  steer: "Click or drag: it follows your mark. Let go for 5 seconds and it goes back to normal.",
+  place: "Click where it goes. Only in the event's first 15 seconds.",
+};
+
+function setAim(a) {
+  radar.aim = a;
+  radar.ambSpots = [];
+  document.querySelectorAll("#aimSeg button").forEach((b) => b.classList.toggle("on", b.dataset.aim === a));
+  $("aimDesc").textContent = AIM_DESC[a] || "";
+  drawRadar();
+}
+
+function drawRadar() {
+  const cv = $("radar");
+  if (!cv || cv.closest(".tab").hidden) return;
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  if (!radar.pos) {
+    ctx.fillStyle = "#0b0a12"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#9a93ad"; ctx.font = "15px system-ui"; ctx.textAlign = "center";
+    ctx.fillText("Waiting for their game...", W / 2, H / 2);
+    return;
+  }
+  const view = { cx: radar.pos.x, cz: radar.pos.z, scale: radar.zoom / W, refY: radar.pos.y };
+  drawBlocks(ctx, (blockCache[radar.scene] || {}).blocks, view, W, H);
+  const toS = (x, z) => [W / 2 + (x - view.cx) / view.scale, H / 2 + (z - view.cz) / view.scale];
+  // Range rings every 500 units.
+  ctx.strokeStyle = "rgba(255,255,255,.07)";
+  for (let r = 500; r < radar.zoom; r += 500) { ctx.beginPath(); ctx.arc(W / 2, H / 2, r / view.scale, 0, 7); ctx.stroke(); }
+  // Camera: a pale wedge.
+  const cam = (radar.pos.cam * Math.PI) / 180;
+  ctx.fillStyle = "rgba(255,255,255,.06)";
+  ctx.beginPath(); ctx.moveTo(W / 2, H / 2);
+  ctx.arc(W / 2, H / 2, W * 0.45, Math.PI / 2 - cam - 0.45, Math.PI / 2 - cam + 0.45); ctx.closePath(); ctx.fill();
+  const colors = { e: "#ff6b6b", b: "#f3c969", N: "#ff2a5a", n: "#8fa3c4", s: "#c49bff" };
+  for (const a of radar.acts) {
+    const [x, y] = toS(a.x, a.z);
+    if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
+    ctx.fillStyle = colors[a.k] || "#ccc";
+    ctx.beginPath(); ctx.arc(x, y, a.k === "N" ? 7 : a.k === "s" ? 5 : 4.5, 0, 7); ctx.fill();
+    if (a.k === "N" || a.k === "b") { ctx.strokeStyle = "#0b0a12"; ctx.lineWidth = 1.5; ctx.stroke(); }
+  }
+  // Them: an arrow pointing where they face (yaw 0 faces +z, which is down here).
+  const yaw = (radar.pos.yaw * Math.PI) / 180;
+  const dx = Math.sin(yaw), dz = Math.cos(yaw);
+  ctx.fillStyle = "#6bdc8b"; ctx.strokeStyle = "#0b0a12"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W / 2 + dx * 12, H / 2 + dz * 12);
+  ctx.lineTo(W / 2 - dx * 7 + dz * 7, H / 2 - dz * 7 - dx * 7);
+  ctx.lineTo(W / 2 - dx * 7 - dz * 7, H / 2 - dz * 7 + dx * 7);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // What you've clicked.
+  ctx.strokeStyle = "#f3c969"; ctx.lineWidth = 2;
+  for (const [x, z] of radar.ambSpots) { const [sx, sy] = toS(x, z); ctx.beginPath(); ctx.arc(sx, sy, 8, 0, 7); ctx.stroke(); }
+  if (radar.mark && Date.now() - radar.markT < 2500) {
+    const [sx, sy] = toS(radar.mark[0], radar.mark[1]);
+    ctx.strokeStyle = "#c49bff";
+    ctx.beginPath(); ctx.moveTo(sx - 9, sy); ctx.lineTo(sx + 9, sy); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx, sy + 9); ctx.stroke();
+  }
+}
+
+function radarWorld(e) {
+  const cv = $("radar");
+  const r = cv.getBoundingClientRect();
+  const sx = ((e.clientX - r.left) / r.width) * cv.width, sy = ((e.clientY - r.top) / r.height) * cv.height;
+  const scale = radar.zoom / cv.width;
+  return [Math.round(radar.pos.x + (sx - cv.width / 2) * scale), Math.round(radar.pos.z + (sy - cv.height / 2) * scale)];
+}
+
+function setupRadar() {
+  document.querySelectorAll("#aimSeg button").forEach((b) => b.addEventListener("click", () => setAim(b.dataset.aim)));
+  document.querySelectorAll("#zoomSeg button").forEach((b) => b.addEventListener("click", () => {
+    radar.zoom = parseInt(b.dataset.zoom, 10);
+    document.querySelectorAll("#zoomSeg button").forEach((x) => x.classList.toggle("on", x === b));
+    drawRadar();
+  }));
+  const cv = $("radar");
+  let held = false, lastSteer = 0, pending = null, timer = null;
+  const sendSteer = () => {
+    timer = null;
+    if (!pending || radar.steer < 0) return;
+    lastSteer = Date.now();
+    act("steer", 0, { a: radar.steer, b: pending[0], c: pending[1] }, true);
+    pending = null;
+  };
+  const steerTo = (w) => {
+    pending = w;
+    radar.mark = w; radar.markT = Date.now(); drawRadar();
+    const wait = 1050 - (Date.now() - lastSteer);
+    if (wait <= 0) sendSteer(); else if (!timer) timer = setTimeout(sendSteer, wait);
+  };
+  cv.addEventListener("pointerdown", (e) => {
+    if (!radar.pos) return;
+    const w = radarWorld(e);
+    if (radar.aim === "steer") { held = true; cv.setPointerCapture(e.pointerId); return steerTo(w); }
+    radar.mark = w; radar.markT = Date.now();
+    if (radar.aim === "airstrike") {
+      const over = { a: w[0], b: w[1], c: 1 };
+      const why = blockReason("airstrike", 0, over);
+      if (why) return toast(why);
+      act("airstrike", 0, over);
+    } else if (radar.aim === "ambush") {
+      const n = parseInt($("ambCount").value, 10);
+      radar.ambSpots.push(w);
+      if (radar.ambSpots.length >= n) {
+        const over = { a: parseInt($("ambPool").value, 10), b: n, c: 0, text: radar.ambSpots.map((p) => p.join(",")).join(";") };
+        radar.ambSpots = [];
+        const why = blockReason("ambush", 0, over);
+        if (why) toast(why); else act("ambush", 0, over);
+      } else {
+        toast(`Spot ${radar.ambSpots.length} of ${n}. Click ${n - radar.ambSpots.length} more.`);
+      }
+    } else if (radar.aim === "place" && radar.place) {
+      const sel = $("sealSel");
+      const over = { a: radar.place.ev, b: w[0], c: w[1], text: radar.place.ev === 55 ? sel.value : "0" };
+      const why = blockReason("place", 0, over);
+      if (why) return toast(why);
+      act("place", 0, over);
+      if (radar.place.ev === 55 && sel.selectedIndex < sel.options.length - 1) sel.selectedIndex++;
+    }
+    drawRadar();
+  });
+  cv.addEventListener("pointermove", (e) => { if (held && radar.aim === "steer" && radar.pos) steerTo(radarWorld(e)); });
+  const up = () => { held = false; };
+  cv.addEventListener("pointerup", up);
+  cv.addEventListener("pointercancel", up);
+}
+
+// --- Termina map and surprises ---------------------------------------------------------
+
+let surZone = -1;   // the area picked on the map
+let surSpot = null; // [x, z] picked on its mini map, or null: anywhere
+
+function zoneMarks(s, hasNem) {
+  const Z = T.zones;
+  const inRange = (v) => (v >= 0 && v < Z.length ? v : -1);
+  const pz = s.pz !== undefined ? inRange(parseInt(s.pz, 10)) : -1;
+  const lz = s.lz !== undefined ? inRange(parseInt(s.lz, 10)) : -1;
+  const nz = hasNem && s.nz !== undefined ? inRange(parseInt(s.nz, 10)) : -1;
+  const marks = {};
+  // Indoor areas show on the outdoor area their door is in.
+  const out = (z) => (z >= 0 && Z[z].parent >= 0 ? Z[z].parent : z);
+  const add = (z, m) => { if (z >= 0) (marks[out(z)] = marks[out(z)] || []).push(Object.assign(m, { real: z })); };
+  const at = pz >= 0 ? pz : lz;
+  if (at >= 0) add(at, { c: "var(--green)", t: "L", tip: pz >= 0 ? "They're here" : "Last seen here (inside somewhere)" });
+  if (nz >= 0) add(nz, { c: "var(--red)", t: "N", tip: "Their Nemesis roams here" });
+  (s.bz || "").split(",").filter(Boolean).forEach((b) => {
+    const k = { F: ["#5fe0e0", "A friend's bounty waits"], W: ["#ff8a4c", "The WANTED target waits"], R: ["var(--purple)", "A rare bounty waits"], B: ["var(--moon)", "A bounty they took waits"] }[b[0]] || ["var(--moon)", "A bounty waits"];
+    add(parseInt(b.slice(1), 10), { c: k[0], t: "★", tip: k[1] });
+  });
+  (s.surprises || "").split(";").filter(Boolean).forEach((x) => {
+    const [z, k, f] = x.split(":");
+    add(parseInt(z, 10), { c: "var(--purple)", t: "?", tip: `${SURPRISE_KINDS[k] || "A surprise"} waits${f ? " (from " + f + ")" : ""}` });
+  });
+  return { marks, at, pz };
+}
+
+function drawTermina(s, hasNem) {
+  const Z = T.zones.filter((z) => z.parent < 0 && z.x !== undefined);
+  const { marks, at, pz } = zoneMarks(s, hasNem);
+  const outAt = at >= 0 && T.zones[at].parent >= 0 ? T.zones[at].parent : at;
+  const selOut = surZone >= 0 && T.zones[surZone].parent >= 0 ? T.zones[surZone].parent : surZone;
+  let svg = '<svg viewBox="0 0 480 400" role="img" aria-label="Map of Termina">';
+  const drawn = new Set();
+  Z.forEach((z) => z.links.forEach((o) => {
+    const k = Math.min(z.id, o) + "-" + Math.max(z.id, o);
+    const t = T.zones[o];
+    if (drawn.has(k) || !t || t.x === undefined || z.id === 5 && t.id <= 4 || t.id === 5 && z.id <= 4) return;
+    drawn.add(k);
+    svg += `<line class="edge" x1="${z.x}" y1="${z.y}" x2="${t.x}" y2="${t.y}"/>`;
+  }));
+  const field = T.zones[5];
+  const cls = (id, base) => base + (outAt === id ? " here" : "") + (selOut === id ? " sel" : "");
+  svg += `<ellipse class="${cls(5, "field")}" data-zone="5" cx="${field.x}" cy="${field.y}" rx="100" ry="64"${tipAttr(field.name)}/>`;
+  svg += `<text class="lbl" x="${field.x}" y="${field.y + 58}">Termina Field</text>`;
+  Z.forEach((z) => {
+    if (z.id === 5) return;
+    const town = z.id <= 4;
+    svg += `<circle class="${cls(z.id, "node")}" data-zone="${z.id}" cx="${z.x}" cy="${z.y}" r="${town ? 7 : 9}"${tipAttr(z.name)}/>`;
+    svg += `<text class="lbl" x="${z.x}" y="${z.y + (town ? 16 : 20)}"${town ? ' style="font-size:8px"' : ""}>${esc(z.short || z.name)}</text>`;
+  });
+  Object.keys(marks).forEach((zk) => {
+    const z = T.zones[zk], list = marks[zk];
+    list.forEach((m, i) => {
+      let x, y;
+      if (z.id === 5) {
+        const ang = -Math.PI / 2 + (i - (list.length - 1) / 2) * 0.5;
+        x = z.x + Math.cos(ang) * 100; y = z.y + Math.sin(ang) * 64;
+      } else {
+        x = z.x + (z.x > 380 ? -1 : 1) * (15 + (i % 3) * 12); y = z.y - 12 - Math.floor(i / 3) * 12;
+      }
+      const where = m.real !== z.id ? " (in " + T.zones[m.real].name + ")" : "";
+      svg += `<g${tipAttr(z.name + ": " + m.tip + where)}><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="${m.c}"/>` +
+        `<text class="mk" x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" fill="#0f0d17">${esc(m.t)}</text></g>`;
+    });
+  });
+  svg += "</svg>";
+  setHtml($("termina"), svg);
+  const note = !s.day ? "Waiting for their game." : pz >= 0 ? "They're in " + T.zones[pz].name + "." : at >= 0 ? `They're inside somewhere; last seen in ${T.zones[at].name}.` : "They're inside somewhere.";
+  if ($("mapNote").textContent !== note) $("mapNote").textContent = note;
+  zoneCard(marks);
+}
+
+function zoneCard(marks) {
+  if (surZone < 0) return;
+  const z = T.zones[surZone];
+  const outId = z.parent >= 0 ? z.parent : z.id;
+  $("zoneTitle").textContent = z.name;
+  const here = (marks[outId] || []).filter((m) => m.real === z.id).map((m) => m.tip);
+  $("zoneInfo").textContent = here.length ? here.join(". ") + "." : z.parent >= 0 ? "Inside, off " + T.zones[z.parent].name + "." : "Nothing marked here right now.";
+  const rooms = T.zones.filter((r) => r.parent === outId);
+  $("roomsSub").hidden = !rooms.length;
+  setHtml($("rooms"), [T.zones[outId], ...rooms].map((r) => `<button data-room="${r.id}" class="${r.id === surZone ? "on" : ""}">${esc(r.id === outId ? "Outside" : r.name)}</button>`).join(""));
+  $("surZone").textContent = "Hide it in: " + z.name;
+}
+
+function pickZone(id) {
+  if (id === surZone) return;
+  surZone = id;
+  surSpot = null;
+  render();
+  drawMini();
+}
+
+// The picked area's mini map (if they've been there), to pick an exact spot.
+async function drawMini() {
+  const wrap = $("surMiniWrap");
+  if (surZone < 0) { wrap.hidden = true; return; }
+  await loadMapped();
+  const z = T.zones[surZone];
+  const scene = (z.scenes || []).find((sc) => mappedScenes && mappedScenes.has(sc));
+  if (scene === undefined) {
+    wrap.hidden = true;
+    $("surClear").hidden = true;
+    $("surSpotNote").textContent = "Spot: anywhere in the area (they haven't mapped it yet, so you can't pick one).";
+    return;
+  }
+  const blocks = await loadBlocks(scene);
+  if (!blocks || !blocks.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, ys = [];
+  for (const b of blocks) {
+    x0 = Math.min(x0, b.bx * BLOCK); x1 = Math.max(x1, (b.bx + 1) * BLOCK);
+    z0 = Math.min(z0, b.bz * BLOCK); z1 = Math.max(z1, (b.bz + 1) * BLOCK);
+    ys.push(b.base);
+  }
+  const cv = $("surMini"), ctx = cv.getContext("2d");
+  const view = { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, scale: Math.max(x1 - x0, z1 - z0) / cv.width, refY: ys.sort((a, b) => a - b)[ys.length >> 1] };
+  cv._view = view;
+  drawBlocks(ctx, blocks, view, cv.width, cv.height);
+  if (surSpot) {
+    const sx = cv.width / 2 + (surSpot[0] - view.cx) / view.scale, sy = cv.height / 2 + (surSpot[1] - view.cz) / view.scale;
+    ctx.strokeStyle = "#c49bff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(sx, sy, 9, 0, 7); ctx.stroke();
+  }
+  $("surClear").hidden = !surSpot;
+  $("surSpotNote").textContent = surSpot ? "Spot: where you clicked (moved away from doors if it's too close)." : "Spot: anywhere (not by a door). Click the map to pick one.";
+}
+
+function setupSurprise() {
+  $("termina").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-zone]");
+    if (el) pickZone(parseInt(el.dataset.zone, 10));
+  });
+  $("rooms").addEventListener("click", (e) => {
+    const el = e.target.closest("[data-room]");
+    if (el) pickZone(parseInt(el.dataset.room, 10));
+  });
+  const kindChange = () => {
+    const k = $("surKind").value;
+    $("surEv").hidden = k !== "0";
+    $("surPool").hidden = k !== "1";
+    $("surArgRow").hidden = k !== "0" && k !== "1";
+    render();
+  };
+  $("surKind").addEventListener("change", kindChange);
+  kindChange();
+  $("surClear").addEventListener("click", () => { surSpot = null; drawMini(); });
+  $("surMini").addEventListener("click", (e) => {
+    const cv = $("surMini"), v = cv._view;
+    if (!v) return;
+    const r = cv.getBoundingClientRect();
+    const sx = ((e.clientX - r.left) / r.width) * cv.width, sy = ((e.clientY - r.top) / r.height) * cv.height;
+    surSpot = [Math.round(v.cx + (sx - cv.width / 2) * v.scale), Math.round(v.cz + (sy - cv.height / 2) * v.scale)];
+    drawMini();
+  });
+}
+
+// --- Blocked -----------------------------------------------------------------------------
+
+function showDead(name) {
+  $("dead").hidden = false;
+  $("app").hidden = true; $("bar2").hidden = true; $("tabs").hidden = true; $("login").hidden = true;
+  document.querySelector("header").hidden = true;
+  $("deadName").textContent = (name ? name + ". " : "") + "The moon has turned its face from you.";
+  if (!showDead.t) showDead.t = Date.now();
+  const n = Math.floor((Date.now() - showDead.t) / 1000);
+  $("deadCount").textContent = n > 20 ? "It is still watching." : "";
+}
+
+function hideDead() {
+  if ($("dead").hidden) return;
+  $("dead").hidden = true;
+  document.querySelector("header").hidden = false;
+  showDead.t = 0;
+  showApp(true);
+}
+
 async function refresh() {
-  if (!key) return;
+  if (!key || !myName) return;
   try {
     const r = await fetch("/api/state", { headers: headers() });
     if (r.status === 401) { toast(await r.text()); return logout(); }
+    if (r.status === 409 || r.status === 400) {
+      const j = await r.json();
+      toast(j.msg || "Pick a name.");
+      myName = ""; store.del("ge_name");
+      return showApp(false);
+    }
     if (!r.ok) { $("conn").textContent = await r.text(); return; }
-    state = await r.json();
+    const j = await r.json();
+    if (j.blocked) return showDead(j.name);
+    hideDead();
+    state = j;
     const s = parseStatus(state.status);
     const deaths = s.deaths !== undefined ? parseInt(s.deaths, 10) : null;
     if (deaths !== null && lastDeaths !== null && deaths > lastDeaths) toast("They fell! +" + ((state && state.deathBonus) || 15) + " chaos points.");
@@ -1021,7 +1507,7 @@ function logout() {
   showApp(false); render(); hideTip();
 }
 function start() {
-  if (!key) return logout();
+  if (!key || !myName) { showApp(false); if (key) $("keyInput").value = key; return; }
   showApp(true); refresh();
   if (store.get("ge_hinted") !== "1") {
     store.set("ge_hinted", "1");
@@ -1038,6 +1524,8 @@ function setupTabs() {
     document.querySelectorAll(".tab").forEach((sec) => (sec.hidden = sec.dataset.tab !== t));
     store.set("ge_tab", t);
     hideTip();
+    if (t === "radar") loadBlocks(radar.scene).then(drawRadar);
+    if (t === "map") drawMini();
   };
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.tab)));
   show(cur);
@@ -1045,7 +1533,10 @@ function setupTabs() {
 
 setup();
 start();
-setInterval(refresh, 3000);
+// Faster while they're steering or placing something.
+(function loop() {
+  refresh().finally(() => setTimeout(loop, view.s && (parseInt(view.s.steer, 10) >= 0 || view.s.evplace) ? 1000 : 3000));
+})();
 </script>
 </body>
 </html>

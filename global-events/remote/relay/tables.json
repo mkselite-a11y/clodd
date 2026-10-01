@@ -3,7 +3,7 @@
   {
    "id": 0,
    "name": "Bomb Rain",
-   "desc": "Bombs fall from the sky all around you.",
+   "desc": "Bombs fall from high up. Get under cover.",
    "second": true,
    "primary": true,
    "tier": 1
@@ -35,7 +35,7 @@
   {
    "id": 4,
    "name": "Moonfall",
-   "desc": "Boulders fall where you stand. Keep moving.",
+   "desc": "Boulders land where you're heading. Turn!",
    "second": true,
    "primary": true,
    "tier": 2
@@ -99,7 +99,7 @@
   {
    "id": 14,
    "name": "Echo",
-   "desc": "A ghost walks your old path. Don't touch it.",
+   "desc": "A ghost walks your path. One touch kills.",
    "second": false,
    "primary": true,
    "tier": 0
@@ -107,7 +107,7 @@
   {
    "id": 18,
    "name": "Champion Duel",
-   "desc": "Duel a mini-boss. Beat it to move on.",
+   "desc": "Duel a champion. Beat it to move on.",
    "second": false,
    "primary": false,
    "tier": 3
@@ -129,14 +129,6 @@
    "tier": 0
   },
   {
-   "id": 21,
-   "name": "Imposters",
-   "desc": "Some carpenters are ReDeads in disguise.",
-   "second": false,
-   "primary": true,
-   "tier": 1
-  },
-  {
    "id": 22,
    "name": "Carpenter Uprising",
    "desc": "Rainbow carpenters attack. Hit them to stop.",
@@ -151,14 +143,6 @@
    "second": false,
    "primary": true,
    "tier": 0
-  },
-  {
-   "id": 24,
-   "name": "Poltergeist",
-   "desc": "Rocks circle you, flash red, then fly at you.",
-   "second": true,
-   "primary": true,
-   "tier": 1
   },
   {
    "id": 25,
@@ -183,22 +167,6 @@
    "second": false,
    "primary": true,
    "tier": 0
-  },
-  {
-   "id": 28,
-   "name": "Swarm Night",
-   "desc": "A huge Keese swarm fills the sky.",
-   "second": true,
-   "primary": true,
-   "tier": 1
-  },
-  {
-   "id": 29,
-   "name": "Majora Looms",
-   "desc": "Majora's Mask throws boss masks at your spot.",
-   "second": true,
-   "primary": true,
-   "tier": 2
   },
   {
    "id": 30,
@@ -227,7 +195,7 @@
   {
    "id": 34,
    "name": "Pop Quiz",
-   "desc": "Name the song. Wrong costs half your hearts.",
+   "desc": "Four questions. Wrong costs half your hearts.",
    "second": false,
    "primary": false,
    "tier": 0
@@ -247,93 +215,256 @@
    "second": false,
    "primary": true,
    "tier": 0
+  },
+  {
+   "id": 37,
+   "name": "Starfall Bounty",
+   "desc": "Stand where the stars land!",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 38,
+   "name": "Dowsing Moon",
+   "desc": "Follow the warmth, press A to dig.",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 39,
+   "name": "Giant's Gale",
+   "desc": "Hold the stick INTO the wind.",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 40,
+   "name": "Sinking Sands",
+   "desc": "Keep moving!",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 41,
+   "name": "Frostbite",
+   "desc": "Roll to shake off the frost.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 42,
+   "name": "Scythe Sweep",
+   "desc": "Jump it or stand in the green gap.",
+   "second": false,
+   "primary": false,
+   "tier": 2
+  },
+  {
+   "id": 43,
+   "name": "Moth Swarm",
+   "desc": "Spin attack to scatter the moths!",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 44,
+   "name": "Hex of Silence",
+   "desc": "Don't press B or the C buttons.",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 45,
+   "name": "Moon Tether",
+   "desc": "Stay inside the drifting circle!",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 46,
+   "name": "Moon's Grasp",
+   "desc": "When it grabs you, MASH A!",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 47,
+   "name": "Heartbeat Hex",
+   "desc": "Press A on every heartbeat.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 48,
+   "name": "Moon's Reflex Test",
+   "desc": "Press the button that flashes up!",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 49,
+   "name": "Gorgon's Gaze",
+   "desc": "Keep your camera AWAY from the eye.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 50,
+   "name": "Dissonance",
+   "desc": "Play any 3 ocarina notes.",
+   "second": false,
+   "primary": false,
+   "tier": 0
+  },
+  {
+   "id": 51,
+   "name": "Mirror Madness",
+   "desc": "Face the shard, hold Z to break it.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 52,
+   "name": "Volley of Stars",
+   "desc": "Face the star and hold R to guard!",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 53,
+   "name": "Sleeping Giant",
+   "desc": "Tiptoe! Running wakes the giant.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 54,
+   "name": "Mask Salesman's Game",
+   "desc": "Watch the arrows, repeat on D-pad.",
+   "second": false,
+   "primary": false,
+   "tier": 1
+  },
+  {
+   "id": 55,
+   "name": "Pressure Seals",
+   "desc": "Step on the seals in order.",
+   "second": false,
+   "primary": false,
+   "tier": 1
   }
  ],
  "pools": [
   {
    "id": 3,
    "name": "Wolfos",
-   "tier": 1
+   "tier": 1,
+   "desc": ""
   },
   {
    "id": 4,
    "name": "White Wolfos",
-   "tier": 1
+   "tier": 1,
+   "desc": ""
   },
   {
    "id": 5,
    "name": "Stalchild",
-   "tier": 0
-  },
-  {
-   "id": 6,
-   "name": "ReDead",
-   "tier": 1
+   "tier": 0,
+   "desc": ""
   },
   {
    "id": 7,
    "name": "Poe",
-   "tier": 1
+   "tier": 1,
+   "desc": ""
   },
   {
    "id": 9,
    "name": "Tektite",
-   "tier": 0
+   "tier": 0,
+   "desc": ""
   },
   {
    "id": 13,
    "name": "Dodongo",
-   "tier": 2
+   "tier": 2,
+   "desc": ""
   },
   {
    "id": 19,
    "name": "Like Like",
-   "tier": 2
+   "tier": 2,
+   "desc": ""
   },
   {
    "id": 22,
    "name": "Hiploop",
-   "tier": 0
+   "tier": 0,
+   "desc": ""
   },
   {
    "id": 24,
    "name": "Snapper",
-   "tier": 1
+   "tier": 1,
+   "desc": ""
   },
   {
    "id": 28,
    "name": "Peahat",
-   "tier": 2
+   "tier": 2,
+   "desc": ""
   },
   {
    "id": 30,
    "name": "Garo Master",
-   "tier": 2
+   "tier": 2,
+   "desc": ""
   },
   {
    "id": 31,
    "name": "Iron Knuckle",
-   "tier": 3
+   "tier": 3,
+   "desc": ""
   },
   {
    "id": 32,
    "name": "Dinolfos",
-   "tier": 2
+   "tier": 2,
+   "desc": ""
   },
   {
    "id": 33,
    "name": "Big Poe",
-   "tier": 2
+   "tier": 2,
+   "desc": ""
   },
   {
    "id": 8,
    "name": "Chuchu",
-   "tier": 0
+   "tier": 0,
+   "desc": ""
   },
   {
    "id": 10,
    "name": "Blue Bubble",
-   "tier": 0
+   "tier": 0,
+   "desc": ""
   }
  ],
  "traits": [
@@ -344,8 +475,8 @@
   },
   {
    "id": 1,
-   "name": "Swift",
-   "desc": "Moves much faster than normal."
+   "name": "Coward",
+   "desc": "At 30% health it flees, then returns healed."
   },
   {
    "id": 2,
@@ -369,8 +500,8 @@
   },
   {
    "id": 6,
-   "name": "Giant",
-   "desc": "50% bigger, with 50% more health."
+   "name": "Moonblessed",
+   "desc": "Can't be hurt while an event is running."
   },
   {
    "id": 7,
@@ -379,8 +510,8 @@
   },
   {
    "id": 8,
-   "name": "Brutal",
-   "desc": "You take 50% more damage while near it."
+   "name": "Mark-Hungry",
+   "desc": "Hits harder the more Moon Marks you carry."
   },
   {
    "id": 9,
@@ -399,18 +530,13 @@
   },
   {
    "id": 12,
-   "name": "Leech",
-   "desc": "Heals itself whenever it hurts you."
-  },
-  {
-   "id": 13,
-   "name": "Second Wind",
-   "desc": "Its first killing blow leaves it at half health."
+   "name": "Frostbrand",
+   "desc": "Its hits chill you: your stick goes half as far."
   },
   {
    "id": 14,
    "name": "Thief",
-   "desc": "Steals 10 rupees whenever it hurts you."
+   "desc": "Steals 3 Moon Marks per hit. Pays back double."
   },
   {
    "id": 15,
@@ -422,17 +548,12 @@
   {
    "id": 0,
    "name": "Thin Skin",
-   "desc": "They take 50% more damage."
+   "desc": "You take 50% more damage."
   },
   {
    "id": 1,
    "name": "Tough Crowd",
    "desc": "Enemies have 50% more health."
-  },
-  {
-   "id": 2,
-   "name": "Vengeful Dead",
-   "desc": "Slain enemies leave a falling bomb behind."
   },
   {
    "id": 3,
@@ -447,12 +568,12 @@
   {
    "id": 5,
    "name": "Heart Lock",
-   "desc": "They can't heal within 2 hearts of their max."
+   "desc": "You can't heal within 2 hearts of your max."
   },
   {
    "id": 6,
    "name": "Open Wounds",
-   "desc": "After a hit, they can't heal for 10 seconds."
+   "desc": "After a hit, you can't heal for 10 seconds."
   },
   {
    "id": 8,
@@ -467,12 +588,7 @@
   {
    "id": 10,
    "name": "Butterfingers",
-   "desc": "Every hit they take costs 5 rupees."
-  },
-  {
-   "id": 11,
-   "name": "Rupee Rot",
-   "desc": "They lose a rupee every 20 seconds."
+   "desc": "Every hit you take costs 5 rupees."
   },
   {
    "id": 12,
@@ -482,7 +598,7 @@
   {
    "id": 13,
    "name": "Restless Earth",
-   "desc": "If they stand still 4 seconds, a boulder falls on them."
+   "desc": "Stand still 4 seconds and a boulder falls on you."
   },
   {
    "id": 14,
@@ -492,37 +608,22 @@
   {
    "id": 15,
    "name": "Emboldened",
-   "desc": "Their Nemesis gains a level."
+   "desc": "Your Nemesis gains a level."
   },
   {
    "id": 16,
    "name": "Hunted",
-   "desc": "Their Nemesis turns up far more often."
-  },
-  {
-   "id": 17,
-   "name": "Moon Tears",
-   "desc": "Boulders fall on them now and then."
+   "desc": "Your Nemesis turns up far more often."
   },
   {
    "id": 18,
    "name": "Ambushers",
-   "desc": "New areas may greet them with enemies."
+   "desc": "New areas may greet you with enemies."
   },
   {
    "id": 19,
    "name": "Keese Escort",
-   "desc": "A few Keese follow them everywhere."
-  },
-  {
-   "id": 20,
-   "name": "Weak Recovery",
-   "desc": "All healing is halved."
-  },
-  {
-   "id": 21,
-   "name": "Bleeding",
-   "desc": "Every hit takes two more hearts a moment later."
+   "desc": "A few Keese follow you everywhere."
   }
  ],
  "curses": [
@@ -557,34 +658,9 @@
    "desc": "A Blood Moon rises every night at 6 PM."
   },
   {
-   "id": 6,
-   "name": "Night Terrors",
-   "desc": "Events come twice as often at night."
-  },
-  {
    "id": 7,
    "name": "Silent Moon",
    "desc": "No warning or roulette before events."
-  },
-  {
-   "id": 8,
-   "name": "Unseen Omen",
-   "desc": "Events hide their names."
-  },
-  {
-   "id": 9,
-   "name": "Aftershocks",
-   "desc": "A short Bomb Rain follows every event."
-  },
-  {
-   "id": 10,
-   "name": "Impending Doom",
-   "desc": "Moon Pressure is on: events get worse as the moon gets closer."
-  },
-  {
-   "id": 11,
-   "name": "Legion",
-   "desc": "Blood Moon hordes are twice as big."
   },
   {
    "id": 12,
@@ -597,16 +673,6 @@
    "desc": "Every event comes back a minute later."
   },
   {
-   "id": 14,
-   "name": "Meteor Shower",
-   "desc": "Boulders fall on them during every event."
-  },
-  {
-   "id": 15,
-   "name": "Ambush",
-   "desc": "New areas may greet them with a Blood Moon."
-  },
-  {
    "id": 16,
    "name": "Bell Toll",
    "desc": "Events strike every 3 hours on the clock."
@@ -615,16 +681,6 @@
    "id": 17,
    "name": "Hex",
    "desc": "Cursed Tag joins every event."
-  },
-  {
-   "id": 18,
-   "name": "Moon's Wrath",
-   "desc": "Every 5 events they survive, the next is a harder combo."
-  },
-  {
-   "id": 19,
-   "name": "Weightless Moon",
-   "desc": "Low gravity whenever an event is running."
   }
  ],
  "pouch": [
@@ -636,7 +692,7 @@
   {
    "id": 1,
    "name": "Giga Blade",
-   "desc": "Arm it: their next sword hits do triple damage."
+   "desc": "Arm it: your next sword hits do triple damage."
   },
   {
    "id": 2,
@@ -650,43 +706,43 @@
   },
   {
    "id": 4,
-   "name": "Recall Feather",
-   "desc": "Snaps them back to where they stood 10 seconds ago."
+   "name": "Lunar Tonic",
+   "desc": "Heals 4 hearts."
   },
   {
    "id": 5,
-   "name": "Storm Rod",
-   "desc": "Lightning strikes up to 5 nearby enemies."
+   "name": "Second Wind",
+   "desc": "Automatic: a killing blow leaves you at 4 hearts."
   },
   {
    "id": 6,
    "name": "Moon Shield",
-   "desc": "Raise it: it absorbs their next hits."
+   "desc": "Raise it: it absorbs your next hits."
   },
   {
    "id": 7,
-   "name": "Blood Pact",
-   "desc": "60 seconds: deal double damage, take double."
+   "name": "Nemesis Brand",
+   "desc": "The next roaming enemy you hurt becomes your Nemesis."
   },
   {
    "id": 8,
    "name": "Nemesis Compass",
-   "desc": "60 seconds: shows where their Nemesis is."
+   "desc": "60 seconds: shows where your Nemesis is."
   },
   {
    "id": 9,
    "name": "Smoke Veil",
-   "desc": "Enemies lose track of them for 10 seconds."
+   "desc": "Enemies lose track of you for 10 seconds."
   },
   {
    "id": 10,
-   "name": "Decoy",
-   "desc": "Drops a decoy that draws enemies for 12 seconds."
+   "name": "Stillwater Charm",
+   "desc": "Ends the event that's running. No reward."
   },
   {
    "id": 11,
    "name": "Moon Dash",
-   "desc": "Blinks them a short way forward, through enemies (3 uses)."
+   "desc": "Blink forward along the ground, through enemies."
   }
  ],
  "sounds": [
@@ -756,161 +812,871 @@
  "zones": [
   {
    "id": 0,
-   "name": "Clock Town",
+   "name": "South Clock Town",
+   "parent": -1,
    "links": [
-    1
+    1,
+    2,
+    3,
+    4,
+    5
    ],
-   "x": 220,
-   "y": 175
+   "scenes": [
+    111
+   ],
+   "x": 240,
+   "y": 222,
+   "short": "S. Town"
   },
   {
    "id": 1,
-   "name": "Termina Field",
+   "name": "East Clock Town",
+   "parent": -1,
    "links": [
     0,
-    2,
-    5,
-    6,
-    10,
-    12
+    3,
+    5
    ],
-   "x": 220,
-   "y": 175
+   "scenes": [
+    108
+   ],
+   "x": 276,
+   "y": 200,
+   "short": "E. Town"
   },
   {
    "id": 2,
-   "name": "Swamp Road",
+   "name": "West Clock Town",
+   "parent": -1,
    "links": [
-    1,
-    3
+    0,
+    5
    ],
-   "x": 220,
-   "y": 255
+   "scenes": [
+    109
+   ],
+   "x": 204,
+   "y": 200,
+   "short": "W. Town"
   },
   {
    "id": 3,
-   "name": "Southern Swamp",
+   "name": "North Clock Town",
+   "parent": -1,
    "links": [
-    2,
-    4
+    0,
+    1,
+    5
    ],
-   "x": 220,
-   "y": 292
+   "scenes": [
+    110
+   ],
+   "x": 240,
+   "y": 178,
+   "short": "N. Town"
   },
   {
    "id": 4,
-   "name": "Woodfall",
+   "name": "Laundry Pool",
+   "parent": -1,
    "links": [
-    3
+    0
    ],
-   "x": 220,
-   "y": 326
+   "scenes": [
+    112
+   ],
+   "x": 280,
+   "y": 228,
+   "short": "Laundry"
   },
   {
    "id": 5,
-   "name": "Milk Road",
+   "name": "Termina Field",
+   "parent": -1,
    "links": [
-    1
+    0,
+    1,
+    2,
+    3,
+    6,
+    11,
+    17,
+    19,
+    23
    ],
-   "x": 128,
-   "y": 238
+   "scenes": [
+    45
+   ],
+   "x": 240,
+   "y": 200,
+   "short": "Termina Field"
   },
   {
    "id": 6,
-   "name": "Mountain Path",
+   "name": "Road to the Swamp",
+   "parent": -1,
    "links": [
-    1,
+    5,
     7
    ],
-   "x": 220,
-   "y": 100
+   "scenes": [
+    64
+   ],
+   "x": 240,
+   "y": 292,
+   "short": "Swamp Road"
   },
   {
    "id": 7,
-   "name": "Mtn. Village",
+   "name": "Southern Swamp",
+   "parent": -1,
    "links": [
     6,
     8,
-    9
+    9,
+    10
    ],
-   "x": 220,
-   "y": 62
+   "scenes": [
+    69,
+    0
+   ],
+   "x": 240,
+   "y": 335,
+   "short": "Southern Swamp"
   },
   {
    "id": 8,
-   "name": "Goron Village",
+   "name": "Deku Palace",
+   "parent": -1,
    "links": [
     7
    ],
-   "x": 140,
-   "y": 34
+   "scenes": [
+    43
+   ],
+   "x": 165,
+   "y": 362,
+   "short": "Deku Palace"
   },
   {
    "id": 9,
-   "name": "Snowhead",
+   "name": "Woodfall",
+   "parent": -1,
    "links": [
     7
    ],
-   "x": 300,
-   "y": 34
+   "scenes": [
+    70
+   ],
+   "x": 240,
+   "y": 382,
+   "short": "Woodfall"
   },
   {
    "id": 10,
-   "name": "Great Bay",
+   "name": "Woods of Mystery",
+   "parent": -1,
    "links": [
-    1,
-    11
+    7
    ],
-   "x": 100,
-   "y": 175
+   "scenes": [
+    100
+   ],
+   "x": 315,
+   "y": 362,
+   "short": "Woods of Mystery"
   },
   {
    "id": 11,
-   "name": "Zora Cape",
+   "name": "Path to the Mountain",
+   "parent": -1,
    "links": [
-    10
+    5,
+    12
    ],
-   "x": 38,
-   "y": 175
+   "scenes": [
+    28
+   ],
+   "x": 240,
+   "y": 100,
+   "short": "Mountain Path"
   },
   {
    "id": 12,
-   "name": "Ikana Road",
+   "name": "Mountain Village",
+   "parent": -1,
    "links": [
-    1,
+    11,
     13,
-    14
+    15
    ],
-   "x": 322,
-   "y": 175
+   "scenes": [
+    80,
+    90
+   ],
+   "x": 240,
+   "y": 70,
+   "short": "Mountain Village"
   },
   {
    "id": 13,
-   "name": "Ikana Canyon",
+   "name": "Twin Islands",
+   "parent": -1,
    "links": [
     12,
-    15
+    14
    ],
-   "x": 374,
-   "y": 140
+   "scenes": [
+    93,
+    94
+   ],
+   "x": 160,
+   "y": 48,
+   "short": "Twin Islands"
   },
   {
    "id": 14,
-   "name": "Graveyard",
-   "links": [
-    12
-   ],
-   "x": 374,
-   "y": 214
-  },
-  {
-   "id": 15,
-   "name": "Stone Tower",
+   "name": "Goron Village",
+   "parent": -1,
    "links": [
     13
    ],
-   "x": 394,
-   "y": 84
+   "scenes": [
+    77,
+    72
+   ],
+   "x": 80,
+   "y": 28,
+   "short": "Goron Village"
+  },
+  {
+   "id": 15,
+   "name": "Path to Snowhead",
+   "parent": -1,
+   "links": [
+    12,
+    16
+   ],
+   "scenes": [
+    91
+   ],
+   "x": 320,
+   "y": 48,
+   "short": "Snowhead Path"
+  },
+  {
+   "id": 16,
+   "name": "Snowhead",
+   "parent": -1,
+   "links": [
+    15
+   ],
+   "scenes": [
+    92
+   ],
+   "x": 400,
+   "y": 26,
+   "short": "Snowhead"
+  },
+  {
+   "id": 17,
+   "name": "Milk Road",
+   "parent": -1,
+   "links": [
+    5,
+    18
+   ],
+   "scenes": [
+    34
+   ],
+   "x": 340,
+   "y": 272,
+   "short": "Milk Road"
+  },
+  {
+   "id": 18,
+   "name": "Romani Ranch",
+   "parent": -1,
+   "links": [
+    17
+   ],
+   "scenes": [
+    53
+   ],
+   "x": 405,
+   "y": 320,
+   "short": "Romani Ranch"
+  },
+  {
+   "id": 19,
+   "name": "Great Bay Coast",
+   "parent": -1,
+   "links": [
+    5,
+    20,
+    21
+   ],
+   "scenes": [
+    55
+   ],
+   "x": 92,
+   "y": 212,
+   "short": "Great Bay Coast"
+  },
+  {
+   "id": 20,
+   "name": "Zora Cape",
+   "parent": -1,
+   "links": [
+    19,
+    22
+   ],
+   "scenes": [
+    56
+   ],
+   "x": 52,
+   "y": 285,
+   "short": "Zora Cape"
+  },
+  {
+   "id": 21,
+   "name": "Pirates' Fortress",
+   "parent": -1,
+   "links": [
+    19
+   ],
+   "scenes": [
+    59
+   ],
+   "x": 52,
+   "y": 140,
+   "short": "Pirates' Fortress"
+  },
+  {
+   "id": 22,
+   "name": "Zora Hall",
+   "parent": -1,
+   "links": [
+    20
+   ],
+   "scenes": [
+    51
+   ],
+   "x": 60,
+   "y": 345,
+   "short": "Zora Hall"
+  },
+  {
+   "id": 23,
+   "name": "Road to Ikana",
+   "parent": -1,
+   "links": [
+    5,
+    24,
+    25
+   ],
+   "scenes": [
+    83
+   ],
+   "x": 380,
+   "y": 200,
+   "short": "Road to Ikana"
+  },
+  {
+   "id": 24,
+   "name": "Ikana Graveyard",
+   "parent": -1,
+   "links": [
+    23
+   ],
+   "scenes": [
+    67
+   ],
+   "x": 430,
+   "y": 252,
+   "short": "Graveyard"
+  },
+  {
+   "id": 25,
+   "name": "Ikana Canyon",
+   "parent": -1,
+   "links": [
+    23,
+    26
+   ],
+   "scenes": [
+    19
+   ],
+   "x": 432,
+   "y": 150,
+   "short": "Ikana Canyon"
+  },
+  {
+   "id": 26,
+   "name": "Stone Tower",
+   "parent": -1,
+   "links": [
+    25
+   ],
+   "scenes": [
+    88,
+    89
+   ],
+   "x": 445,
+   "y": 88,
+   "short": "Stone Tower"
+  },
+  {
+   "id": 27,
+   "name": "Clock Tower",
+   "parent": 0,
+   "links": [],
+   "scenes": [
+    99
+   ]
+  },
+  {
+   "id": 28,
+   "name": "Stock Pot Inn",
+   "parent": 1,
+   "links": [],
+   "scenes": [
+    97
+   ]
+  },
+  {
+   "id": 29,
+   "name": "Milk Bar",
+   "parent": 1,
+   "links": [],
+   "scenes": [
+    21
+   ]
+  },
+  {
+   "id": 30,
+   "name": "Mayor's Residence",
+   "parent": 1,
+   "links": [],
+   "scenes": [
+    18
+   ]
+  },
+  {
+   "id": 31,
+   "name": "Honey & Darling's",
+   "parent": 1,
+   "links": [],
+   "scenes": [
+    17
+   ]
+  },
+  {
+   "id": 32,
+   "name": "Treasure Chest Shop",
+   "parent": 1,
+   "links": [],
+   "scenes": [
+    23
+   ]
+  },
+  {
+   "id": 33,
+   "name": "Town Shooting Gallery",
+   "parent": 1,
+   "links": [],
+   "scenes": [
+    32
+   ]
+  },
+  {
+   "id": 34,
+   "name": "Curiosity Shop",
+   "parent": 2,
+   "links": [],
+   "scenes": [
+    13
+   ]
+  },
+  {
+   "id": 35,
+   "name": "Trading Post",
+   "parent": 2,
+   "links": [],
+   "scenes": [
+    52
+   ]
+  },
+  {
+   "id": 36,
+   "name": "Bomb Shop",
+   "parent": 2,
+   "links": [],
+   "scenes": [
+    104
+   ]
+  },
+  {
+   "id": 37,
+   "name": "Swordsman's School",
+   "parent": 2,
+   "links": [],
+   "scenes": [
+    84
+   ]
+  },
+  {
+   "id": 38,
+   "name": "Post Office",
+   "parent": 2,
+   "links": [],
+   "scenes": [
+    46
+   ]
+  },
+  {
+   "id": 39,
+   "name": "Lottery Shop",
+   "parent": 2,
+   "links": [],
+   "scenes": [
+    57
+   ]
+  },
+  {
+   "id": 40,
+   "name": "Deku Playground",
+   "parent": 3,
+   "links": [],
+   "scenes": [
+    30
+   ]
+  },
+  {
+   "id": 41,
+   "name": "Astral Observatory",
+   "parent": 5,
+   "links": [],
+   "scenes": [
+    41
+   ]
+  },
+  {
+   "id": 42,
+   "name": "A Grotto",
+   "parent": 5,
+   "links": [],
+   "scenes": [
+    7
+   ]
+  },
+  {
+   "id": 43,
+   "name": "Fairy Fountain",
+   "parent": 5,
+   "links": [],
+   "scenes": [
+    38
+   ]
+  },
+  {
+   "id": 44,
+   "name": "Swamp Shooting Gallery",
+   "parent": 6,
+   "links": [],
+   "scenes": [
+    36
+   ]
+  },
+  {
+   "id": 45,
+   "name": "Potion Shop",
+   "parent": 7,
+   "links": [],
+   "scenes": [
+    10
+   ]
+  },
+  {
+   "id": 46,
+   "name": "Tourist Center",
+   "parent": 7,
+   "links": [],
+   "scenes": [
+    87
+   ]
+  },
+  {
+   "id": 47,
+   "name": "Swamp Spider House",
+   "parent": 7,
+   "links": [],
+   "scenes": [
+    39
+   ]
+  },
+  {
+   "id": 48,
+   "name": "Deku King's Chamber",
+   "parent": 8,
+   "links": [],
+   "scenes": [
+    62
+   ]
+  },
+  {
+   "id": 49,
+   "name": "Woodfall Temple",
+   "parent": 9,
+   "links": [],
+   "scenes": [
+    27
+   ]
+  },
+  {
+   "id": 50,
+   "name": "Blacksmith",
+   "parent": 12,
+   "links": [],
+   "scenes": [
+    44
+   ]
+  },
+  {
+   "id": 51,
+   "name": "Goron Graveyard",
+   "parent": 12,
+   "links": [],
+   "scenes": [
+    78
+   ]
+  },
+  {
+   "id": 52,
+   "name": "Goron Racetrack",
+   "parent": 13,
+   "links": [],
+   "scenes": [
+    107
+   ]
+  },
+  {
+   "id": 53,
+   "name": "Goron Shrine",
+   "parent": 14,
+   "links": [],
+   "scenes": [
+    50
+   ]
+  },
+  {
+   "id": 54,
+   "name": "Goron Shop",
+   "parent": 14,
+   "links": [],
+   "scenes": [
+    61
+   ]
+  },
+  {
+   "id": 55,
+   "name": "Snowhead Temple",
+   "parent": 16,
+   "links": [],
+   "scenes": [
+    33
+   ]
+  },
+  {
+   "id": 56,
+   "name": "Gorman Track",
+   "parent": 17,
+   "links": [],
+   "scenes": [
+    106
+   ]
+  },
+  {
+   "id": 57,
+   "name": "Ranch House",
+   "parent": 18,
+   "links": [],
+   "scenes": [
+    16
+   ]
+  },
+  {
+   "id": 58,
+   "name": "Doggy Racetrack",
+   "parent": 18,
+   "links": [],
+   "scenes": [
+    65
+   ]
+  },
+  {
+   "id": 59,
+   "name": "Cucco Shack",
+   "parent": 18,
+   "links": [],
+   "scenes": [
+    66
+   ]
+  },
+  {
+   "id": 60,
+   "name": "Marine Lab",
+   "parent": 19,
+   "links": [],
+   "scenes": [
+    47
+   ]
+  },
+  {
+   "id": 61,
+   "name": "Fisherman's Hut",
+   "parent": 19,
+   "links": [],
+   "scenes": [
+    60
+   ]
+  },
+  {
+   "id": 62,
+   "name": "Oceanside Spider House",
+   "parent": 19,
+   "links": [],
+   "scenes": [
+    40
+   ]
+  },
+  {
+   "id": 63,
+   "name": "Pinnacle Rock",
+   "parent": 19,
+   "links": [],
+   "scenes": [
+    37
+   ]
+  },
+  {
+   "id": 64,
+   "name": "Waterfall Rapids",
+   "parent": 20,
+   "links": [],
+   "scenes": [
+    74
+   ]
+  },
+  {
+   "id": 65,
+   "name": "Great Bay Temple",
+   "parent": 20,
+   "links": [],
+   "scenes": [
+    73
+   ]
+  },
+  {
+   "id": 66,
+   "name": "Pirates' Hideout",
+   "parent": 21,
+   "links": [],
+   "scenes": [
+    35,
+    20
+   ]
+  },
+  {
+   "id": 67,
+   "name": "Zora Band Rooms",
+   "parent": 22,
+   "links": [],
+   "scenes": [
+    76
+   ]
+  },
+  {
+   "id": 68,
+   "name": "Dampe's House",
+   "parent": 24,
+   "links": [],
+   "scenes": [
+    82
+   ]
+  },
+  {
+   "id": 69,
+   "name": "Beneath the Graveyard",
+   "parent": 24,
+   "links": [],
+   "scenes": [
+    12
+   ]
+  },
+  {
+   "id": 70,
+   "name": "Ikana Castle",
+   "parent": 25,
+   "links": [],
+   "scenes": [
+    29
+   ]
+  },
+  {
+   "id": 71,
+   "name": "Beneath the Well",
+   "parent": 25,
+   "links": [],
+   "scenes": [
+    75
+   ]
+  },
+  {
+   "id": 72,
+   "name": "Music Box House",
+   "parent": 25,
+   "links": [],
+   "scenes": [
+    85
+   ]
+  },
+  {
+   "id": 73,
+   "name": "Sakon's Hideout",
+   "parent": 25,
+   "links": [],
+   "scenes": [
+    79
+   ]
+  },
+  {
+   "id": 74,
+   "name": "Secret Shrine",
+   "parent": 25,
+   "links": [],
+   "scenes": [
+    96
+   ]
+  },
+  {
+   "id": 75,
+   "name": "Poe Hut",
+   "parent": 25,
+   "links": [],
+   "scenes": [
+    81
+   ]
+  },
+  {
+   "id": 76,
+   "name": "Stone Tower Temple",
+   "parent": 26,
+   "links": [],
+   "scenes": [
+    22,
+    24
+   ]
   }
  ]
 }
