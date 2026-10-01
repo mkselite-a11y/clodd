@@ -121,19 +121,17 @@ static s32 Menu_TraitRows(u16* out, s32 n, u16 mask) {
     }
     return n;
 }
-static u16 sV2ShopEntries[5];
+static u16 sV2ShopEntries[3];
 static u16 sV2ItemEntries[1 + 32];
-static u16 sV2ServiceEntries[1 + 32];
+static u16 sV2ServiceEntries[3 + 32];
 static s32 sV2ItemCount = 0;
 static s32 sV2ServiceCount = 0;
 static u16 sV2BanEntries[EV_COUNT];
 static u16 sV2CallEntries[EV_COUNT];
 static s32 sV2EvCount = 0;
 // V3: the curse sits with the events; one list of events, each with its own page.
-static const u16 sEventsEntries[] = { ID_EV_CURSE_INFO, ID_EV_STATUS,     ID_EV_MASTER,       ID_SUB_EV_LIST,
-                                      ID_EV_TRIGGER,    ID_EV_END,        ID_EV_INTERVAL,     ID_EV_DURATION,
-                                      ID_SUB_V2_MUTS,   ID_V2_MUT,        ID_SUB_EV_POOL,     ID_SUB_EV_CRITTERS,
-                                      ID_SUB_EV_FEATURES, ID_SUB_EV_REPORT };
+static const u16 sEventsEntries[] = { ID_EV_CURSE_INFO, ID_EV_STATUS, ID_EV_MASTER,   ID_SUB_EV_LIST, ID_EV_TRIGGER,
+                                      ID_EV_END,        ID_SUB_V2_MUTS, ID_V2_MUT,   ID_SUB_EV_REPORT };
 static const u16 sEvFeatureEntries[] = { ID_EV_ROULETTE,  ID_EV_COMBOS,    ID_EV_CURSE,
                                          ID_EV_HOURS,     ID_EV_TIMERSTYLE,
                                          ID_EV_WARNSOUND, ID_EV_STREAKS,   ID_EV_MERCY };
@@ -188,13 +186,14 @@ static const u16 sMajoraEntries[] = { ID_MJ_SIZE };
 static const u16 sLeviathanEntries[] = { ID_LV_SIZE };
 
 // Built at startup since they're long runs of consecutive IDs.
-static u16 sEvListEntries[EV_COUNT + 2];
+static u16 sEvListEntries[EV_COUNT + 7];
 static s32 sEvListCount = 0;
 static u16 sEvStartEntries[EV_COUNT];
 static s32 sEvStartCount = 0;
 static u16 sGiveItemEntries[GIVE_ITEM_COUNT];
 static u16 sGiveMaskEntries[GIVE_MASK_COUNT];
 static u16 sPoolEntries[3 + POOL_COUNT];
+static s32 sPoolCount = 0;
 static u16 sCritterEntries[1 + CRIT_COUNT];
 static u16 sReportEntries[10 + EV_COUNT];
 static s32 sReportCount = 0;
@@ -207,8 +206,6 @@ static void Menu_BuildLists(void) {
     sV2ShopEntries[0] = ID_V2_MARKS;
     sV2ShopEntries[1] = ID_SUB_V2_ITEMS;
     sV2ShopEntries[2] = ID_SUB_V2_SERVICES;
-    sV2ShopEntries[3] = ID_SUB_V2_BAN;
-    sV2ShopEntries[4] = ID_SUB_V2_CALL;
     sV2ItemCount = 0;
     sV2ItemEntries[sV2ItemCount++] = ID_V2_MARKS;
     for (i = 0; i < V2_ShopItemCount(); i++) {
@@ -216,6 +213,8 @@ static void Menu_BuildLists(void) {
     }
     sV2ServiceCount = 0;
     sV2ServiceEntries[sV2ServiceCount++] = ID_V2_MARKS;
+    sV2ServiceEntries[sV2ServiceCount++] = ID_SUB_V2_CALL; // V3: Call and Ban are Moon Services
+    sV2ServiceEntries[sV2ServiceCount++] = ID_SUB_V2_BAN;
     for (i = 0; i < V2_ShopServiceCount(); i++) {
         if (!V2_ServiceHidden(i)) {
             sV2ServiceEntries[sV2ServiceCount++] = ID_V2_SHOP_FIRST + V2_ShopItemCount() + i;
@@ -243,6 +242,12 @@ static void Menu_BuildLists(void) {
     sReportEntries[sReportCount++] = ID_RR_KILLER;
     sReportEntries[sReportCount++] = ID_RR_KILLER_NAME;
     sReportEntries[sReportCount++] = ID_RR_RESET;
+    // V3: the event settings sit at the top of Choose Events.
+    sEvListEntries[sEvListCount++] = ID_EV_INTERVAL;
+    sEvListEntries[sEvListCount++] = ID_EV_DURATION;
+    sEvListEntries[sEvListCount++] = ID_SUB_EV_FEATURES;
+    sEvListEntries[sEvListCount++] = ID_SUB_EV_POOL;
+    sEvListEntries[sEvListCount++] = ID_SUB_EV_CRITTERS;
     sEvListEntries[sEvListCount++] = ID_EV_ALL_ON;
     sEvListEntries[sEvListCount++] = ID_EV_ALL_OFF;
     for (i = 0; i < EV_COUNT; i++) {
@@ -262,8 +267,11 @@ static void Menu_BuildLists(void) {
     sPoolEntries[0] = ID_POOL_HORDE;
     sPoolEntries[1] = ID_POOL_ALL_ON;
     sPoolEntries[2] = ID_POOL_ALL_OFF;
+    sPoolCount = 3;
     for (i = 0; i < POOL_COUNT; i++) {
-        sPoolEntries[3 + i] = ID_POOL_FIRST + i;
+        if (i != 33) { // V3: Big Poes are retired
+            sPoolEntries[sPoolCount++] = ID_POOL_FIRST + i;
+        }
     }
     sCritterEntries[0] = ID_CRIT_AMOUNT;
     for (i = 0; i < CRIT_COUNT; i++) {
@@ -286,7 +294,7 @@ static const u16 sTeleportEntries[] = { ID_SAVEPOS,       ID_LOADPOS,       ID_W
 static const u16 sCarpenterEntries[] = { ID_C_LOOP, ID_C_RAINBOW, ID_C_GLOW, ID_C_SPEED, ID_C_REVERSE };
 static const u16 sSettingsEntries[] = { ID_THEME,    ID_SOUNDS,    ID_V2_NEWS,   ID_V2_BANNERS, ID_V2_AUTOSAVE,
                                          ID_V2_MUT,   ID_V2_BOUNTY, ID_V2_NEM,    ID_V2_POUCH,   ID_V2_TRACKER,
-                                         ID_V2_REMOTE, ID_SUB_CARPENTER, ID_ALL_OFF };
+                                         ID_V2_REMOTE, ID_ALL_OFF };
 
 s32 V2_TakenBounty(s32 k);
 
@@ -329,7 +337,7 @@ static const u16* Menu_Entries(s32 page, s32* count) {
             *count = sEvStartCount;
             return sEvStartEntries;
         case MENU_POOL:
-            *count = ARRAY_COUNT(sPoolEntries);
+            *count = sPoolCount;
             return sPoolEntries;
         case MENU_CRITTERS:
             *count = ARRAY_COUNT(sCritterEntries);
@@ -726,19 +734,21 @@ static s32 Menu_Parent(s32 page) {
         case MENU_GIVE_ITEM:
         case MENU_GIVE_MASK:
             return MENU_ITEMS;
+        case MENU_EV_FEATURES:
+        case MENU_POOL:
+        case MENU_CRITTERS:
+            return MENU_EV_LIST;
         case MENU_EV_LIST:
         case MENU_EV_START:
         case MENU_EV_SETTINGS:
-        case MENU_EV_FEATURES:
         case MENU_EV_REPORT:
         case MENU_EV_LOG:
-        case MENU_POOL:
-        case MENU_CRITTERS:
             return MENU_EVENTS;
         case MENU_V2_MUTS:
             return MENU_EVENTS;
         case MENU_V2_BAN:
         case MENU_V2_CALL:
+            return MENU_V2_SERVICES;
         case MENU_V2_ITEMS:
         case MENU_V2_SERVICES:
             return MENU_V2_SHOP;
@@ -2150,6 +2160,13 @@ static void Menu_Close(PlayState* play) {
         CutsceneManager_Stop(CS_ID_GLOBAL_TALK);
     }
     Player_SetCsAction(play, NULL, PLAYER_CSACTION_END);
+}
+
+// Friend Link's Forced Ambush pulls Link out of the menu.
+void Menu_ForceClose(PlayState* play) {
+    if (gMenuOpen) {
+        Menu_Close(play);
+    }
 }
 
 // ---------------------------------------------------------------------------

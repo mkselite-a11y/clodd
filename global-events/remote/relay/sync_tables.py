@@ -105,7 +105,14 @@ retired_curses = cases_returning(can_use, "false")
 curse_enum = re.search(r"typedef enum \{([^}]*?CURSE_COUNT)", common + events_c + v11, re.S).group(1)
 curse_ids = re.findall(r"(CURSE_\w+)", curse_enum)
 dead = {curse_ids.index(n) for n in retired_curses if n in curse_ids}
-curses = [c for c in old["curses"] if c["id"] not in dead]
+describe = body(v11, "static void Curse_Describe(char* out, s32 size)")
+curse_desc = dict(re.findall(r'case (CURSE_\w+):\s*Ev_Append\(out, 0, "((?:[^"\\]|\\.)*)"', describe))
+curses = []
+for c in old["curses"]:
+    if c["id"] in dead:
+        continue
+    d = curse_desc.get(curse_ids[c["id"]])
+    curses.append(dict(c, desc=d) if d else c)
 
 # --- enemies that can be bounties / Nemeses -------------------------------------------
 hunt = [int(x) for x in re.search(r"sHuntPool\[\] = \{([^}]*)\}", v2).group(1).split(",")]

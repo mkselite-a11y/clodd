@@ -27,12 +27,58 @@ static s32 sRefunds[8];           // ids of commands that couldn't run (the rela
 static s32 sRefundCount = 0;
 
 
-// Soundboard (panel order)
+// Soundboard (panel order: keep in step with "sounds" in remote/relay/tables.json).
 static const u16 sPrankSfx[] = {
-    NA_SE_SY_GET_ITEM,     NA_SE_SY_PIECE_OF_HEART, NA_SE_SY_TRE_BOX_APPEAR, NA_SE_EN_REDEAD_CRY,
-    NA_SE_EN_WIZ_LAUGH,    NA_SE_EV_CHICKEN_CRY_M,  NA_SE_EV_COW_CRY,        NA_SE_VO_NAVY_HELLO,
-    NA_SE_SY_TIMESIGNAL_BELL, NA_SE_IT_BOMB_EXPLOSION,
+    NA_SE_SY_GET_ITEM,       NA_SE_SY_CORRECT_CHIME, NA_SE_SY_TRE_BOX_APPEAR, NA_SE_SY_HITPOINT_ALARM,
+    NA_SE_SY_ERROR,          NA_SE_SY_TIMESIGNAL_BELL, NA_SE_VO_NAVY_HELLO,   NA_SE_EN_STALKIDS_LAUGH,
+    NA_SE_EN_PO_LAUGH,       NA_SE_EN_WIZ_LAUGH,     NA_SE_EN_REDEAD_CRY,     NA_SE_EN_GOLON_SNORE1,
+    NA_SE_EV_CHICKEN_CRY_M,  NA_SE_EV_COW_CRY,       NA_SE_EV_HORSE_NEIGH,    NA_SE_EV_DOG_CRY_EVENING,
+    NA_SE_IT_BOMB_EXPLOSION,
 };
+static s32 sPrankSfxId = -1;
+static s32 sPrankReps = 0;    // plays left (short sounds repeat a few times)
+static s32 sPrankGap = 0;     // frames to the next one
+static s32 sBgmDucked = 0;    // frames the music stays quiet so the sound is heard
+
+// Prank sounds: the music dips for a moment, and short ones play a few times.
+static void Prank_Sound(s32 k) {
+    u16 sfx = sPrankSfx[k];
+
+    sPrankSfxId = sfx;
+    sPrankReps = (sfx == NA_SE_SY_HITPOINT_ALARM) ? 6 : ((k >= 6) && (k <= 15)) ? 2 : 1;
+    sPrankGap = 0;
+    if (sBgmDucked == 0) {
+        Audio_SetMainBgmVolume(0x28, 3);
+    }
+    sBgmDucked = 3 * FPS;
+}
+
+static void Prank_SoundUpdate(void) {
+    if ((sPrankReps > 0) && (--sPrankGap <= 0)) {
+        Audio_PlaySfx((u16)sPrankSfxId);
+        sPrankReps--;
+        sPrankGap = (sPrankSfxId == NA_SE_SY_HITPOINT_ALARM) ? 8 : 16;
+    }
+    if ((sBgmDucked > 0) && (--sBgmDucked == 0)) {
+        Audio_SetMainBgmVolume(0x7F, 10);
+    }
+}
+
+// --- Pranks with something to see -------------------------------------------------
+
+#define LINGER_FRAMES (30 * FPS)
+static s32 sDiscoTimer = 0;
+static s32 sConfettiTimer = 0;
+
+typedef struct {
+    Vec3f pos;
+    s32 timer;
+} Beam;
+static Beam sBeams[4];
+
+// A friend's "look here": a column of light at their mark, a few seconds.
+static void Beam_Add(PlayState* play, f32 x, f32 z);
+static void Beam_Update(PlayState* play);
 
 // Our Poes never leave a soul to bottle (that would hand out a real item).
 // Both kinds move to the MISC list when they turn into a soul; the Big Poe
@@ -94,6 +140,14 @@ static const char* Link_StateValue(char* out, s32 maxLen, u8* r, u8* g, u8* b) {
 
 static char sLinkFrom[8] = "";    // name of the friend who sent the command being run
 static char sFriendNowFrom[8] = ""; // ...and of the one whose "start now" is waiting
+
+// "id|type|..." -> "type|..."
+static const char* Link_Strip(const char* line) {
+    while ((*line != '\0') && (*line != '|')) {
+        line++;
+    }
+    return (*line == '|') ? line + 1 : line;
+}
 
 static s32 Link_StartsWith(const char* s, const char* prefix) {
     while (*prefix != '\0') {
@@ -254,7 +308,7 @@ static s32 Link_Harmful(const char* type) {
     static const char* sMean[] = { "ev_now",    "ev_next",   "ev_soon",  "nem_make", "nem_trait", "nem_level",
                                    "nem_hunt",  "draft",     "bounty",   "ambush",   "curse",     "curse_set",
                                    "tax",       "airstrike", "size",     "wanted",   "ev_extend", "empower",
-                                   "blackout",  "nem_stat",  "surprise", "place",    "steer" };
+                                   "blackout",  "nem_stat",  "surprise", "place",    "steer",   "forced_ambush" };
     s32 k;
 
     for (k = 0; k < (s32)ARRAY_COUNT(sMean); k++) {
@@ -1265,8 +1319,74 @@ static s32 Link_Run(PlayState* play, char* line) {
             Link_Say("Your friend healed you!", "");
         }
     } else if (Str_Eq(type, "sfx") && (a >= 0) && (a < (s32)ARRAY_COUNT(sPrankSfx))) {
-        Audio_PlaySfx(sPrankSfx[a]); // no message: that's the joke
+        Prank_Sound(a); // no message: that's the joke
         Link_Result("Played a sound", "");
+    } else if (Str_Eq(type, "cuccos")) {
+        Player* player = GET_PLAYER(play);
+        s32 i;
+        s32 made = 0;
+
+        for (i = 0; (player != NULL) && (i < 6); i++) {
+            Vec3f spot;
+            Actor* cucco;
+
+            if (!Ev_FindSpot(play, 80.0f, 220.0f, (s16)(i * 0x2AAA), 0x1800, true, &spot)) {
+                continue;
+            }
+            cucco = Ev_Spawn(play, ACTOR_EN_NIW, OBJECT_NIW, &spot, 0, (s16)(Rand_ZeroOne() * 0xFFFF), 0,
+                             (s16)0xFFFF, TAG_V2);
+            if (cucco != NULL) {
+                Linger_Add(cucco, LINGER_FRAMES);
+                made++;
+            }
+        }
+        if (made > 0) {
+            Audio_PlaySfx(NA_SE_EV_CHICKEN_CRY_M);
+            Link_Result("Cucco party", "");
+            Link_Say("Your friend threw a cucco party. Don't hit them.", "");
+        } else {
+            Link_Fail("no room for cuccos", "");
+        }
+    } else if (Str_Eq(type, "disco")) {
+        sDiscoTimer = 15 * FPS;
+        Link_Result("Disco", "");
+        Link_Say("Your friend turned on the disco lights!", "");
+    } else if (Str_Eq(type, "confetti")) {
+        sConfettiTimer = 3 * FPS;
+        Audio_PlaySfx(NA_SE_SY_CORRECT_CHIME);
+        Link_Result("Confetti", "");
+        Link_Say("Your friend is celebrating you!", "");
+    } else if (Str_Eq(type, "beam")) {
+        // Free and quiet: a friend pointing at something.
+        Beam_Add(play, (f32)a, (f32)b);
+    } else if (Str_Eq(type, "forced_ambush") && Link_PoolOk(a) && (b >= 3) && (b <= 6)) {
+        // Pulled out of any menu, surrounded.
+        s32 i;
+        s32 made = 0;
+
+        for (i = 0; i < b; i++) {
+            Vec3f spot;
+            Actor* e = NULL;
+
+            if (Ev_FindSpot(play, 180.0f, 320.0f, (s16)(i * (0x10000 / b)), 0x1800, true, &spot)) {
+                e = V2_SpawnEnemy(play, a, &spot, 0.0f, 0.0f, TAG_V2);
+            }
+            if (e == NULL) {
+                e = V2_SpawnEnemy(play, a, NULL, 200.0f, 400.0f, TAG_V2);
+            }
+            if (e != NULL) {
+                Ev_Poof(play, &e->world.pos, 1);
+                made++;
+            }
+        }
+        if (made > 0) {
+            V2_Banner("FORCED AMBUSH", Pool_Name(a));
+            Audio_PlaySfx(NA_SE_SY_FOUND);
+            Link_Result("Forced ambush: ", Pool_Name(a));
+            Link_Say("Your friend dragged you into an ambush!", "");
+        } else {
+            Link_Fail("no room for an ambush", "");
+        }
     } else if (Str_Eq(type, "shake")) {
         Camera* cam = GET_ACTIVE_CAM(play);
 
@@ -1819,6 +1939,82 @@ static void Link_SendStatus(PlayState* play, s32 playing) {
     ger_status(sLinkStatus, (u32)n);
 }
 
+
+static void Beam_Add(PlayState* play, f32 x, f32 z) {
+    Vec3f at;
+    s32 k;
+    s32 pick = 0;
+
+    if (!Link_GroundAt(play, x, z, &at)) {
+        return;
+    }
+    for (k = 1; k < (s32)ARRAY_COUNT(sBeams); k++) {
+        if (sBeams[k].timer < sBeams[pick].timer) {
+            pick = k;
+        }
+    }
+    sBeams[pick].pos = at;
+    sBeams[pick].timer = 4 * FPS;
+}
+
+// Beams, the disco and confetti (every frame, even paused: they're only looks).
+static void Beam_Update(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+    Vec3f vel = { 0.0f, 3.5f, 0.0f };
+    Vec3f acc = { 0.0f, 0.0f, 0.0f };
+    Color_RGBA8 prim = { 255, 255, 230, 255 };
+    Color_RGBA8 env = { 255, 220, 120, 255 };
+    s32 k;
+
+    for (k = 0; k < (s32)ARRAY_COUNT(sBeams); k++) {
+        if (sBeams[k].timer > 0) {
+            Vec3f p = sBeams[k].pos;
+
+            sBeams[k].timer--;
+            p.x += Rand_CenteredFloat(14.0f);
+            p.z += Rand_CenteredFloat(14.0f);
+            p.y += Rand_ZeroOne() * 260.0f;
+            EffectSsKirakira_SpawnDispersed(play, &p, &vel, &acc, &prim, &env, 2600, 22);
+            p.y = sBeams[k].pos.y + 4.0f;
+            EffectSsKirakira_SpawnDispersed(play, &p, &vel, &acc, &prim, &env, 3200, 14);
+        }
+    }
+    if ((sConfettiTimer > 0) && (player != NULL)) {
+        Vec3f p = player->actor.world.pos;
+        Vec3f cvel;
+        Vec3f cacc = { 0.0f, -0.25f, 0.0f };
+        Color_RGBA8 cprim = { 255, 255, 255, 255 };
+        Color_RGBA8 cenv;
+
+        sConfettiTimer--;
+        for (k = 0; k < 3; k++) {
+            HueToRgb((s32)(Rand_ZeroOne() * 360.0f), &cenv.r, &cenv.g, &cenv.b);
+            cenv.a = 255;
+            cvel.x = Rand_CenteredFloat(8.0f);
+            cvel.y = 6.0f + Rand_ZeroOne() * 4.0f;
+            cvel.z = Rand_CenteredFloat(8.0f);
+            p.y = player->actor.world.pos.y + 60.0f;
+            EffectSsKirakira_SpawnDispersed(play, &p, &cvel, &cacc, &cprim, &cenv, 3000, 40);
+        }
+    }
+    if (sDiscoTimer > 0) {
+        static const u8 sStyles[4] = { ENV_RED, ENV_COLD, ENV_ORANGE, ENV_DARK };
+
+        sDiscoTimer--;
+        if (sActive < 0) {
+            if (sDiscoTimer > 0) {
+                Ev_ApplyEnv(play, sStyles[(sDiscoTimer / 12) % 4], 0.6f);
+            } else if (!sNightDark && (sFriendDarkTimer == 0)) {
+                Ev_ClearEnv(play);
+                Ev_RestoreLighting(play);
+            }
+        }
+    }
+}
+
+static char sStash[128]; // a command that came in while they were in a menu (it waits there)
+static s32 sStashed = false;
+
 // Every frame, from V2_Update.
 static void Link_Update(PlayState* play, s32 playing) {
     static char cmd[128];
@@ -1844,6 +2040,8 @@ static void Link_Update(PlayState* play, s32 playing) {
         (sFakeTimer < 5 * FPS)) {
         Audio_PlaySfx(NA_SE_SY_WARNING_COUNT_N);
     }
+    Prank_SoundUpdate();
+    Beam_Update(play);
     if ((sFakeTimer > 0) && playing && (--sFakeTimer == 0)) {
         Menu_ShowToast("...or not.");
     }
@@ -1884,8 +2082,38 @@ static void Link_Update(PlayState* play, s32 playing) {
         sLinkGap--;
     }
     // Commands wait while Link can't take them: paused, a menu, the Pop Quiz,
-    // or while he's going down.
+    // or while he's going down. A Forced Ambush doesn't: it pulls him out of
+    // a menu (one command is looked at; anything else waits in the stash).
     if (Link_HoldReason(play, playing)[0] != '\0') {
+        if ((gMenuOpen || sSaveUiOpen || (play->pauseCtx.state != PAUSE_STATE_OFF)) &&
+            (gSaveContext.save.saveInfo.playerData.health > 0) && !sQuizHolding && (sLinkGap == 0)) {
+            if (!sStashed && (ger_poll(sStash, sizeof(sStash)) > 0)) {
+                sStashed = true;
+            }
+            if (sStashed && Link_StartsWith(Link_Strip(sStash), "forced_ambush|")) {
+                if (gMenuOpen) {
+                    Menu_ForceClose(play);
+                }
+                if (sSaveUiOpen) {
+                    sSaveClickClose = true; // closes the way its own Close button does
+                }
+                // The pause menu closes the way Start would (only while it's just sitting open).
+                if ((play->pauseCtx.state == PAUSE_STATE_MAIN) && (play->pauseCtx.mainState == PAUSE_MAIN_STATE_IDLE) &&
+                    !play->pauseCtx.itemDescriptionOn) {
+                    Interface_SetAButtonDoAction(play, DO_ACTION_NONE);
+                    play->pauseCtx.state = PAUSE_STATE_UNPAUSE_SETUP;
+                    Audio_PlaySfx(NA_SE_SY_WIN_CLOSE);
+                }
+                Menu_ShowBanner("FORCED AMBUSH", "Get ready...");
+            }
+        }
+        return;
+    }
+    if (sStashed) {
+        sStashed = false;
+        if (Link_Run(play, sStash)) {
+            sLinkGap = FPS;
+        }
         return;
     }
     // A "start now" that had to wait.

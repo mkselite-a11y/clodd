@@ -630,12 +630,12 @@
   {
    "id": 0,
    "name": "Restless Moon",
-   "desc": "Events come a third more often."
+   "desc": "Events come 33% more often."
   },
   {
    "id": 1,
    "name": "Lingering Dread",
-   "desc": "Events last half again as long."
+   "desc": "Events last 50% longer."
   },
   {
    "id": 2,
@@ -665,7 +665,7 @@
   {
    "id": 12,
    "name": "Glass Moon",
-   "desc": "They take double damage during events."
+   "desc": "You take double damage during events."
   },
   {
    "id": 13,
@@ -752,38 +752,66 @@
   },
   {
    "id": 1,
-   "name": "Heart Piece jingle"
-  },
-  {
-   "id": 2,
    "name": "Secret found"
   },
   {
+   "id": 2,
+   "name": "Chest appears"
+  },
+  {
    "id": 3,
-   "name": "ReDead scream"
+   "name": "Low health alarm"
   },
   {
    "id": 4,
-   "name": "Wizrobe laugh"
+   "name": "Error buzzer"
   },
   {
    "id": 5,
-   "name": "Cucco"
-  },
-  {
-   "id": 6,
-   "name": "Cow"
-  },
-  {
-   "id": 7,
-   "name": "Tatl: Hey!"
-  },
-  {
-   "id": 8,
    "name": "Clock Town bell"
   },
   {
+   "id": 6,
+   "name": "Tatl: Hey!"
+  },
+  {
+   "id": 7,
+   "name": "Skull Kid laugh"
+  },
+  {
+   "id": 8,
+   "name": "Poe laugh"
+  },
+  {
    "id": 9,
+   "name": "Wizrobe laugh"
+  },
+  {
+   "id": 10,
+   "name": "ReDead scream"
+  },
+  {
+   "id": 11,
+   "name": "Goron snore"
+  },
+  {
+   "id": 12,
+   "name": "Cucco"
+  },
+  {
+   "id": 13,
+   "name": "Cow"
+  },
+  {
+   "id": 14,
+   "name": "Epona neigh"
+  },
+  {
+   "id": 15,
+   "name": "Dog bark"
+  },
+  {
+   "id": 16,
    "name": "Explosion"
   }
  ],

@@ -277,7 +277,7 @@ static s32 Trait_Random(void) {
 _Static_assert(TR_COUNT <= 16, "traits must fit in a u16");
 
 // Enemies that can be bounties or Nemeses (indices into sPool).
-static const u8 sHuntPool[] = { 3, 4, 5, 7, 9, 13, 19, 22, 24, 28, 30, 31, 32, 33, 8, 10 }; // V3: no ReDeads (you can only knock them down)
+static const u8 sHuntPool[] = { 3, 4, 5, 7, 9, 13, 19, 22, 24, 28, 30, 31, 32, 8, 10 }; // V3: no ReDeads (you can only knock them down), no Big Poes
 
 #define TAGF_V2_GUARD (1 << 0) // Nemesis bodyguard
 #define TAGF_V2_ELITE (1 << 1) // WANTED bounty: Meteor Caller
@@ -562,7 +562,7 @@ static s32 sStreakPaid = false;
 static s32 sWantedPosted = false;
 static Actor* sGuards[2];
 static Actor* sNemOrphan = NULL; // a Nemesis replaced by a save code, still out in the world
-static const u8 sRarePool[] = { 19, 30, 31, 32, 33 }; // Like Like, Garo Master, Iron Knuckle, Dinolfos, Big Poe
+static const u8 sRarePool[] = { 19, 30, 31, 32 }; // Like Like, Garo Master, Iron Knuckle, Dinolfos
 static s32 sV2Ready = false;
 
 // Nemesis
@@ -1798,6 +1798,7 @@ static void V2_AfterActorUpdate(PlayState* play, Actor* actor) {
     Player* player = GET_PLAYER(play);
     u16 tr;
     s32 enraged;
+    s32 airborne;
 
     if ((t == NULL) || (player == NULL) || (actor->update == NULL) ||
         ((t->traits == 0) && (t->tag != TAG_NEMV2)) ||
@@ -1841,15 +1842,48 @@ static void V2_AfterActorUpdate(PlayState* play, Actor* actor) {
             actor->colChkInfo.health++;
         }
     }
-    // Nemesis Speed: +12% movement per point.
-    if ((t->tag == TAG_NEMV2) && (actor == sNem.actor) && (sNemStat[NS_SPEED] > 0)) {
+    // Stuck-jump watchdog: a walking Nemesis that has been "in the air" right above
+    // the floor for 3 seconds is put back down; after 6 it pops up somewhere else.
+    if ((t->tag == TAG_NEMV2) && (actor == sNem.actor) && (actor->gravity < 0.0f)) {
+        static s32 sNemAir = 0;
+
+        if (actor->bgCheckFlags & BGCHECKFLAG_GROUND) {
+            sNemAir = 0;
+        } else if (++sNemAir == 3 * FPS) {
+            Vec3f probe = actor->world.pos;
+            CollisionPoly* poly;
+            s32 bgId;
+            f32 floorY;
+
+            probe.y += 60.0f;
+            floorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &poly, &bgId, &probe);
+            if ((floorY > BGCHECK_Y_MIN) && (actor->world.pos.y - floorY < 80.0f)) {
+                actor->world.pos.y = floorY;
+                actor->velocity.y = -4.0f;
+            }
+        } else if (sNemAir >= 6 * FPS) {
+            Vec3f spot;
+
+            sNemAir = 0;
+            if (Ev_FindSpot(play, 200.0f, 400.0f, player->actor.shape.rot.y, 0x7FFF, true, &spot)) {
+                Ev_Poof(play, &actor->world.pos, 1);
+                actor->world.pos = spot;
+                actor->prevPos = spot;
+                actor->velocity.y = 0.0f;
+                Ev_Poof(play, &spot, 1);
+            }
+        }
+    }
+    airborne = (actor->gravity < 0.0f) && !(actor->bgCheckFlags & BGCHECKFLAG_GROUND);
+    // Nemesis Speed: +12% movement per point (on the ground only).
+    if ((t->tag == TAG_NEMV2) && (actor == sNem.actor) && (sNemStat[NS_SPEED] > 0) && !airborne) {
         f32 k = MIN(0.12f * Nem_StatEff(NS_SPEED), 1.5f);
 
         actor->world.pos.x += (actor->world.pos.x - actor->prevPos.x) * k;
         actor->world.pos.z += (actor->world.pos.z - actor->prevPos.z) * k;
     }
 
-    if (enraged) {
+    if (enraged && !airborne) {
         actor->world.pos.x += (actor->world.pos.x - actor->prevPos.x) * 0.6f;
         actor->world.pos.z += (actor->world.pos.z - actor->prevPos.z) * 0.6f;
     }

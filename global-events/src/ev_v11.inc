@@ -668,7 +668,7 @@ const char* Events_InfoDesc(s32 id) {
         case ID_EV_DURATION: return "How long timed events last.";
         case ID_EV_INTENSITY: return "How hard events hit: Mild, Normal or Brutal.";
         case ID_SUB_EV_FEATURES: return "Roulette, combos, curses and Moon Pressure.";
-        case ID_SUB_EV_LIST: return "Pick which events can happen.";
+        case ID_SUB_EV_LIST: return "Event timing and settings, and which events can happen.";
         case ID_SUB_EV_START: return "Start any event right now.";
         case ID_SUB_EV_SETTINGS: return "Fine-tune each event.";
         case ID_SUB_EV_REPORT: return "Stats for this save: survived, deaths, combos.";

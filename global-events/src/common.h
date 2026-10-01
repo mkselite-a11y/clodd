@@ -442,6 +442,7 @@ s32 BaseHue(PlayState* play);
 extern s32 gMenuOpen;
 void Menu_Open(PlayState* play);
 void Menu_ShowToast(const char* text);
+void Menu_ForceClose(PlayState* play);
 // V3 pop-ups: kinds pick the colour. Banners fall back to a pop-up when turned off.
 typedef enum { NOTE_PLAIN, NOTE_MARKS, NOTE_FRIEND, NOTE_WARN, NOTE_NEMESIS, NOTE_NEWS } NoteKind;
 void Menu_Notify(const char* text, s32 kind);

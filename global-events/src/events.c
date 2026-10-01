@@ -346,6 +346,7 @@ static const SpawnDef sPool[POOL_COUNT] = {
 };
 
 #define POOL_ODOLWA 34
+#define POOL_BIGPOE 33
 
 const char* Pool_Name(s32 index) {
     static const char* sNames[POOL_COUNT] = {
@@ -1649,7 +1650,8 @@ static s32 Ev_PickPoolEnemy(s32 allowBosses) {
     s32 i;
 
     for (i = 0; i < POOL_COUNT; i++) {
-        if (gOpt[ID_POOL_FIRST + i] && (allowBosses || (i < POOL_FIRST_BOSS))) {
+        // V3: Big Poes are no fun to fight: never picked.
+        if (gOpt[ID_POOL_FIRST + i] && (allowBosses || (i < POOL_FIRST_BOSS)) && (i != POOL_BIGPOE)) {
             candidates[count++] = i;
         }
     }
@@ -1697,9 +1699,75 @@ static s32 Ev_CountRoomEnemies(PlayState* play) {
     return count;
 }
 
+// V3: Searchlights' backup stays a little after the lights go out.
+#define LINGER_MAX 12
+static Actor* sLinger[LINGER_MAX];
+static s16 sLingerT[LINGER_MAX];
+static s32 sLingerN = 0;
+
+static void Linger_Keep(PlayState* play, s32 frames) {
+    Actor* actor = play->actorCtx.actorLists[ACTORCAT_ENEMY].first;
+
+    for (; (actor != NULL) && (sLingerN < LINGER_MAX); actor = actor->next) {
+        TagData* t = Tag_Get(actor);
+
+        if ((t != NULL) && (t->tag == TAG_EVENT) && (actor->update != NULL) && (actor->colChkInfo.health > 0)) {
+            t->tag = TAG_V2; // outlives the event like the 2.0 extras do
+            sLinger[sLingerN] = actor;
+            sLingerT[sLingerN] = (s16)frames;
+            sLingerN++;
+        }
+    }
+}
+
+static void Ev_Poof(PlayState* play, Vec3f* pos, s32 colorIndex);
+
+// Something a friend sent (cuccos) that goes away by itself later.
+static void Linger_Add(Actor* actor, s32 frames) {
+    if (sLingerN < LINGER_MAX) {
+        sLinger[sLingerN] = actor;
+        sLingerT[sLingerN] = (s16)frames;
+        sLingerN++;
+    }
+}
+
+static s32 Linger_Exists(PlayState* play, Actor* target) {
+    s32 c;
+
+    for (c = 0; c < ACTORCAT_MAX; c++) {
+        Actor* actor;
+
+        for (actor = play->actorCtx.actorLists[c].first; actor != NULL; actor = actor->next) {
+            if (actor == target) {
+                return (actor->update != NULL) && ((c != ACTORCAT_ENEMY) || (actor->colChkInfo.health > 0));
+            }
+        }
+    }
+    return false;
+}
+
+static void Linger_Update(PlayState* play, s32 playing) {
+    s32 i;
+
+    for (i = sLingerN - 1; i >= 0; i--) {
+        if (!Linger_Exists(play, sLinger[i])) {
+            sLinger[i] = sLinger[--sLingerN];
+            sLingerT[i] = sLingerT[sLingerN];
+        } else if (playing && (--sLingerT[i] <= 0)) {
+            Ev_Poof(play, &sLinger[i]->world.pos, 1);
+            Actor_Kill(sLinger[i]);
+            sLinger[i] = sLinger[--sLingerN];
+            sLingerT[i] = sLingerT[sLingerN];
+        }
+    }
+}
+
 static void Ev_End(PlayState* play) {
     if (sActive < 0) {
         return;
+    }
+    if ((sActive == EV_SEARCH) || (sCombo == EV_SEARCH)) {
+        Linger_Keep(play, 10 * FPS);
     }
     Stats_OnEnd();
     V3_OnEnd(play, gSaveContext.save.saveInfo.playerData.health > 0);
@@ -2423,6 +2491,8 @@ static s32 Dir_Exhausted(void) {
     return sDirSpent >= Dir_Budget() * 2 - 1;
 }
 
+static s32 sSpawnNear = false;
+
 static void Ev_SpawnDef(PlayState* play, const SpawnDef* def, s32 params, f32 minDist, f32 maxDist) {
     Player* player = GET_PLAYER(play);
     Actor* actor;
@@ -2432,9 +2502,10 @@ static void Ev_SpawnDef(PlayState* play, const SpawnDef* def, s32 params, f32 mi
     if (!Dir_Allow(play, def->actorId)) {
         return;
     }
-    // V3: outdoors, enemies come from much farther away and close in.
+    // V3: outdoors, enemies come from much farther away and close in
+    // (not Searchlights' backup: that one has to show up right away).
     found = false;
-    if (Ev_IsOutdoors(play) && (Dir_Cost(def->actorId) > 0)) {
+    if (!sSpawnNear && Ev_IsOutdoors(play) && (Dir_Cost(def->actorId) > 0)) {
         found = Ev_FindSpot(play, MAX(minDist, 800.0f), MIN(maxDist * 3.5f, 2500.0f), player->actor.shape.rot.y,
                             0x7FFF, true, &spot);
     }
@@ -3132,7 +3203,7 @@ static void Freeze_Update(PlayState* play) {
 
 // Indexes into sPool.
 static const u8 sNemRegular[] = { 3, 4, 5, 6, 9, 13, 19, 22, 24, 28 };
-static const u8 sNemMiniboss[] = { 30, 31, 32, 33 };
+static const u8 sNemMiniboss[] = { 30, 31, 32 };
 
 static s32 sNemPick = -1;
 static Actor* sNemActor = NULL;
@@ -3910,7 +3981,9 @@ static void Tick_Search(PlayState* play) {
         s32 pick = Ev_PickPoolEnemy(false);
         const SpawnDef* def = &sPool[(pick >= 0) ? pick : 5];
 
+        sSpawnNear = true;
         Ev_SpawnDef(play, def, def->params, 150.0f, 350.0f);
+        sSpawnNear = false;
     }
 }
 
@@ -5172,6 +5245,12 @@ static s32 Ev_StepToward(PlayState* play, Actor* actor, Vec3f* target, f32 speed
     f32 floorY;
 
     if (dist < 1.0f) {
+        return false;
+    }
+    // Never drag something that's in the air: a jumping enemy (Dinolfos, Tektite)
+    // pulled back to the floor can get stuck mid-jump.
+    if ((actor->category == ACTORCAT_ENEMY) && !(actor->bgCheckFlags & BGCHECKFLAG_GROUND) &&
+        (actor->gravity < 0.0f)) {
         return false;
     }
     speed = MIN(speed, dist);
@@ -7528,6 +7607,7 @@ void Events_Update(PlayState* play) {
 
     sStillFreeze = false; // Time Moves When You Move decides again each frame, while playing
     V3_Always(play);
+    Linger_Update(play, playing);
 
     Ev_UpdateMusic(play);
     Stats_CheckDeath(play);
@@ -7646,6 +7726,25 @@ void Events_Update(PlayState* play) {
     if (!gOpt[ID_EV_MASTER]) {
         return;
     }
+    // Real time: the countdown keeps going while they're paused or in a menu
+    // (the event itself still waits until they're back in action).
+    {
+        static OSTime sLastTick = 0;
+        static u32 sMsBank = 0;
+        OSTime now = osGetTime();
+        u32 ms = (sLastTick != 0) ? (u32)(now - sLastTick) / (OS_CPU_COUNTER / 1000) : 0;
+
+        sLastTick = now;
+        if (playing) {
+            sMsBank = 0;
+        } else if ((sActive < 0) && (sCurseCardTimer == 0) && (sPauseReason == 0) && !Curse_Is(CURSE_BELL)) {
+            sMsBank += MIN(ms, 2000);
+            while ((sMsBank >= 1000 / FPS) && (sUntilNext > 1)) {
+                sMsBank -= 1000 / FPS;
+                sUntilNext--;
+            }
+        }
+    }
     if (playing) {
         if ((sActive >= 0) || (sCurseCardTimer > 0) || (sPauseReason != 0)) {
             return; // safe zones and Active Hours hold the countdown
@@ -7679,6 +7778,7 @@ void Events_OnPlayInit(PlayState* play) {
     }
     Ambush_OnNewArea();
     V2_OnNewArea();
+    sLingerN = 0;
     // New area: our spawns, object entries, light and music are all gone.
     sInjectionCount = 0;
     sSceneReady = false;
