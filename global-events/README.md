@@ -46,6 +46,12 @@ New in 3.1:
 - Friends type the room key and their name every time they open the page.
 - In game: the next-event countdown runs in real time, even while you're paused or in a menu. Searchlights' backup shows up close and sticks around 10 seconds after the lights go out. Big Poes are gone. Event settings are at the top of Choose Events, and Call/Ban an Event are Moon Services.
 
+New in 3.1.1:
+
+- **Maps of every area**, not just the ones you've visited. The first time the game connects, `CUSTOM_GlobalEventsRemote.dll` reads the ROM copy MM Recompiled keeps on your PC, builds a rough height map of all 77 areas and uploads it to your relay (once). Friends can then pick exact spots anywhere on the Map tab. If it can't find the ROM, add `rom=C:\path\to\your\rom.z64` to `CUSTOM_GlobalEventsRemote.txt`. Nothing from the ROM goes anywhere but your own relay.
+- **Radar zoom**: mouse wheel, pinch, + and -, "Whole area" and "Near them".
+- **Archipelago heatmap (spoilers)** on the Map tab, off until a friend turns it on. They type your room address and slot name once (it's shared with the room); the page connects as a read-only tracker and colors each area by how many important items are left there. Rooms with a password aren't supported.
+
 A Friend Shield from the Moon Shop still eats the next mean move.
 
 ### Setting up the relay (once, free)

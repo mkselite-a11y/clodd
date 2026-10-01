@@ -483,6 +483,29 @@ export default {
       return new Response("ok");
     }
 
+    // The game's DLL: every area's map, made once from the player's ROM.
+    if (url.pathname === "/api/mapbulk") {
+      if (request.method !== "POST") {
+        const row = await db.prepare("SELECT v FROM kv WHERE k = 'maps_rom_v1'").first();
+        return new Response(row ? "done" : "no");
+      }
+      if (url.searchParams.get("done") === "1") {
+        await kvSet(db, "maps_rom_v1", now).run();
+        return new Response("ok");
+      }
+      const writes = [];
+      for (const line of (await request.text()).slice(0, 40000).split("\n")) {
+        const [scene, bx, bz, base, cells] = line.split("|");
+        const n = [scene, bx, bz, base].map((x) => parseInt(x, 10));
+        if (!n.every(Number.isFinite) || !MAP_CELLS.test(cells || "")) continue;
+        // What the game saw while playing wins over the ROM's version.
+        writes.push(db.prepare("INSERT OR IGNORE INTO maps (scene, bx, bz, base, cells, t) VALUES (?, ?, ?, ?, ?, ?)").bind(n[0], n[1], n[2], n[3], cells, 0));
+        if (writes.length >= 60) break;
+      }
+      if (writes.length) await db.batch(writes);
+      return new Response("ok");
+    }
+
     // The panel: the mapped blocks of one area, or which areas have any.
     if (url.pathname === "/api/map") {
       const scene = int(url.searchParams.get("scene"));
@@ -581,6 +604,20 @@ export default {
     if (!me || me.name !== myName || now - me.t > 10000) {
       await kvSet(db, "friend:" + fid, JSON.stringify({ name: myName, t: now })).run();
       friends[fid] = { name: myName, t: now };
+    }
+
+    // The panel (Spoilers on): the Archipelago room a friend typed in, shared with the room.
+    if (url.pathname === "/api/ap") {
+      if (mode === 0) return json({ blocked: true });
+      if (request.method === "POST") {
+        let body;
+        try { body = await request.json(); } catch { return json({ ok: false }, 400); }
+        const address = String(body.address || "").replace(/[^A-Za-z0-9.:\-]/g, "").slice(0, 80);
+        const slot = String(body.slot || "").slice(0, 32);
+        await db.batch([kvSet(db, "ap_address", address), kvSet(db, "ap_slot", slot)]);
+        return json({ ok: true });
+      }
+      return json({ address: kv.ap_address || "", slot: kv.ap_slot || "" });
     }
 
     // The panel: everything it shows.

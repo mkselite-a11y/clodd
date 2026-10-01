@@ -281,7 +281,7 @@
       <div class="desc" id="aimDesc">Pick what a click does.</div>
       <div id="radarWrap"><canvas id="radar" width="560" height="560"></canvas></div>
       <div class="row" style="justify-content:space-between">
-        <div class="seg" id="zoomSeg"><button data-zoom="1200">Close</button><button data-zoom="2400" class="on">Medium</button><button data-zoom="5000">Far</button></div>
+        <div class="seg" id="zoomSeg" data-tip="Zoom: mouse wheel, pinch, or these buttons."><button data-zoom="in">+</button><button data-zoom="out">&minus;</button><button data-zoom="fit">Whole area</button><button data-zoom="near">Near them</button></div>
         <span class="muted" id="radarNote"></span>
       </div>
       <div class="legend" style="margin-bottom:4px"><span><i style="background:var(--green)"></i>Them</span><span><i style="background:var(--red)"></i>Enemy</span><span><i style="background:#ff2a5a"></i>Nemesis</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#8fa3c4"></i>People</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
@@ -318,6 +318,12 @@
       <div id="termina"></div>
       <div class="legend"><span><i style="background:var(--green)"></i>Them (L)</span><span><i style="background:var(--red)"></i>Nemesis (N)</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#5fe0e0"></i>Posted by a friend</span><span><i style="background:#ff8a4c"></i>WANTED</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
       <div class="desc" id="mapNote"></div>
+      <div class="sub" data-tip="Connects to their Archipelago room as a read-only tracker and colors each area by how many important items still wait there. Off until you turn it on, every visit.">Archipelago heatmap (spoilers)</div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="apOn" style="width:auto;margin:0"> Show where their important items are</label>
+      <div id="apBox" hidden>
+        <div class="row"><input type="text" id="apAddr" placeholder="archipelago.gg:38281"><input type="text" id="apSlot" placeholder="Their slot name" style="max-width:180px"><button id="apGo">Connect</button></div>
+        <div class="desc" id="apStatus">Rooms with a password aren't supported.</div>
+      </div>
     </div>
     <div class="card">
       <h2 id="zoneTitle" data-tip="The area you clicked on the map.">Pick an area</h2>
@@ -583,6 +589,7 @@ function setup() {
   setupTabs();
   setupRadar();
   setupSurprise();
+  setupAp();
   $("nameEdit").value = myName;
   $("nameSave").addEventListener("click", () => {
     const want = cleanName($("nameEdit").value);
@@ -1221,9 +1228,10 @@ function drawRadar() {
   const view = { cx: radar.pos.x, cz: radar.pos.z, scale: radar.zoom / W, refY: radar.pos.y };
   drawBlocks(ctx, (blockCache[radar.scene] || {}).blocks, view, W, H);
   const toS = (x, z) => [W / 2 + (x - view.cx) / view.scale, H / 2 + (z - view.cz) / view.scale];
-  // Range rings every 500 units.
+  // Range rings (spaced to the zoom).
   ctx.strokeStyle = "rgba(255,255,255,.07)";
-  for (let r = 500; r < radar.zoom; r += 500) { ctx.beginPath(); ctx.arc(W / 2, H / 2, r / view.scale, 0, 7); ctx.stroke(); }
+  const ring = [250, 500, 1000, 2000, 5000, 10000].find((r) => radar.zoom / r <= 10) || 10000;
+  for (let r = ring; r < radar.zoom; r += ring) { ctx.beginPath(); ctx.arc(W / 2, H / 2, r / view.scale, 0, 7); ctx.stroke(); }
   // Camera: a pale wedge.
   const cam = (radar.pos.cam * Math.PI) / 180;
   ctx.fillStyle = "rgba(255,255,255,.06)";
@@ -1256,6 +1264,24 @@ function drawRadar() {
   }
 }
 
+function setZoom(z) {
+  radar.zoom = Math.max(400, Math.min(40000, z));
+  drawRadar();
+}
+
+// Zoomed out far enough to see the whole area around them.
+function fitZoom() {
+  const blocks = (blockCache[radar.scene] || {}).blocks || [];
+  if (!radar.pos || !blocks.length) return 8000;
+  let far = 0;
+  for (const b of blocks) {
+    for (const [x, z] of [[b.bx * BLOCK, b.bz * BLOCK], [(b.bx + 1) * BLOCK, (b.bz + 1) * BLOCK]]) {
+      far = Math.max(far, Math.abs(x - radar.pos.x), Math.abs(z - radar.pos.z));
+    }
+  }
+  return far * 2 + 400;
+}
+
 function radarWorld(e) {
   const cv = $("radar");
   const r = cv.getBoundingClientRect();
@@ -1281,11 +1307,30 @@ function setupRadar() {
     $("radar").scrollIntoView({ behavior: "smooth", block: "center" });
   });
   document.querySelectorAll("#zoomSeg button").forEach((b) => b.addEventListener("click", () => {
-    radar.zoom = parseInt(b.dataset.zoom, 10);
-    document.querySelectorAll("#zoomSeg button").forEach((x) => x.classList.toggle("on", x === b));
-    drawRadar();
+    const z = b.dataset.zoom;
+    if (z === "in") setZoom(radar.zoom / 1.5);
+    else if (z === "out") setZoom(radar.zoom * 1.5);
+    else if (z === "near") setZoom(2400);
+    else setZoom(fitZoom());
   }));
   const cv = $("radar");
+  // Wheel and pinch zoom.
+  cv.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(radar.zoom * (e.deltaY > 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
+  const touches = new Map();
+  let pinch0 = 0, zoom0 = 0;
+  cv.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "touch") return;
+    touches.set(e.pointerId, [e.clientX, e.clientY]);
+    if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); zoom0 = radar.zoom; }
+  });
+  cv.addEventListener("pointermove", (e) => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, [e.clientX, e.clientY]);
+    if (touches.size === 2 && pinch0 > 0) { const [a, b] = [...touches.values()]; setZoom(zoom0 * pinch0 / Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1]))); }
+  });
+  const lift = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch0 = 0; };
+  cv.addEventListener("pointerup", lift);
+  cv.addEventListener("pointercancel", lift);
   let held = false, lastSteer = 0, pending = null, timer = null;
   const sendSteer = () => {
     timer = null;
@@ -1301,7 +1346,7 @@ function setupRadar() {
     if (wait <= 0) sendSteer(); else if (!timer) timer = setTimeout(sendSteer, wait);
   };
   cv.addEventListener("pointerdown", (e) => {
-    if (!radar.pos) return;
+    if (!radar.pos || touches.size > 1) return;
     const w = radarWorld(e);
     if (radar.aim === "steer") { held = true; cv.setPointerCapture(e.pointerId); return steerTo(w); }
     radar.mark = w; radar.markT = Date.now();
@@ -1373,6 +1418,99 @@ function zoneMarks(s, hasNem) {
   return { marks, at, pz };
 }
 
+// --- Archipelago heatmap (spoilers, off by default) -----------------------------------
+
+const AP_GAME = "Majora's Mask Recompiled";
+const ap = { ws: null, loc: {}, idZone: {}, heat: {}, total: {}, status: "" };
+
+function apSay(t) { ap.status = t; $("apStatus").textContent = t; }
+
+function apHeat() {
+  ap.heat = {}; ap.total = {};
+  const node = (z) => (z >= 0 && T.zones[z].parent >= 0 && T.zones[z].x === undefined ? T.zones[z].parent : z);
+  for (const [id, w] of Object.entries(ap.loc)) {
+    const z = ap.idZone[id];
+    if (z === undefined) continue;
+    const n = node(z);
+    ap.heat[n] = (ap.heat[n] || 0) + w;
+    if (w >= 3) ap.total[n] = (ap.total[n] || 0) + 1;
+  }
+  render();
+}
+
+function apStop() {
+  if (ap.ws) { try { ap.ws.close(); } catch (e) { /* gone */ } }
+  ap.ws = null; ap.loc = {}; ap.heat = {}; ap.total = {};
+  render();
+}
+
+function apStart(addr, slot) {
+  apStop();
+  if (!addr || !slot) return apSay("Type their room address and slot name.");
+  const url = /^wss?:\/\//.test(addr) ? addr : (/^(localhost|127\.)/.test(addr) ? "ws://" : "wss://") + addr;
+  apSay("Connecting...");
+  let ws;
+  try { ws = new WebSocket(url); } catch (e) { return apSay("That address doesn't look right."); }
+  ap.ws = ws;
+  const send = (m) => ws.send(JSON.stringify([m]));
+  ws.onerror = () => apSay("Couldn't reach the room. Check the address (the port changes when a room restarts).");
+  ws.onclose = () => { if (ap.ws === ws) apSay(ap.status.startsWith("Live") ? "Disconnected." : ap.status); };
+  ws.onmessage = (e) => {
+    let msgs;
+    try { msgs = JSON.parse(e.data); } catch (err) { return; }
+    for (const m of msgs) {
+      if (m.cmd === "RoomInfo") {
+        send({ cmd: "GetDataPackage", games: [AP_GAME] });
+      } else if (m.cmd === "DataPackage") {
+        const names = ((m.data.games || {})[AP_GAME] || {}).location_name_to_id || {};
+        ap.idZone = {};
+        for (const [name, id] of Object.entries(names)) if (T.aploc[name] !== undefined) ap.idZone[id] = T.aploc[name];
+        send({ cmd: "Connect", password: "", game: "", name: slot, uuid: "moons-hand-" + fid, items_handling: 0,
+          version: { major: 0, minor: 6, build: 0, class: "Version" }, tags: ["Tracker"], slot_data: false });
+      } else if (m.cmd === "ConnectionRefused") {
+        apSay("The room said no: " + (m.errors || []).join(", ") + ".");
+      } else if (m.cmd === "Connected") {
+        apSay("Live: reading what's left...");
+        if ((m.missing_locations || []).length) send({ cmd: "LocationScouts", locations: m.missing_locations, create_as_hint: 0 });
+      } else if (m.cmd === "LocationInfo") {
+        for (const it of m.locations || []) ap.loc[it.location] = (it.flags & 1) ? 3 : (it.flags & 2) ? 1 : 0;
+        apSay("Live: " + Object.values(ap.loc).filter((w) => w >= 3).length + " important items left in their world.");
+        apHeat();
+      } else if (m.cmd === "RoomUpdate" && m.checked_locations) {
+        for (const id of m.checked_locations) delete ap.loc[id];
+        apHeat();
+      }
+    }
+  };
+}
+
+function setupAp() {
+  $("apOn").checked = false; // spoilers: off every visit
+  $("apOn").addEventListener("change", async () => {
+    const on = $("apOn").checked;
+    $("apBox").hidden = !on;
+    if (!on) return apStop();
+    try {
+      const j = await (await fetch("/api/ap", { headers: headers() })).json();
+      if (j.address) $("apAddr").value = j.address;
+      if (j.slot) $("apSlot").value = j.slot;
+      if (j.address && j.slot) apStart(j.address, j.slot);
+    } catch (e) { /* type it in */ }
+  });
+  $("apGo").addEventListener("click", async () => {
+    const address = $("apAddr").value.trim(), slot = $("apSlot").value.trim();
+    // Shared with the room, so the others don't have to type it.
+    try { await fetch("/api/ap", { method: "POST", headers: headers({ "content-type": "application/json" }), body: JSON.stringify({ address, slot }) }); } catch (e) { /* still try */ }
+    apStart(address, slot);
+  });
+}
+
+function heatColor(h, max) {
+  const t = Math.min(1, h / Math.max(1, max));
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  return `rgb(${mix(45, 255)},${mix(38, 120)},${mix(60, 40)})`;
+}
+
 function drawTermina(s, hasNem) {
   const Z = T.zones.filter((z) => z.x !== undefined);
   const { marks, at, pz } = zoneMarks(s, hasNem);
@@ -1391,12 +1529,15 @@ function drawTermina(s, hasNem) {
   }));
   const field = T.zones[5];
   const cls = (id, base) => base + (outAt === id ? " here" : "") + (selOut === id ? " sel" : "");
-  svg += `<ellipse class="${cls(5, "field")}" data-zone="5" cx="${field.x}" cy="${field.y}" rx="100" ry="64"${tipAttr(field.name)}/>`;
+  const hmax = Math.max(0, ...Object.values(ap.heat));
+  const heatFill = (id) => (ap.ws && ap.heat[id] ? ` style="fill:${heatColor(ap.heat[id], hmax)}"` : "");
+  const heatTip = (id) => (ap.ws ? ` (${ap.total[id] || 0} important items left)` : "");
+  svg += `<ellipse class="${cls(5, "field")}" data-zone="5"${heatFill(5)} cx="${field.x}" cy="${field.y}" rx="100" ry="64"${tipAttr(field.name + heatTip(5))}/>`;
   svg += `<text class="lbl" x="${field.x}" y="${field.y + 58}">Termina Field</text>`;
   Z.forEach((z) => {
     if (z.id === 5) return;
     const town = z.id <= 4;
-    svg += `<circle class="${cls(z.id, "node")}" data-zone="${z.id}" cx="${z.x}" cy="${z.y}" r="${town ? 7 : 9}"${tipAttr(z.name)}/>`;
+    svg += `<circle class="${cls(z.id, "node")}" data-zone="${z.id}" cx="${z.x}" cy="${z.y}" r="${town ? 7 : 9}"${heatFill(z.id)}${tipAttr(z.name + heatTip(z.id))}/>`;
     svg += `<text class="lbl" x="${z.x}" y="${z.y + (town ? 16 : 20)}"${town ? ' style="font-size:8px"' : ""}>${esc(z.short || z.name)}</text>`;
   });
   Object.keys(marks).forEach((zk) => {
@@ -1453,7 +1594,7 @@ async function drawMini() {
   if (scene === undefined) {
     wrap.hidden = true;
     $("surClear").hidden = true;
-    $("surSpotNote").textContent = "Spot: anywhere in the area (they haven't mapped it yet, so you can't pick one).";
+    $("surSpotNote").textContent = "Spot: anywhere in the area (its map isn't on the relay yet: their game uploads every area's map once, the first time it connects).";
     return;
   }
   const blocks = await loadBlocks(scene);

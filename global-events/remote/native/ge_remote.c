@@ -20,6 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <io.h>
+#include <stdlib.h>
+#include <math.h>
+#include <wctype.h>
 
 // --- Recomp native library interface ----------------------------------------
 
@@ -77,6 +80,7 @@ static wchar_t sBasePath[256];
 static INTERNET_PORT sPort = 443;
 static int sSecure = 1;
 static char sKey[128];
+static wchar_t sRomPath[MAX_PATH]; // rom= in the .txt (optional)
 
 
 // --- Files next to this DLL ----------------------------------------------------
@@ -195,6 +199,8 @@ static int LoadConfig(void) {
         }
         if (strcmp(k, "url") == 0) {
             strncpy(url, v, sizeof(url) - 1);
+        } else if (strcmp(k, "rom") == 0) {
+            MultiByteToWideChar(CP_UTF8, 0, v, -1, sRomPath, MAX_PATH); // optional: where your ROM is
         } else if ((strcmp(k, "key") == 0) || (strcmp(k, "room_key") == 0) || (strcmp(k, "password") == 0)) {
             strncpy(sKey, v, sizeof(sKey) - 1);
         }
@@ -285,6 +291,15 @@ static int Http(const wchar_t* verb, const wchar_t* path, const char* body, int 
 
 // --- Network thread ----------------------------------------------------------
 
+static void MapRom_Run(void);
+static int ExtraStatus(char* out, int max);
+
+static DWORD WINAPI MapRomThread(LPVOID unused) {
+    (void)unused;
+    MapRom_Run();
+    return 0;
+}
+
 static int Enqueue(const char* line) {
     int ok = 0;
 
@@ -303,8 +318,9 @@ static int Enqueue(const char* line) {
 
 static DWORD WINAPI NetThread(LPVOID unused) {
     static char resp[8192];
-    static char body[STATUS_LEN];
+    static char body[STATUS_LEN + 512];
     long long cursor = -1; // -1: skip anything sent before the game started
+    int mapStarted = 0;
     ULONGLONG lastPost = 0;
 
     (void)unused;
@@ -337,6 +353,10 @@ static DWORD WINAPI NetThread(LPVOID unused) {
             int full = 0;
 
             InterlockedExchange(&sState, ST_OK);
+            if (!mapStarted) {
+                mapStarted = 1; // the area maps, once per start (skipped if the relay has them)
+                CreateThread(NULL, 0, MapRomThread, NULL, 0, NULL);
+            }
             while (line != NULL) {
                 if (strncmp(line, "cursor|", 7) == 0) {
                     newCursor = _atoi64(line + 7);
@@ -372,6 +392,14 @@ static DWORD WINAPI NetThread(LPVOID unused) {
             memcpy(body, sStatus, sStatusLen);
             len = sStatusLen;
         }
+        LeaveCriticalSection(&sLock);
+        if (fresh) {
+            len += ExtraStatus(body + len, (int)sizeof(body) - len - 1);
+            if (len > (int)sizeof(body) - 1) {
+                len = (int)sizeof(body) - 1;
+            }
+        }
+        EnterCriticalSection(&sLock);
         linkOff = (strncmp(sStatus, "link=0", 6) == 0);
         // A friend is steering an event: keep the radar quick.
         steering = (strstr(sStatus, "\nsteer=-1") == NULL) && (strstr(sStatus, "\nsteer=") != NULL);
@@ -740,3 +768,5 @@ __declspec(dllexport) void ger_fetch(uint8_t* rdram, RecompCtx* ctx) {
     }
     SetReturn(ctx, 0);
 }
+
+#include "ge_rommap.c"
