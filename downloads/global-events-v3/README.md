@@ -52,6 +52,12 @@ New in 3.1.1:
 - **Radar zoom**: mouse wheel, pinch, + and -, "Whole area" and "Near them".
 - **Archipelago heatmap (spoilers)** on the Map tab, off until a friend turns it on. You set your room once in game: **Friends tab > Archipelago room** (address like `archipelago.gg:38281`, and your slot name). It's remembered; update it when your room's port changes. The page connects as a read-only tracker and colors each area by how many important items are left there. Rooms with a password aren't supported.
 
+New in 3.1.3:
+
+- **One Map tab.** The live view around you and the Termina map are side by side. Friends click any area on Termina to look at it and hide a surprise at an exact spot ("Surprise spot"), then "Back to them" for the live view, strikes, steering and placing.
+- **Maps show only ground you can walk on.** The area maps follow the ground from each area's entrances (steps, drops, swimming, never through walls), so scenery behind invisible walls is gone. The relay replaces the old maps by itself the first time the new DLL connects.
+- **Forced Ambush** waits for you to pick your mutator instead of closing that screen, and puts your ocarina away like pressing B.
+
 A Friend Shield from the Moon Shop still eats the next mean move.
 
 ### Setting up the relay (once, free)

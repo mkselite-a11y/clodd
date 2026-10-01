@@ -279,36 +279,86 @@ static int CmpFloat(const void* a, const void* b) {
 }
 
 // Turns one scene's floor into "scene|bx|bz|base|cells" lines (appended to out).
+// --- Reachable ground only ---------------------------------------------------------
+// Many areas have scenery with collision (hills and cliffs behind invisible
+// walls). Starting from the area's entrances, we walk outward cell by cell:
+// small steps up, drops down, swimming, and never through a wall. Only ground
+// reached that way goes on the map.
+
+#define LAYERS 5          // floor heights kept per cell (the last can be a water surface)
+#define STEP_UP 70.0f     // a ledge Link walks up
+#define WATER_OUT 100.0f  // climbing out of water
+#define DROP_MAX 800.0f   // jumping down
+
+typedef struct {
+    float ax, az, bx, bz, cx, cz;
+    float minY, maxY;
+} Wall;
+
+static int SegCross(float ax, float az, float bx, float bz, float cx, float cz, float dx, float dz) {
+    float d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax);
+    float d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax);
+    float d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx);
+    float d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx);
+
+    return ((d1 > 0) != (d2 > 0)) && ((d3 > 0) != (d4 > 0));
+}
+
+static int WallBlocks(const Wall* w, float ax, float az, float bx, float bz, float lowY, float highY) {
+    if ((w->maxY < lowY) || (w->minY > highY)) {
+        return 0;
+    }
+    return SegCross(ax, az, bx, bz, w->ax, w->az, w->bx, w->bz) || SegCross(ax, az, bx, bz, w->bx, w->bz, w->cx, w->cz) ||
+           SegCross(ax, az, bx, bz, w->cx, w->cz, w->ax, w->az);
+}
+
 static int SceneToBlocks(uint16_t sceneId, uint32_t dmaIndex, char** out, size_t* outLen, size_t* outCap) {
     uint32_t len = 0;
     uint8_t* scene = RomFile(dmaIndex, &len);
     uint32_t off;
     uint32_t col = 0;
+    uint32_t spawnOff = 0, spawnN = 0, doorOff = 0, doorN = 0;
     uint32_t nVtx, vtxOff, nPoly, polyOff, nWater, waterOff;
-    Tri* tris;
-    int nTri = 0;
+    Tri* tris = NULL;
+    Wall* walls = NULL;
+    int nTri = 0, nWall = 0;
     Water* water = NULL;
     int nWat = 0;
     float minX = 1e9f, maxX = -1e9f, minZ = 1e9f, maxZ = -1e9f;
-    int bx0, bx1, bz0, bz1, bx, bz;
+    int gx0, gz0, W, H, nCells;
+    float* lay = NULL;      // [cell][LAYERS] heights
+    unsigned char* nLay = NULL;
+    unsigned char* isWater = NULL; // [cell][LAYERS]
+    unsigned char* reached = NULL; // [cell][LAYERS]
+    int* bucketStart = NULL;
+    int* bucket = NULL;
+    int* queue = NULL;
+    int qHead = 0, qTail = 0;
+    int seeds = 0;
     uint32_t i;
     int blocks = 0;
+    int k;
 
     if (scene == NULL) {
         return 0;
     }
-    // Scene header commands: 0x03 points at the collision, 0x14 ends the list.
+    // Scene header: 0x00 spawn points, 0x03 collision, 0x0E doors, 0x14 the end.
     for (off = 0; (off + 8 <= len) && (off < 0x200); off += 8) {
         if (scene[off] == 0x14) {
             break;
         }
         if (scene[off] == 0x03) {
             col = BE32(scene + off + 4) & 0xFFFFFF;
+        } else if (scene[off] == 0x00) {
+            spawnN = scene[off + 1];
+            spawnOff = BE32(scene + off + 4) & 0xFFFFFF;
+        } else if (scene[off] == 0x0E) {
+            doorN = scene[off + 1];
+            doorOff = BE32(scene + off + 4) & 0xFFFFFF;
         }
     }
     if ((col == 0) || (col + 0x2C > len)) {
-        free(scene);
-        return 0;
+        goto done;
     }
     nVtx = BE16(scene + col + 0x0C);
     vtxOff = BE32(scene + col + 0x10) & 0xFFFFFF;
@@ -317,37 +367,48 @@ static int SceneToBlocks(uint16_t sceneId, uint32_t dmaIndex, char** out, size_t
     nWater = BE16(scene + col + 0x24);
     waterOff = BE32(scene + col + 0x28) & 0xFFFFFF;
     if ((vtxOff + nVtx * 6 > len) || (polyOff + nPoly * 16 > len)) {
-        free(scene);
-        return 0;
+        goto done;
     }
     tris = (Tri*)malloc(sizeof(Tri) * (nPoly + 1));
-    if (tris == NULL) {
-        free(scene);
-        return 0;
+    walls = (Wall*)malloc(sizeof(Wall) * (nPoly + 1));
+    if ((tris == NULL) || (walls == NULL)) {
+        goto done;
     }
     for (i = 0; i < nPoly; i++) {
         const uint8_t* p = scene + polyOff + i * 16;
         uint32_t ia = BE16(p + 2) & 0x1FFF, ib = BE16(p + 4) & 0x1FFF, ic = BE16(p + 6) & 0x1FFF;
         int16_t ny = (int16_t)BE16(p + 0xA);
-        Tri* t;
+        float v[9];
 
-        if ((ny < 0x3000) || (ia >= nVtx) || (ib >= nVtx) || (ic >= nVtx)) {
-            continue; // walls, ceilings and steep slopes aren't ground
+        if ((ia >= nVtx) || (ib >= nVtx) || (ic >= nVtx)) {
+            continue;
         }
-        t = &tris[nTri++];
 #define VX(k, o) ((float)(int16_t)BE16(scene + vtxOff + (k) * 6 + (o)))
-        t->ax = VX(ia, 0), t->ay = VX(ia, 2), t->az = VX(ia, 4);
-        t->bx = VX(ib, 0), t->by = VX(ib, 2), t->bz = VX(ib, 4);
-        t->cx = VX(ic, 0), t->cy = VX(ic, 2), t->cz = VX(ic, 4);
+        v[0] = VX(ia, 0), v[1] = VX(ia, 2), v[2] = VX(ia, 4);
+        v[3] = VX(ib, 0), v[4] = VX(ib, 2), v[5] = VX(ib, 4);
+        v[6] = VX(ic, 0), v[7] = VX(ic, 2), v[8] = VX(ic, 4);
 #undef VX
-        t->minX = min(t->ax, min(t->bx, t->cx));
-        t->maxX = max(t->ax, max(t->bx, t->cx));
-        t->minZ = min(t->az, min(t->bz, t->cz));
-        t->maxZ = max(t->az, max(t->bz, t->cz));
-        minX = min(minX, t->minX);
-        maxX = max(maxX, t->maxX);
-        minZ = min(minZ, t->minZ);
-        maxZ = max(maxZ, t->maxZ);
+        if (ny >= 0x3000) {
+            Tri* t = &tris[nTri++];
+
+            t->ax = v[0], t->ay = v[1], t->az = v[2];
+            t->bx = v[3], t->by = v[4], t->bz = v[5];
+            t->cx = v[6], t->cy = v[7], t->cz = v[8];
+            t->minX = min(t->ax, min(t->bx, t->cx));
+            t->maxX = max(t->ax, max(t->bx, t->cx));
+            t->minZ = min(t->az, min(t->bz, t->cz));
+            t->maxZ = max(t->az, max(t->bz, t->cz));
+            minX = min(minX, t->minX);
+            maxX = max(maxX, t->maxX);
+            minZ = min(minZ, t->minZ);
+            maxZ = max(maxZ, t->maxZ);
+        } else if (ny > -0x3000) { // walls (and steep slopes): they stop the walk
+            Wall* w = &walls[nWall++];
+
+            w->ax = v[0], w->az = v[2], w->bx = v[3], w->bz = v[5], w->cx = v[6], w->cz = v[8];
+            w->minY = min(v[1], min(v[4], v[7]));
+            w->maxY = max(v[1], max(v[4], v[7]));
+        }
     }
     if ((nWater > 0) && (waterOff + nWater * 16 <= len)) {
         water = (Water*)malloc(sizeof(Water) * nWater);
@@ -363,101 +424,293 @@ static int SceneToBlocks(uint16_t sceneId, uint32_t dmaIndex, char** out, size_t
         }
     }
     if (nTri == 0) {
-        free(tris);
-        free(water);
-        free(scene);
-        return 0;
+        goto done;
     }
-    bx0 = (int)floorf(minX / MAP_BLOCK);
-    bx1 = (int)floorf(maxX / MAP_BLOCK);
-    bz0 = (int)floorf(minZ / MAP_BLOCK);
-    bz1 = (int)floorf(maxZ / MAP_BLOCK);
-    for (bz = bz0; bz <= bz1; bz++) {
-        for (bx = bx0; bx <= bx1; bx++) {
-            float x0 = (float)(bx * MAP_BLOCK), z0 = (float)(bz * MAP_BLOCK);
-            float h[256];
-            int has[256];
-            float sorted[256];
-            int nh = 0;
-            int wet[256];
-            int c;
-            float base;
-            char line[300];
-            int n;
-            int any = 0;
+    gx0 = (int)floorf(minX / MAP_CELL);
+    gz0 = (int)floorf(minZ / MAP_CELL);
+    W = (int)floorf(maxX / MAP_CELL) - gx0 + 1;
+    H = (int)floorf(maxZ / MAP_CELL) - gz0 + 1;
+    if ((W <= 0) || (H <= 0) || ((long long)W * H > 400 * 400)) {
+        goto done;
+    }
+    nCells = W * H;
+    lay = (float*)malloc(sizeof(float) * nCells * LAYERS);
+    nLay = (unsigned char*)calloc(nCells, 1);
+    isWater = (unsigned char*)calloc((size_t)nCells * LAYERS, 1);
+    reached = (unsigned char*)calloc((size_t)nCells * LAYERS, 1);
+    bucketStart = (int*)calloc(nCells + 1, sizeof(int));
+    queue = (int*)malloc(sizeof(int) * nCells * LAYERS);
+    if (!lay || !nLay || !isWater || !reached || !bucketStart || !queue) {
+        goto done;
+    }
+    // Floor heights per cell (several, for bridges and upper floors).
+    for (k = 0; k < nTri; k++) {
+        int x0 = (int)floorf(tris[k].minX / MAP_CELL) - gx0, x1 = (int)floorf(tris[k].maxX / MAP_CELL) - gx0;
+        int z0 = (int)floorf(tris[k].minZ / MAP_CELL) - gz0, z1 = (int)floorf(tris[k].maxZ / MAP_CELL) - gz0;
+        int cx, cz;
 
-            for (c = 0; c < 256; c++) {
-                float x = x0 + (c % 16) * MAP_CELL + MAP_CELL / 2;
-                float z = z0 + (c / 16) * MAP_CELL + MAP_CELL / 2;
-                int k;
+        for (cz = max(z0, 0); cz <= min(z1, H - 1); cz++) {
+            for (cx = max(x0, 0); cx <= min(x1, W - 1); cx++) {
+                int c = cz * W + cx;
+                float y;
+                int j;
+                int dup = 0;
 
-                has[c] = 0;
-                wet[c] = 0;
-                for (k = 0; k < nTri; k++) {
-                    float y;
-
-                    if ((x < tris[k].minX) || (x > tris[k].maxX) || (z < tris[k].minZ) || (z > tris[k].maxZ)) {
-                        continue;
-                    }
-                    if (TriHeight(&tris[k], x, z, &y) && (!has[c] || (y > h[c]))) {
-                        h[c] = y;
-                        has[c] = 1;
-                    }
-                }
-                for (k = 0; k < nWat; k++) {
-                    if ((x >= water[k].minX) && (x <= water[k].maxX) && (z >= water[k].minZ) && (z <= water[k].maxZ) &&
-                        (!has[c] || (water[k].y > h[c] + 10.0f))) {
-                        wet[c] = 1;
-                    }
-                }
-                if (has[c]) {
-                    sorted[nh++] = h[c];
-                }
-                any |= has[c] | wet[c];
-            }
-            if (!any) {
-                continue;
-            }
-            if (nh > 0) {
-                qsort(sorted, nh, sizeof(float), CmpFloat);
-                base = sorted[nh / 2];
-            } else {
-                base = 0.0f;
-            }
-            n = snprintf(line, sizeof(line), "%u|%d|%d|%d|", sceneId, bx, bz, (int)base);
-            for (c = 0; c < 256; c++) {
-                char ch;
-
-                if (wet[c]) {
-                    ch = '~';
-                } else if (!has[c]) {
-                    ch = '.';
-                } else {
-                    float rel = (h[c] - base) / 40.0f;
-                    int code = (int)((rel >= 0.0f) ? (rel + 0.5f) : (rel - 0.5f)) + 32;
-
-                    ch = (char)(0x30 + ((code < 0) ? 0 : (code > 63) ? 63 : code));
-                }
-                line[n++] = ch;
-            }
-            line[n++] = '\n';
-            if (*outLen + n + 1 > *outCap) {
-                size_t cap = (*outCap == 0) ? 65536 : *outCap * 2;
-                char* grown = (char*)realloc(*out, cap);
-
-                if (grown == NULL) {
+                if (!TriHeight(&tris[k], (gx0 + cx) * MAP_CELL + MAP_CELL / 2.0f, (gz0 + cz) * MAP_CELL + MAP_CELL / 2.0f, &y)) {
                     continue;
                 }
-                *out = grown;
-                *outCap = cap;
+                for (j = 0; j < nLay[c]; j++) {
+                    if (fabsf(lay[c * LAYERS + j] - y) < 30.0f) {
+                        dup = 1;
+                        lay[c * LAYERS + j] = max(lay[c * LAYERS + j], y);
+                    }
+                }
+                if (!dup && (nLay[c] < LAYERS - 1)) {
+                    lay[c * LAYERS + nLay[c]++] = y;
+                }
             }
-            memcpy(*out + *outLen, line, n);
-            *outLen += n;
-            blocks++;
         }
     }
+    // Water surfaces you can swim on (where they sit above the floor).
+    for (k = 0; k < nWat; k++) {
+        int x0 = (int)floorf(water[k].minX / MAP_CELL) - gx0, x1 = (int)floorf(water[k].maxX / MAP_CELL) - gx0;
+        int z0 = (int)floorf(water[k].minZ / MAP_CELL) - gz0, z1 = (int)floorf(water[k].maxZ / MAP_CELL) - gz0;
+        int cx, cz;
+
+        for (cz = max(z0, 0); cz <= min(z1, H - 1); cz++) {
+            for (cx = max(x0, 0); cx <= min(x1, W - 1); cx++) {
+                int c = cz * W + cx;
+
+                if (nLay[c] < LAYERS) {
+                    isWater[c * LAYERS + nLay[c]] = 1;
+                    lay[c * LAYERS + nLay[c]++] = water[k].y;
+                }
+            }
+        }
+    }
+    // Walls bucketed by the cells they touch.
+    for (k = 0; k < nWall; k++) {
+        int x0 = (int)floorf(min(walls[k].ax, min(walls[k].bx, walls[k].cx)) / MAP_CELL) - gx0;
+        int x1 = (int)floorf(max(walls[k].ax, max(walls[k].bx, walls[k].cx)) / MAP_CELL) - gx0;
+        int z0 = (int)floorf(min(walls[k].az, min(walls[k].bz, walls[k].cz)) / MAP_CELL) - gz0;
+        int z1 = (int)floorf(max(walls[k].az, max(walls[k].bz, walls[k].cz)) / MAP_CELL) - gz0;
+        int cx, cz;
+
+        for (cz = max(z0, 0); cz <= min(z1, H - 1); cz++) {
+            for (cx = max(x0, 0); cx <= min(x1, W - 1); cx++) {
+                bucketStart[cz * W + cx + 1]++;
+            }
+        }
+    }
+    for (k = 0; k < nCells; k++) {
+        bucketStart[k + 1] += bucketStart[k];
+    }
+    bucket = (int*)malloc(sizeof(int) * (bucketStart[nCells] + 1));
+    if (bucket == NULL) {
+        goto done;
+    }
+    {
+        int* fill = (int*)calloc(nCells, sizeof(int));
+
+        if (fill == NULL) {
+            goto done;
+        }
+        for (k = 0; k < nWall; k++) {
+            int x0 = (int)floorf(min(walls[k].ax, min(walls[k].bx, walls[k].cx)) / MAP_CELL) - gx0;
+            int x1 = (int)floorf(max(walls[k].ax, max(walls[k].bx, walls[k].cx)) / MAP_CELL) - gx0;
+            int z0 = (int)floorf(min(walls[k].az, min(walls[k].bz, walls[k].cz)) / MAP_CELL) - gz0;
+            int z1 = (int)floorf(max(walls[k].az, max(walls[k].bz, walls[k].cz)) / MAP_CELL) - gz0;
+            int cx, cz;
+
+            for (cz = max(z0, 0); cz <= min(z1, H - 1); cz++) {
+                for (cx = max(x0, 0); cx <= min(x1, W - 1); cx++) {
+                    int c = cz * W + cx;
+
+                    bucket[bucketStart[c] + fill[c]++] = k;
+                }
+            }
+        }
+        free(fill);
+    }
+    // Start from every spawn point and door.
+    for (k = 0; k < (int)(spawnN + doorN); k++) {
+        uint32_t at = (k < (int)spawnN) ? spawnOff + k * 16 + 2 : doorOff + (k - spawnN) * 16 + 6;
+        float px, py, pz;
+        int cx, cz, c, j, best = -1;
+        float bestD = 200.0f;
+
+        if (at + 6 > len) {
+            continue;
+        }
+        px = (float)(int16_t)BE16(scene + at);
+        py = (float)(int16_t)BE16(scene + at + 2);
+        pz = (float)(int16_t)BE16(scene + at + 4);
+        cx = (int)floorf(px / MAP_CELL) - gx0;
+        cz = (int)floorf(pz / MAP_CELL) - gz0;
+        if ((cx < 0) || (cz < 0) || (cx >= W) || (cz >= H)) {
+            continue;
+        }
+        c = cz * W + cx;
+        for (j = 0; j < nLay[c]; j++) {
+            float d = fabsf(lay[c * LAYERS + j] - py);
+
+            if (d < bestD) {
+                bestD = d;
+                best = j;
+            }
+        }
+        if ((best >= 0) && !reached[c * LAYERS + best]) {
+            reached[c * LAYERS + best] = 1;
+            queue[qTail++] = c * LAYERS + best;
+            seeds++;
+        }
+    }
+    if (seeds == 0) {
+        // No way in found: keep every floor (better than nothing).
+        for (k = 0; k < nCells; k++) {
+            int j;
+
+            for (j = 0; j < nLay[k]; j++) {
+                reached[k * LAYERS + j] = 1;
+            }
+        }
+    }
+    while (qHead < qTail) {
+        int node = queue[qHead++];
+        int c = node / LAYERS, la = node % LAYERS;
+        int cx = c % W, cz = c / W;
+        float ya = lay[node];
+        static const int sDir[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+        int d;
+
+        for (d = 0; d < 4; d++) {
+            int nx = cx + sDir[d][0], nz = cz + sDir[d][1];
+            int nc, j;
+            float ax, az, bx, bz;
+
+            if ((nx < 0) || (nz < 0) || (nx >= W) || (nz >= H)) {
+                continue;
+            }
+            nc = nz * W + nx;
+            ax = (gx0 + cx) * MAP_CELL + MAP_CELL / 2.0f, az = (gz0 + cz) * MAP_CELL + MAP_CELL / 2.0f;
+            bx = (gx0 + nx) * MAP_CELL + MAP_CELL / 2.0f, bz = (gz0 + nz) * MAP_CELL + MAP_CELL / 2.0f;
+            for (j = 0; j < nLay[nc]; j++) {
+                int nn = nc * LAYERS + j;
+                float yb = lay[nn];
+                float dy = yb - ya;
+                float up = isWater[node] ? WATER_OUT : STEP_UP;
+                int b, blocked = 0;
+
+                if (reached[nn] || (dy > up) || (dy < -DROP_MAX)) {
+                    continue;
+                }
+                // A wall between the two cells at chest height stops it.
+                for (b = bucketStart[c]; (b < bucketStart[c + 1]) && !blocked; b++) {
+                    blocked = WallBlocks(&walls[bucket[b]], ax, az, bx, bz, max(ya, yb) + 20.0f, max(ya, yb) + 60.0f);
+                }
+                for (b = bucketStart[nc]; (b < bucketStart[nc + 1]) && !blocked; b++) {
+                    blocked = WallBlocks(&walls[bucket[b]], ax, az, bx, bz, max(ya, yb) + 20.0f, max(ya, yb) + 60.0f);
+                }
+                if (!blocked) {
+                    reached[nn] = 1;
+                    queue[qTail++] = nn;
+                }
+            }
+            (void)la;
+        }
+    }
+    // Out to 16x16 blocks: the highest reached floor per cell, or water.
+    {
+        int bx0 = (int)floorf((float)gx0 / 16.0f), bz0 = (int)floorf((float)gz0 / 16.0f);
+        int bx1 = (int)floorf((float)(gx0 + W - 1) / 16.0f), bz1 = (int)floorf((float)(gz0 + H - 1) / 16.0f);
+        int bx, bz;
+
+        for (bz = bz0; bz <= bz1; bz++) {
+            for (bx = bx0; bx <= bx1; bx++) {
+                float h[256];
+                int kind[256]; // 0 none, 1 floor, 2 water
+                float sorted[256];
+                int nh = 0;
+                int any = 0;
+                int c;
+                float base = 0.0f;
+                char line[300];
+                int n;
+
+                for (c = 0; c < 256; c++) {
+                    int cx = bx * 16 + (c % 16) - gx0, cz = bz * 16 + (c / 16) - gz0;
+                    int j;
+                    int cell;
+                    float bestY = -1e9f;
+                    int bestKind = 0;
+
+                    kind[c] = 0;
+                    if ((cx < 0) || (cz < 0) || (cx >= W) || (cz >= H)) {
+                        continue;
+                    }
+                    cell = cz * W + cx;
+                    for (j = 0; j < nLay[cell]; j++) {
+                        if (reached[cell * LAYERS + j] && (lay[cell * LAYERS + j] > bestY)) {
+                            bestY = lay[cell * LAYERS + j];
+                            bestKind = isWater[cell * LAYERS + j] ? 2 : 1;
+                        }
+                    }
+                    kind[c] = bestKind;
+                    h[c] = bestY;
+                    if (bestKind == 1) {
+                        sorted[nh++] = bestY;
+                    }
+                    any |= bestKind;
+                }
+                if (!any) {
+                    continue;
+                }
+                if (nh > 0) {
+                    qsort(sorted, nh, sizeof(float), CmpFloat);
+                    base = sorted[nh / 2];
+                }
+                n = snprintf(line, sizeof(line), "%u|%d|%d|%d|", sceneId, bx, bz, (int)base);
+                for (c = 0; c < 256; c++) {
+                    char ch = '.';
+
+                    if (kind[c] == 2) {
+                        ch = '~';
+                    } else if (kind[c] == 1) {
+                        float rel = (h[c] - base) / 40.0f;
+                        int code = (int)((rel >= 0.0f) ? (rel + 0.5f) : (rel - 0.5f)) + 32;
+
+                        ch = (char)(0x30 + ((code < 0) ? 0 : (code > 63) ? 63 : code));
+                    }
+                    line[n++] = ch;
+                }
+                line[n++] = '\n';
+                if (*outLen + n + 1 > *outCap) {
+                    size_t cap = (*outCap == 0) ? 65536 : *outCap * 2;
+                    char* grown = (char*)realloc(*out, cap);
+
+                    if (grown == NULL) {
+                        continue;
+                    }
+                    *out = grown;
+                    *outCap = cap;
+                }
+                memcpy(*out + *outLen, line, n);
+                *outLen += n;
+                blocks++;
+            }
+        }
+    }
+done:
     free(tris);
+    free(walls);
     free(water);
+    free(lay);
+    free(nLay);
+    free(isWater);
+    free(reached);
+    free(bucketStart);
+    free(bucket);
+    free(queue);
     free(scene);
     return blocks;
 }
@@ -483,6 +736,7 @@ static void MapRom_Run(void) {
         InterlockedExchange(&sMapRomState, 2);
         return;
     }
+
     InterlockedExchange(&sMapRomState, 1);
     if (!RomFind()) {
         InterlockedExchange(&sMapRomState, 3);
@@ -493,6 +747,17 @@ static void MapRom_Run(void) {
     }
     free(sRom);
     sRom = NULL;
+    if (len == 0) {
+        InterlockedExchange(&sMapRomState, 4);
+        free(all);
+        return;
+    }
+    // New maps ready: the old ones (an older format) go first.
+    if (Http(L"POST", L"/api/mapbulk?reset=1", "", 0, NULL, 0) != 200) {
+        InterlockedExchange(&sMapRomState, 4);
+        free(all);
+        return;
+    }
     // About 40 blocks per request.
     while (pos < len) {
         size_t end = pos;

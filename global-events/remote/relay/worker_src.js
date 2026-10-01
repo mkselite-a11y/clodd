@@ -478,6 +478,9 @@ export default {
       const m = parseStatus((await request.text()).slice(0, 1000));
       const scene = int(m.scene), bx = int(m.bx), bz = int(m.bz), base = int(m.base);
       if (![scene, bx, bz, base].every(Number.isFinite) || !MAP_CELLS.test(m.cells || "")) return new Response("bad map", { status: 400 });
+      // Once the ROM maps (walkable ground only) are in, the game's own scans aren't needed.
+      const rom = await db.prepare("SELECT v FROM kv WHERE k = 'maps_rom_v2'").first();
+      if (rom) return new Response("ok");
       await db.prepare("INSERT INTO maps (scene, bx, bz, base, cells, t) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(scene, bx, bz) DO UPDATE SET base = excluded.base, cells = excluded.cells, t = excluded.t")
         .bind(scene, bx, bz, base, m.cells, now).run();
       return new Response("ok");
@@ -486,11 +489,15 @@ export default {
     // The game's DLL: every area's map, made once from the player's ROM.
     if (url.pathname === "/api/mapbulk") {
       if (request.method !== "POST") {
-        const row = await db.prepare("SELECT v FROM kv WHERE k = 'maps_rom_v1'").first();
+        const row = await db.prepare("SELECT v FROM kv WHERE k = 'maps_rom_v2'").first();
         return new Response(row ? "done" : "no");
       }
+      if (url.searchParams.get("reset") === "1") {
+        await db.batch([db.prepare("DELETE FROM maps"), kvDel(db, "maps_rom_v1"), kvDel(db, "maps_rom_v2")]);
+        return new Response("ok");
+      }
       if (url.searchParams.get("done") === "1") {
-        await kvSet(db, "maps_rom_v1", now).run();
+        await kvSet(db, "maps_rom_v2", now).run();
         return new Response("ok");
       }
       const writes = [];
@@ -498,8 +505,7 @@ export default {
         const [scene, bx, bz, base, cells] = line.split("|");
         const n = [scene, bx, bz, base].map((x) => parseInt(x, 10));
         if (!n.every(Number.isFinite) || !MAP_CELLS.test(cells || "")) continue;
-        // What the game saw while playing wins over the ROM's version.
-        writes.push(db.prepare("INSERT OR IGNORE INTO maps (scene, bx, bz, base, cells, t) VALUES (?, ?, ?, ?, ?, ?)").bind(n[0], n[1], n[2], n[3], cells, 0));
+        writes.push(db.prepare("INSERT OR REPLACE INTO maps (scene, bx, bz, base, cells, t) VALUES (?, ?, ?, ?, ?, ?)").bind(n[0], n[1], n[2], n[3], cells, 0));
         if (writes.length >= 60) break;
       }
       if (writes.length) await db.batch(writes);

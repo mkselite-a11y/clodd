@@ -104,6 +104,8 @@
   .seg { display: flex; gap: 4px; flex-wrap: wrap; }
   .seg button { margin: 2px 0; padding: 6px 10px; font-size: 13px; }
   .seg button.on { background: #5a3a7a; border-color: var(--purple); }
+  .mapgrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+  @media (max-width: 760px) { .mapgrid { grid-template-columns: 1fr; } }
   #termina svg { width: 100%; max-width: 620px; height: auto; display: block; margin: 0 auto; }
   #termina .edge { stroke: #3a3352; stroke-width: 2; }
   #termina .node { fill: #231f33; stroke: #4a4166; stroke-width: 1.5; cursor: pointer; }
@@ -148,8 +150,7 @@
   <nav id="tabs" hidden>
     <button data-tab="events" data-tip="Start events, pick their next one, bet on how they do, and change their curse and mutator draft.">Events</button>
     <button data-tab="combat" data-tip="Train, send and name their Nemesis, or post bounties on them.">Combat</button>
-    <button data-tab="radar" data-tip="A live view around them: air strikes, ambushes, the Forced Ambush, steering and placing things.">Radar</button>
-    <button data-tab="map" data-tip="All of Termina: where they are, and where you hide surprises for them.">Map</button>
+    <button data-tab="radar" data-tip="The live view around them and every area of Termina: air strikes, ambushes, surprises, steering and placing things.">Map</button>
     <button data-tab="fun" data-tip="Help them out (hearts, Moon Marks, pouch items) or mess with them harmlessly (sounds, cuccos, disco, messages).">Gifts &amp; Pranks</button>
     <button data-tab="info" data-tip="Everything about their run, who's here, and the history.">Info</button>
   </nav>
@@ -266,42 +267,71 @@
     </div>
   </section>
 
-  <!-- RADAR -->
+  <!-- MAP: the live view around them, every area of Termina, and everything you can do there -->
   <section class="tab" data-tab="radar" hidden>
     <div class="card wide">
-      <h2 data-tip="Their surroundings, live. North is up. The arrow is them, the pale wedge is where their camera looks. The ground fills in as they explore.">Radar</h2>
-      <div class="row" id="placeBox" hidden><span class="chip place" id="placeLine"></span><select id="sealSel" style="max-width:120px" hidden></select></div>
-      <div class="seg" id="aimSeg">
-        <button data-aim="place" id="placeBtn" class="hot" hidden>PLACE</button>
-        <button data-aim="steer" id="steerBtn" class="hot" hidden>STEER</button>
-        <button data-aim="look" class="on" data-tip="Free: a column of light shows up in their world where you click. Point things out to them.">Look here (free)</button>
-        <button data-aim="airstrike" hidden>Aiming: air strike</button>
-        <button data-aim="ambush" hidden>Aiming: ambush</button>
+      <div class="mapgrid">
+        <div>
+          <div class="row" style="justify-content:space-between;margin-bottom:6px">
+            <h2 id="viewTitle" style="margin:0" data-tip="North is up. The arrow is them and the pale wedge is where their camera looks. Pick any area on the right to look at it.">Around them</h2>
+            <button id="followBtn" hidden>Back to them</button>
+          </div>
+          <div class="row" id="placeBox" hidden><span class="chip place" id="placeLine"></span><select id="sealSel" style="max-width:120px" hidden></select></div>
+          <div class="seg" id="aimSeg">
+            <button data-aim="place" id="placeBtn" class="hot" hidden>PLACE</button>
+            <button data-aim="steer" id="steerBtn" class="hot" hidden>STEER</button>
+            <button data-aim="look" class="on" data-tip="Free: a column of light shows up in their world where you click. Point things out to them.">Look here (free)</button>
+            <button data-aim="surprise" data-tip="Click where your surprise should wait. Then pick it in Hide a surprise below.">Surprise spot</button>
+            <button data-aim="airstrike" hidden>Aiming: air strike</button>
+            <button data-aim="ambush" hidden>Aiming: ambush</button>
+          </div>
+          <div class="desc" id="aimDesc">Pick what a click does.</div>
+          <div id="radarWrap"><canvas id="radar" width="560" height="560"></canvas></div>
+          <div class="row" style="justify-content:space-between">
+            <div class="seg" id="zoomSeg" data-tip="Zoom: mouse wheel, pinch, or these buttons."><button data-zoom="in">+</button><button data-zoom="out">&minus;</button><button data-zoom="fit">Whole area</button><button data-zoom="near">Close</button></div>
+            <span class="muted" id="radarNote"></span>
+          </div>
+          <div class="legend" style="margin-bottom:4px"><span><i style="background:var(--green)"></i>Them</span><span><i style="background:var(--red)"></i>Enemy</span><span><i style="background:#ff2a5a"></i>Nemesis</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#8fa3c4"></i>People</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
+        </div>
+        <div>
+          <h2 data-tip="Where they are in Termina, plus their Nemesis, the bounties they took and the surprises waiting. Click an area to look at it.">Termina</h2>
+          <div id="termina"></div>
+          <div class="legend"><span><i style="background:var(--green)"></i>Them</span><span><i style="background:var(--red)"></i>Nemesis</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#5fe0e0"></i>A friend's</span><span><i style="background:#ff8a4c"></i>WANTED</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
+          <div class="desc" id="mapNote"></div>
+          <div class="desc" id="zoneInfo"></div>
+          <div class="sub" id="roomsSub" hidden>Places inside</div>
+          <div class="rooms" id="rooms"></div>
+          <div class="sub" data-tip="Connects to their Archipelago room as a read-only tracker and colors each area by how many important items still wait there. Off until you turn it on, every visit.">Archipelago heatmap (spoilers)</div>
+          <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="apOn" style="width:auto;margin:0"> Show where their important items are</label>
+          <div id="apBox" hidden>
+            <div class="row"><input type="text" id="apAddr" placeholder="archipelago.gg:38281"><input type="text" id="apSlot" placeholder="Their slot name" style="max-width:180px"><button id="apGo">Connect</button></div>
+            <div class="desc" id="apStatus"></div>
+          </div>
+        </div>
       </div>
-      <div class="desc" id="aimDesc">Pick what a click does.</div>
-      <div id="radarWrap"><canvas id="radar" width="560" height="560"></canvas></div>
-      <div class="row" style="justify-content:space-between">
-        <div class="seg" id="zoomSeg" data-tip="Zoom: mouse wheel, pinch, or these buttons."><button data-zoom="in">+</button><button data-zoom="out">&minus;</button><button data-zoom="fit">Whole area</button><button data-zoom="near">Near them</button></div>
-        <span class="muted" id="radarNote"></span>
-      </div>
-      <div class="legend" style="margin-bottom:4px"><span><i style="background:var(--green)"></i>Them</span><span><i style="background:var(--red)"></i>Enemy</span><span><i style="background:#ff2a5a"></i>Nemesis</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#8fa3c4"></i>People</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
     </div>
-  </section>
-
-  <section class="tab" data-tab="radar" hidden style="padding-top:0">
     <div class="card">
-      <h2 data-tip="Bombs from the sky. Auto drops them right on them. Aim lets you click where on the radar (a little extra).">Air strike</h2>
+      <h2 data-tip="It waits in the area until they walk into it. They get a pop-up that someone placed a surprise (not where), and it gives off a faint shimmer. Never right by a door or a loading zone.">Hide a surprise</h2>
+      <div class="note" id="surZone">Shown area: pick one on the Termina map.</div>
+      <div class="row"><select id="surKind"><option value="0">An event</option><option value="1">An ambush (3 enemies)</option><option value="2">A bomb drop</option><option value="3">Rupoor rain</option><option value="4">Their Nemesis</option></select></div>
+      <div class="row" id="surArgRow"><select id="surEv"></select><select id="surPool" hidden></select></div>
+      <div class="desc" id="surSpotNote">Spot: anywhere in the area (not by a door). Use "Surprise spot" on the map to pick one.</div>
+      <div class="row"><button data-act="surprise">Hide it <span class="cost"></span></button><button id="surClear" hidden>Any spot</button></div>
+      <div class="desc" id="surWaiting"></div>
+    </div>
+    <div class="card">
+      <h2 data-tip="Bombs from the sky. Auto drops them right on them. Aim lets you click where on the map (a little extra).">Air strike</h2>
       <div class="row">
         <button data-act="airstrike">Auto: on them <span class="cost"></span></button>
-        <button data-aimbtn="airstrike">Aim on the radar</button>
+        <button data-aimbtn="airstrike">Aim on the map</button>
       </div>
     </div>
     <div class="card">
-      <h2 data-tip="Enemies show up near them. Auto picks the spots. Aim lets you click a spot on the radar for each one.">Ambush</h2>
+      <h2 data-tip="Enemies show up near them. Auto picks the spots. Aim lets you click a spot on the map for each one.">Ambush</h2>
       <div class="row"><select id="ambPool"></select><select id="ambCount" style="max-width:80px"><option value="1">x1</option><option value="2">x2</option><option value="3">x3</option></select></div>
       <div class="row">
         <button data-act="ambush">Auto <span class="cost"></span></button>
-        <button data-aimbtn="ambush">Aim on the radar</button>
+        <button data-aimbtn="ambush">Aim on the map</button>
       </div>
     </div>
     <div class="card">
@@ -310,41 +340,6 @@
       <button data-act="forced_ambush" class="hot" style="animation:none">FORCED AMBUSH <span class="cost"></span></button>
     </div>
   </section>
-
-  <!-- MAP -->
-  <section class="tab" data-tab="map" hidden>
-    <div class="card wide">
-      <h2 data-tip="Where they are in Termina, plus their Nemesis, the bounties they took and the surprises waiting. Click an area to look closer or hide a surprise there.">Termina</h2>
-      <div id="termina"></div>
-      <div class="legend"><span><i style="background:var(--green)"></i>Them (L)</span><span><i style="background:var(--red)"></i>Nemesis (N)</span><span><i style="background:var(--moon)"></i>Bounty</span><span><i style="background:#5fe0e0"></i>Posted by a friend</span><span><i style="background:#ff8a4c"></i>WANTED</span><span><i style="background:var(--purple)"></i>Surprise</span></div>
-      <div class="desc" id="mapNote"></div>
-      <div class="sub" data-tip="Connects to their Archipelago room as a read-only tracker and colors each area by how many important items still wait there. Off until you turn it on, every visit.">Archipelago heatmap (spoilers)</div>
-      <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="apOn" style="width:auto;margin:0"> Show where their important items are</label>
-      <div id="apBox" hidden>
-        <div class="row"><input type="text" id="apAddr" placeholder="archipelago.gg:38281"><input type="text" id="apSlot" placeholder="Their slot name" style="max-width:180px"><button id="apGo">Connect</button></div>
-        <div class="desc" id="apStatus"></div>
-      </div>
-    </div>
-    <div class="card">
-      <h2 id="zoneTitle" data-tip="The area you clicked on the map.">Pick an area</h2>
-      <div class="desc" id="zoneInfo">Click an area on the map.</div>
-      <div class="sub" id="roomsSub" hidden>Places inside</div>
-      <div class="rooms" id="rooms"></div>
-    </div>
-    <div class="card">
-      <h2 data-tip="It waits in the area you picked until they walk into it. They get a pop-up that someone placed a surprise (not where), and it gives off a faint shimmer. Never right by a door or a loading zone.">Hide a surprise</h2>
-      <div class="note" id="surZone">Pick an area on the map first.</div>
-      <div class="row"><select id="surKind"><option value="0">An event</option><option value="1">An ambush (3 enemies)</option><option value="2">A bomb drop</option><option value="3">Rupoor rain</option><option value="4">Their Nemesis</option></select></div>
-      <div class="row" id="surArgRow"><select id="surEv"></select><select id="surPool" hidden></select></div>
-      <div class="desc" id="surSpotNote">Spot: anywhere in the area (not by a door).</div>
-      <div class="mini" id="surMiniWrap" hidden><canvas id="surMini" width="420" height="420"></canvas></div>
-      <div class="row"><button data-act="surprise">Hide it <span class="cost"></span></button><button id="surClear" hidden>Any spot</button></div>
-      <div class="desc" id="surWaiting"></div>
-    </div>
-  </section>
-
-
-
 
   <!-- GIFTS & PRANKS -->
   <section class="tab" data-tab="fun" hidden>
@@ -677,7 +672,7 @@ async function act(type, dataA, over, quiet) {
     if (j.blocked) { busy = false; return refresh(); }
     if (j.msg) toast(j.msg);
     if (quiet) return;
-    if (j.ok && type === "surprise") { surSpot = null; drawMini(); }
+    if (j.ok && type === "surprise") { surSpot = null; spotNote(); drawRadar(); }
     if (j.ok && type === "msg") $("msgText").value = "";
     if (j.ok && type === "nem_name") $("nemName").value = "";
   } catch (e) { toast("Couldn't reach the relay."); }
@@ -1196,6 +1191,7 @@ function radarState(s) {
 }
 
 const AIM_DESC = {
+  surprise: "Click where your surprise should wait (in the area shown). Then pick it in Hide a surprise below.",
   look: "Click anywhere: a column of light shows up there in their world. Free.",
   airstrike: "Click where the bombs should fall.",
   ambush: "Click a spot for each enemy (the Combat tab picks which and how many).",
@@ -1214,52 +1210,76 @@ function setAim(a) {
   drawRadar();
 }
 
+// What the big map shows: following them, or an area picked on the Termina map.
+// browse: null, or { zone, scene, cx, cz, refY }.
+radar.browse = null;
+
+function viewOf(W) {
+  const b = radar.browse;
+  if (b) return { cx: b.cx, cz: b.cz, scale: radar.zoom / W, refY: b.refY, scene: b.scene };
+  return { cx: radar.pos.x, cz: radar.pos.z, scale: radar.zoom / W, refY: radar.pos.y, scene: radar.scene };
+}
+
+// Are they in the area being shown (so live things and strikes make sense)?
+function viewingThem() {
+  return !!radar.pos && (!radar.browse || radar.browse.scene === radar.scene);
+}
+
 function drawRadar() {
   const cv = $("radar");
   if (!cv || cv.closest(".tab").hidden) return;
   const ctx = cv.getContext("2d");
   const W = cv.width, H = cv.height;
-  if (!radar.pos) {
+  if (!radar.pos && !radar.browse) {
     ctx.fillStyle = "#0b0a12"; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = "#9a93ad"; ctx.font = "15px system-ui"; ctx.textAlign = "center";
-    ctx.fillText("Waiting for their game...", W / 2, H / 2);
+    ctx.fillText("Waiting for their game... (pick an area on the right to look at it)", W / 2, H / 2);
     return;
   }
-  const view = { cx: radar.pos.x, cz: radar.pos.z, scale: radar.zoom / W, refY: radar.pos.y };
-  drawBlocks(ctx, (blockCache[radar.scene] || {}).blocks, view, W, H);
+  const view = viewOf(W);
+  drawBlocks(ctx, (blockCache[view.scene] || {}).blocks, view, W, H);
   const toS = (x, z) => [W / 2 + (x - view.cx) / view.scale, H / 2 + (z - view.cz) / view.scale];
-  // Range rings (spaced to the zoom).
-  ctx.strokeStyle = "rgba(255,255,255,.07)";
-  const ring = [250, 500, 1000, 2000, 5000, 10000].find((r) => radar.zoom / r <= 10) || 10000;
-  for (let r = ring; r < radar.zoom; r += ring) { ctx.beginPath(); ctx.arc(W / 2, H / 2, r / view.scale, 0, 7); ctx.stroke(); }
-  // Camera: a pale wedge.
-  const cam = (radar.pos.cam * Math.PI) / 180;
-  ctx.fillStyle = "rgba(255,255,255,.06)";
-  ctx.beginPath(); ctx.moveTo(W / 2, H / 2);
-  ctx.arc(W / 2, H / 2, W * 0.45, Math.PI / 2 - cam - 0.45, Math.PI / 2 - cam + 0.45); ctx.closePath(); ctx.fill();
-  const colors = { e: "#ff6b6b", b: "#f3c969", N: "#ff2a5a", n: "#8fa3c4", s: "#c49bff" };
-  for (const a of radar.acts) {
-    const [x, y] = toS(a.x, a.z);
-    if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
-    ctx.fillStyle = colors[a.k] || "#ccc";
-    ctx.beginPath(); ctx.arc(x, y, a.k === "N" ? 7 : a.k === "s" ? 5 : 4.5, 0, 7); ctx.fill();
-    if (a.k === "N" || a.k === "b") { ctx.strokeStyle = "#0b0a12"; ctx.lineWidth = 1.5; ctx.stroke(); }
+  if (viewingThem()) {
+    const [px, py] = toS(radar.pos.x, radar.pos.z);
+    // Range rings around them (spaced to the zoom).
+    ctx.strokeStyle = "rgba(255,255,255,.07)";
+    const ring = [250, 500, 1000, 2000, 5000, 10000].find((r) => radar.zoom / r <= 10) || 10000;
+    for (let r = ring; r < radar.zoom; r += ring) { ctx.beginPath(); ctx.arc(px, py, r / view.scale, 0, 7); ctx.stroke(); }
+    // Camera: a pale wedge.
+    const cam = (radar.pos.cam * Math.PI) / 180;
+    ctx.fillStyle = "rgba(255,255,255,.06)";
+    ctx.beginPath(); ctx.moveTo(px, py);
+    ctx.arc(px, py, W * 0.45, Math.PI / 2 - cam - 0.45, Math.PI / 2 - cam + 0.45); ctx.closePath(); ctx.fill();
+    const colors = { e: "#ff6b6b", b: "#f3c969", N: "#ff2a5a", n: "#8fa3c4", s: "#c49bff" };
+    for (const a of radar.acts) {
+      const [x, y] = toS(a.x, a.z);
+      if (x < -10 || y < -10 || x > W + 10 || y > H + 10) continue;
+      ctx.fillStyle = colors[a.k] || "#ccc";
+      ctx.beginPath(); ctx.arc(x, y, a.k === "N" ? 7 : a.k === "s" ? 5 : 4.5, 0, 7); ctx.fill();
+      if (a.k === "N" || a.k === "b") { ctx.strokeStyle = "#0b0a12"; ctx.lineWidth = 1.5; ctx.stroke(); }
+    }
+    // Them: an arrow pointing where they face (yaw 0 faces +z, which is down here).
+    const yaw = (radar.pos.yaw * Math.PI) / 180;
+    const dx = Math.sin(yaw), dz = Math.cos(yaw);
+    ctx.fillStyle = "#6bdc8b"; ctx.strokeStyle = "#0b0a12"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px + dx * 12, py + dz * 12);
+    ctx.lineTo(px - dx * 7 + dz * 7, py - dz * 7 - dx * 7);
+    ctx.lineTo(px - dx * 7 - dz * 7, py - dz * 7 + dx * 7);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   }
-  // Them: an arrow pointing where they face (yaw 0 faces +z, which is down here).
-  const yaw = (radar.pos.yaw * Math.PI) / 180;
-  const dx = Math.sin(yaw), dz = Math.cos(yaw);
-  ctx.fillStyle = "#6bdc8b"; ctx.strokeStyle = "#0b0a12"; ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(W / 2 + dx * 12, H / 2 + dz * 12);
-  ctx.lineTo(W / 2 - dx * 7 + dz * 7, H / 2 - dz * 7 - dx * 7);
-  ctx.lineTo(W / 2 - dx * 7 - dz * 7, H / 2 - dz * 7 + dx * 7);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
   // What you've clicked.
   ctx.strokeStyle = "#f3c969"; ctx.lineWidth = 2;
   for (const [x, z] of radar.ambSpots) { const [sx, sy] = toS(x, z); ctx.beginPath(); ctx.arc(sx, sy, 8, 0, 7); ctx.stroke(); }
+  if (surSpot && surSpotScene === view.scene) {
+    const [sx, sy] = toS(surSpot[0], surSpot[1]);
+    ctx.strokeStyle = "#c49bff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(sx, sy, 10, 0, 7); ctx.stroke();
+    ctx.fillStyle = "#c49bff"; ctx.font = "bold 13px system-ui"; ctx.textAlign = "center"; ctx.fillText("?", sx, sy + 4);
+  }
   if (radar.mark && Date.now() - radar.markT < 2500) {
     const [sx, sy] = toS(radar.mark[0], radar.mark[1]);
-    ctx.strokeStyle = "#c49bff";
+    ctx.strokeStyle = "#c49bff"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(sx - 9, sy); ctx.lineTo(sx + 9, sy); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx, sy + 9); ctx.stroke();
   }
 }
@@ -1269,14 +1289,15 @@ function setZoom(z) {
   drawRadar();
 }
 
-// Zoomed out far enough to see the whole area around them.
+// Zoomed out far enough to see the whole area (around them, or the one being looked at).
 function fitZoom() {
-  const blocks = (blockCache[radar.scene] || {}).blocks || [];
-  if (!radar.pos || !blocks.length) return 8000;
+  const v = radar.browse || (radar.pos ? { cx: radar.pos.x, cz: radar.pos.z, scene: radar.scene } : null);
+  const blocks = v ? (blockCache[v.scene] || {}).blocks || [] : [];
+  if (!blocks.length) return 8000;
   let far = 0;
   for (const b of blocks) {
     for (const [x, z] of [[b.bx * BLOCK, b.bz * BLOCK], [(b.bx + 1) * BLOCK, (b.bz + 1) * BLOCK]]) {
-      far = Math.max(far, Math.abs(x - radar.pos.x), Math.abs(z - radar.pos.z));
+      far = Math.max(far, Math.abs(x - v.cx), Math.abs(z - v.cz));
     }
   }
   return far * 2 + 400;
@@ -1286,8 +1307,46 @@ function radarWorld(e) {
   const cv = $("radar");
   const r = cv.getBoundingClientRect();
   const sx = ((e.clientX - r.left) / r.width) * cv.width, sy = ((e.clientY - r.top) / r.height) * cv.height;
-  const scale = radar.zoom / cv.width;
-  return [Math.round(radar.pos.x + (sx - cv.width / 2) * scale), Math.round(radar.pos.z + (sy - cv.height / 2) * scale)];
+  const v = viewOf(cv.width);
+  return [Math.round(v.cx + (sx - cv.width / 2) * v.scale), Math.round(v.cz + (sy - cv.height / 2) * v.scale)];
+}
+
+// Look at another area (or back at them).
+async function browseZone(id) {
+  const z = T.zones[id];
+  const theirs = radar.pos && (z.scenes || []).includes(radar.scene);
+  if (theirs) { followThem(); return; }
+  await loadMapped();
+  const scene = (z.scenes || []).find((sc) => mappedScenes && mappedScenes.has(sc));
+  if (scene === undefined) {
+    radar.browse = { zone: id, scene: (z.scenes || [-1])[0], cx: 0, cz: 0, refY: 0 };
+    $("radarNote").textContent = "No map for " + z.name + " on the relay yet (their game uploads every area once).";
+  } else {
+    const blocks = await loadBlocks(scene, true) || [];
+    let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9;
+    const ys = [];
+    for (const b of blocks) {
+      x0 = Math.min(x0, b.bx * BLOCK); x1 = Math.max(x1, (b.bx + 1) * BLOCK);
+      z0 = Math.min(z0, b.bz * BLOCK); z1 = Math.max(z1, (b.bz + 1) * BLOCK);
+      ys.push(b.base);
+    }
+    radar.browse = { zone: id, scene, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, refY: ys.sort((a, b) => a - b)[ys.length >> 1] || 0 };
+    radar.zoom = Math.max(x1 - x0, z1 - z0) + 400;
+    $("radarNote").textContent = "";
+  }
+  $("viewTitle").textContent = z.name;
+  $("followBtn").hidden = false;
+  if (radar.aim !== "surprise") setAim("surprise");
+  drawRadar();
+}
+
+function followThem() {
+  radar.browse = null;
+  surPicked = false;
+  $("viewTitle").textContent = "Around them";
+  $("followBtn").hidden = true;
+  if (radar.zoom > 20000) radar.zoom = 2400;
+  drawRadar();
 }
 
 function setupRadar() {
@@ -1346,10 +1405,24 @@ function setupRadar() {
     if (wait <= 0) sendSteer(); else if (!timer) timer = setTimeout(sendSteer, wait);
   };
   cv.addEventListener("pointerdown", (e) => {
-    if (!radar.pos || touches.size > 1) return;
+    if ((!radar.pos && !radar.browse) || touches.size > 1) return;
     const w = radarWorld(e);
-    if (radar.aim === "steer") { held = true; cv.setPointerCapture(e.pointerId); return steerTo(w); }
+    if (radar.aim === "steer" && viewingThem()) { held = true; cv.setPointerCapture(e.pointerId); return steerTo(w); }
     radar.mark = w; radar.markT = Date.now();
+    if (radar.aim === "surprise") {
+      surSpot = w;
+      surSpotScene = viewOf($("radar").width).scene;
+      if (radar.browse) surZone = radar.browse.zone;
+      else if (parseInt(view.s.pz, 10) >= 0) surZone = parseInt(view.s.pz, 10);
+      spotNote();
+      render();
+      drawRadar();
+      return;
+    }
+    if (!viewingThem()) {
+      toast("They're not in this area. Use Back to them for that (or Surprise spot to hide something here).");
+      return;
+    }
     if (radar.aim === "look") {
       const over = { a: w[0], b: w[1], c: 0 };
       const why = blockReason("beam", 0, over);
@@ -1383,7 +1456,8 @@ function setupRadar() {
     }
     drawRadar();
   });
-  cv.addEventListener("pointermove", (e) => { if (held && radar.aim === "steer" && radar.pos) steerTo(radarWorld(e)); });
+  cv.addEventListener("pointermove", (e) => { if (held && radar.aim === "steer" && viewingThem()) steerTo(radarWorld(e)); });
+  $("followBtn").addEventListener("click", followThem);
   const up = () => { held = false; };
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
@@ -1566,60 +1640,36 @@ function drawTermina(s, hasNem) {
 }
 
 function zoneCard(marks) {
+  // In their area and not browsing: the surprise goes where they are.
+  if (!surPicked && view.s && parseInt(view.s.pz, 10) >= 0) surZone = parseInt(view.s.pz, 10);
   if (surZone < 0) return;
   const z = T.zones[surZone];
   const outId = z.parent >= 0 && z.x === undefined ? z.parent : z.id;
-  $("zoneTitle").textContent = z.name;
   const here = (marks[outId] || []).filter((m) => m.real === z.id).map((m) => m.tip);
   const where = z.parent < 0 ? "" : (z.x !== undefined ? "A temple, off " : "Inside, off ") + T.zones[z.parent].name + ". ";
-  $("zoneInfo").textContent = where + (here.length ? here.join(". ") + "." : "Nothing marked here right now.");
+  $("zoneInfo").textContent = z.name + ": " + where + (here.length ? here.join(". ") + "." : "nothing marked here right now.");
   const rooms = T.zones.filter((r) => r.parent === outId && r.x === undefined);
   $("roomsSub").hidden = !rooms.length;
   setHtml($("rooms"), !rooms.length ? "" : [T.zones[outId], ...rooms].map((r) => `<button data-room="${r.id}" class="${r.id === surZone ? "on" : ""}">${esc(r.id === outId ? "Outside" : r.name)}</button>`).join(""));
   $("surZone").textContent = "Hide it in: " + z.name;
 }
 
-function pickZone(id) {
-  if (id === surZone) return;
-  surZone = id;
-  surSpot = null;
-  render();
-  drawMini();
+let surSpotScene = -1;
+let surPicked = false; // an area was picked on the Termina map (otherwise: where they are)
+
+function spotNote() {
+  $("surClear").hidden = !surSpot;
+  $("surSpotNote").textContent = surSpot ? "Spot: where you clicked on the map (moved away from doors if it's too close)." :
+    "Spot: anywhere in the area (not by a door). Use \"Surprise spot\" on the map to pick one.";
 }
 
-// The picked area's mini map (if they've been there), to pick an exact spot.
-async function drawMini() {
-  const wrap = $("surMiniWrap");
-  if (surZone < 0) { wrap.hidden = true; return; }
-  await loadMapped();
-  const z = T.zones[surZone];
-  const scene = (z.scenes || []).find((sc) => mappedScenes && mappedScenes.has(sc));
-  if (scene === undefined) {
-    wrap.hidden = true;
-    $("surClear").hidden = true;
-    $("surSpotNote").textContent = "Spot: anywhere in the area (its map isn't on the relay yet: their game uploads every area's map once, the first time it connects).";
-    return;
-  }
-  const blocks = await loadBlocks(scene);
-  if (!blocks || !blocks.length) { wrap.hidden = true; return; }
-  wrap.hidden = false;
-  let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, ys = [];
-  for (const b of blocks) {
-    x0 = Math.min(x0, b.bx * BLOCK); x1 = Math.max(x1, (b.bx + 1) * BLOCK);
-    z0 = Math.min(z0, b.bz * BLOCK); z1 = Math.max(z1, (b.bz + 1) * BLOCK);
-    ys.push(b.base);
-  }
-  const cv = $("surMini"), ctx = cv.getContext("2d");
-  const view = { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, scale: Math.max(x1 - x0, z1 - z0) / cv.width, refY: ys.sort((a, b) => a - b)[ys.length >> 1] };
-  cv._view = view;
-  drawBlocks(ctx, blocks, view, cv.width, cv.height);
-  if (surSpot) {
-    const sx = cv.width / 2 + (surSpot[0] - view.cx) / view.scale, sy = cv.height / 2 + (surSpot[1] - view.cz) / view.scale;
-    ctx.strokeStyle = "#c49bff"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(sx, sy, 9, 0, 7); ctx.stroke();
-  }
-  $("surClear").hidden = !surSpot;
-  $("surSpotNote").textContent = surSpot ? "Spot: where you clicked (moved away from doors if it's too close)." : "Spot: anywhere (not by a door). Click the map to pick one.";
+function pickZone(id) {
+  surPicked = true;
+  surZone = id;
+  surSpot = null;
+  spotNote();
+  render();
+  browseZone(id);
 }
 
 function setupSurprise() {
@@ -1640,15 +1690,8 @@ function setupSurprise() {
   };
   $("surKind").addEventListener("change", kindChange);
   kindChange();
-  $("surClear").addEventListener("click", () => { surSpot = null; drawMini(); });
-  $("surMini").addEventListener("click", (e) => {
-    const cv = $("surMini"), v = cv._view;
-    if (!v) return;
-    const r = cv.getBoundingClientRect();
-    const sx = ((e.clientX - r.left) / r.width) * cv.width, sy = ((e.clientY - r.top) / r.height) * cv.height;
-    surSpot = [Math.round(v.cx + (sx - cv.width / 2) * v.scale), Math.round(v.cz + (sy - cv.height / 2) * v.scale)];
-    drawMini();
-  });
+  $("surClear").addEventListener("click", () => { surSpot = null; spotNote(); drawRadar(); });
+  spotNote();
 }
 
 // --- Blocked -----------------------------------------------------------------------------
@@ -1734,11 +1777,10 @@ function setupTabs() {
     store.set("ge_tab", t);
     hideTip();
     if (t === "radar") loadBlocks(radar.scene).then(drawRadar);
-    if (t === "map") drawMini();
   };
   document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.tab)));
   showTab = show;
-  show({ curses: "events", pranks: "fun", gifts: "fun" }[cur] || cur);
+  show({ curses: "events", pranks: "fun", gifts: "fun", map: "radar" }[cur] || cur);
 }
 
 setup();
