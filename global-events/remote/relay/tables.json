@@ -6,7 +6,8 @@
    "desc": "Bombs fall from high up. Get under cover.",
    "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": true
   },
   {
    "id": 1,
@@ -14,23 +15,26 @@
    "desc": "Rupoors rain down. Each one costs rupees.",
    "second": true,
    "primary": true,
-   "tier": 0
+   "tier": 0,
+   "double": true
   },
   {
    "id": 2,
    "name": "Blood Moon",
    "desc": "A horde of one enemy type from your pool.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 3
+   "tier": 3,
+   "double": true
   },
   {
    "id": 3,
    "name": "Joke Event",
    "desc": "Harmless critters flood the area.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 4,
@@ -38,143 +42,134 @@
    "desc": "Boulders land where you're heading. Turn!",
    "second": true,
    "primary": true,
-   "tier": 2
+   "tier": 2,
+   "double": true
   },
   {
    "id": 5,
    "name": "The Stalker",
    "desc": "Something hunts you and hits very hard.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 8,
    "name": "Phantom Army",
    "desc": "Invisible soldiers. The Lens shows them.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 2
+   "tier": 2,
+   "double": false
   },
   {
    "id": 9,
    "name": "Treasure Hunt",
    "desc": "Find the hidden rupee in time or be frozen.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 10,
    "name": "Blood Hunger",
    "desc": "Your health drains. Every kill heals you.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 2
+   "tier": 2,
+   "double": false
   },
   {
    "id": 11,
    "name": "Searchlights",
    "desc": "Avoid the spotlights or enemies come.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": true
   },
   {
    "id": 12,
    "name": "Terrible Fate",
    "desc": "Salesmen creep closer when you look away.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 13,
    "name": "Red Light Green Light",
    "desc": "Freeze when the moon watches or get zapped.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 14,
    "name": "Echo",
    "desc": "A ghost walks your path. One touch kills.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 18,
    "name": "Champion Duel",
    "desc": "Duel a champion. Beat it to move on.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 3
-  },
-  {
-   "id": 19,
-   "name": "Infighting",
-   "desc": "Two enemy groups brawl right next to you.",
-   "second": false,
-   "primary": true,
-   "tier": 0
+   "tier": 3,
+   "double": false
   },
   {
    "id": 20,
    "name": "Time Moves w/ You",
    "desc": "Stand still and time stops. So does its clock.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 22,
    "name": "Carpenter Uprising",
    "desc": "Rainbow carpenters attack. Hit them to stop.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 23,
    "name": "Procession of the Dead",
    "desc": "A column of ReDeads marches. Don't cross it.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 0
-  },
-  {
-   "id": 25,
-   "name": "Bullet Hell",
-   "desc": "Mad Scrubs surround you and fire volleys.",
-   "second": false,
-   "primary": true,
-   "tier": 2
+   "tier": 0,
+   "double": false
   },
   {
    "id": 26,
    "name": "Mirage",
-   "desc": "Enemies come with fakes. Find the real one.",
-   "second": false,
+   "desc": "Tough foes come with fakes. Find the real ones.",
+   "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 27,
    "name": "Mirror Dance",
    "desc": "Dancers copy your every move.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 0
-  },
-  {
-   "id": 30,
-   "name": "Sky Leviathan",
-   "desc": "A giant fish circles in the sky. Harmless.",
-   "second": false,
-   "primary": true,
-   "tier": 0
+   "tier": 1,
+   "double": false
   },
   {
    "id": 31,
@@ -182,191 +177,215 @@
    "desc": "Tingle drops bombs. Pop his balloon to stop him.",
    "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": true
   },
   {
    "id": 33,
    "name": "Cursed Tag",
    "desc": "Hit an enemy to pass the curse before it blows.",
-   "second": false,
+   "second": true,
    "primary": true,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 34,
    "name": "Pop Quiz",
    "desc": "Four questions. Wrong costs half your hearts.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 35,
    "name": "Low Gravity",
-   "desc": "Link floats. Jumps and falls go floaty.",
+   "desc": "Low gravity: you jump higher and fall slowly.",
    "second": true,
    "primary": true,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 36,
    "name": "Moonlit Prey",
-   "desc": "Kill the glowing foe for rupees, or get hurt.",
-   "second": false,
+   "desc": "Kill both glowing foes for rupees, or get hurt.",
+   "second": true,
    "primary": true,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 37,
    "name": "Starfall Bounty",
    "desc": "Stand where the stars land!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 38,
    "name": "Dowsing Moon",
    "desc": "Follow the warmth, press A to dig.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 39,
    "name": "Giant's Gale",
    "desc": "Hold the stick INTO the wind.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 40,
    "name": "Sinking Sands",
    "desc": "Keep moving!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 41,
    "name": "Frostbite",
    "desc": "Roll to shake off the frost.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 42,
    "name": "Scythe Sweep",
-   "desc": "Jump it or stand in the green gap.",
-   "second": false,
+   "desc": "Hop it (Z+A) or stand in the gap.",
+   "second": true,
    "primary": false,
-   "tier": 2
+   "tier": 2,
+   "double": true
   },
   {
    "id": 43,
    "name": "Moth Swarm",
    "desc": "Spin attack to scatter the moths!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": true
   },
   {
    "id": 44,
    "name": "Hex of Silence",
    "desc": "Don't press B or the C buttons.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 45,
    "name": "Moon Tether",
    "desc": "Stay inside the drifting circle!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 46,
    "name": "Moon's Grasp",
    "desc": "When it grabs you, MASH A!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 47,
    "name": "Heartbeat Hex",
    "desc": "Press A on every heartbeat.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 48,
    "name": "Moon's Reflex Test",
    "desc": "Press the button that flashes up!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 49,
    "name": "Gorgon's Gaze",
    "desc": "Keep your camera AWAY from the eye.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 50,
    "name": "Dissonance",
    "desc": "Play any 3 ocarina notes.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 0
+   "tier": 0,
+   "double": false
   },
   {
    "id": 51,
    "name": "Mirror Madness",
    "desc": "Face the shard, hold Z to break it.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 52,
    "name": "Volley of Stars",
    "desc": "Face the star and hold R to guard!",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": true
   },
   {
    "id": 53,
    "name": "Sleeping Giant",
    "desc": "Tiptoe! Running wakes the giant.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 54,
    "name": "Mask Salesman's Game",
    "desc": "Watch the arrows, repeat on D-pad.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   },
   {
    "id": 55,
    "name": "Pressure Seals",
    "desc": "Step on the seals in order.",
-   "second": false,
+   "second": true,
    "primary": false,
-   "tier": 1
+   "tier": 1,
+   "double": false
   }
  ],
  "pools": [
@@ -409,7 +428,7 @@
   {
    "id": 19,
    "name": "Like Like",
-   "tier": 2,
+   "tier": 1,
    "desc": ""
   },
   {
@@ -433,7 +452,7 @@
   {
    "id": 30,
    "name": "Garo Master",
-   "tier": 2,
+   "tier": 3,
    "desc": ""
   },
   {
@@ -458,6 +477,12 @@
    "id": 10,
    "name": "Blue Bubble",
    "tier": 0,
+   "desc": ""
+  },
+  {
+   "id": 35,
+   "name": "Garo",
+   "tier": 1,
    "desc": ""
   }
  ],
@@ -530,7 +555,7 @@
   {
    "id": 14,
    "name": "Thief",
-   "desc": "Steals 3 Moon Marks per hit. Pays back double."
+   "desc": "Steals 3 Marks per hit. A bounty pays back double, a Nemesis never."
   },
   {
    "id": 15,
@@ -582,7 +607,7 @@
   {
    "id": 10,
    "name": "Butterfingers",
-   "desc": "Every hit you take costs 5 rupees."
+   "desc": "Every hit you take costs 10 rupees."
   },
   {
    "id": 12,
@@ -602,7 +627,7 @@
   {
    "id": 15,
    "name": "Emboldened",
-   "desc": "Your Nemesis gains a level."
+   "desc": "Your Nemesis fights with +3 in every stat."
   },
   {
    "id": 16,
@@ -624,7 +649,7 @@
   {
    "id": 0,
    "name": "Restless Moon",
-   "desc": "Events come 33% more often."
+   "desc": "Events come 50% more often."
   },
   {
    "id": 1,
@@ -634,7 +659,7 @@
   {
    "id": 2,
    "name": "Fierce Moon",
-   "desc": "Events are one step harder."
+   "desc": "Events hit at Brutal."
   },
   {
    "id": 3,
@@ -686,7 +711,7 @@
   {
    "id": 1,
    "name": "Giga Blade",
-   "desc": "Arm it: your next sword hits do triple damage."
+   "desc": "Arm it: your next 10 sword hits do triple damage."
   },
   {
    "id": 2,
@@ -812,23 +837,23 @@
  "stats": [
   {
    "id": 0,
-   "name": "Speed",
-   "desc": "+12% movement per point."
+   "name": "Health",
+   "desc": "More health (+25% of its base per point)."
   },
   {
    "id": 1,
    "name": "Power",
-   "desc": "+25% damage per point when it hits them."
+   "desc": "Hits harder (+15% damage per point)."
   },
   {
    "id": 2,
-   "name": "Health",
-   "desc": "+15% health per point."
+   "name": "Speed",
+   "desc": "Moves faster (+3% per point)."
   },
   {
    "id": 3,
    "name": "Tracking",
-   "desc": "Moves toward them faster and shows up more often. At 3+ it follows them in from next door."
+   "desc": "Finds them faster and turns up more often. At 8 it follows them through doors."
   }
  ],
  "zones": [
@@ -2111,5 +2136,651 @@
   "Zora Hall Shop 2": 22,
   "Zora Hall Shop 3": 22,
   "Zora Hall Torches Reward": 22
- }
+ },
+ "picks": [
+  {
+   "id": 0,
+   "name": "Thin Skin",
+   "desc": "You take 50% more damage.",
+   "kind": "mutator"
+  },
+  {
+   "id": 1,
+   "name": "Tough Crowd",
+   "desc": "Enemies have 50% more health.",
+   "kind": "mutator"
+  },
+  {
+   "id": 3,
+   "name": "Reinforcements",
+   "desc": "Kills may call in a replacement enemy.",
+   "kind": "mutator"
+  },
+  {
+   "id": 4,
+   "name": "Elite Foes",
+   "desc": "1 in 4 enemies has a random trait.",
+   "kind": "mutator"
+  },
+  {
+   "id": 5,
+   "name": "Heart Lock",
+   "desc": "You can't heal within 2 hearts of your max.",
+   "kind": "mutator"
+  },
+  {
+   "id": 6,
+   "name": "Open Wounds",
+   "desc": "After a hit, you can't heal for 10 seconds.",
+   "kind": "mutator"
+  },
+  {
+   "id": 8,
+   "name": "Mana Tax",
+   "desc": "Magic costs double.",
+   "kind": "mutator"
+  },
+  {
+   "id": 9,
+   "name": "Ammo Tax",
+   "desc": "Arrows, bombs, nuts and sticks go twice as fast.",
+   "kind": "mutator"
+  },
+  {
+   "id": 10,
+   "name": "Butterfingers",
+   "desc": "Every hit you take costs 10 rupees.",
+   "kind": "mutator"
+  },
+  {
+   "id": 12,
+   "name": "Cold Water",
+   "desc": "Swimming drains health (not as Zora).",
+   "kind": "mutator"
+  },
+  {
+   "id": 13,
+   "name": "Restless Earth",
+   "desc": "Stand still 4 seconds and a boulder falls on you.",
+   "kind": "mutator"
+  },
+  {
+   "id": 14,
+   "name": "Dark Nights",
+   "desc": "Nights are much darker.",
+   "kind": "mutator"
+  },
+  {
+   "id": 15,
+   "name": "Emboldened",
+   "desc": "Your Nemesis fights with +3 in every stat.",
+   "kind": "mutator"
+  },
+  {
+   "id": 16,
+   "name": "Hunted",
+   "desc": "Your Nemesis turns up far more often.",
+   "kind": "mutator"
+  },
+  {
+   "id": 18,
+   "name": "Ambushers",
+   "desc": "New areas may greet you with enemies.",
+   "kind": "mutator"
+  },
+  {
+   "id": 19,
+   "name": "Keese Escort",
+   "desc": "A few Keese follow you everywhere.",
+   "kind": "mutator"
+  },
+  {
+   "id": 22,
+   "name": "Restless Moon",
+   "desc": "Events come 50% more often.",
+   "kind": "curse"
+  },
+  {
+   "id": 23,
+   "name": "Lingering Dread",
+   "desc": "Events last 50% longer.",
+   "kind": "curse"
+  },
+  {
+   "id": 24,
+   "name": "Fierce Moon",
+   "desc": "Events hit at Brutal.",
+   "kind": "curse"
+  },
+  {
+   "id": 25,
+   "name": "Twin Omens",
+   "desc": "Combo events are much more common.",
+   "kind": "curse"
+  },
+  {
+   "id": 26,
+   "name": "Moon's Favorite",
+   "desc": "One event comes up half the time.",
+   "kind": "curse"
+  },
+  {
+   "id": 27,
+   "name": "Blood Nights",
+   "desc": "A Blood Moon rises every night at 6 PM.",
+   "kind": "curse"
+  },
+  {
+   "id": 29,
+   "name": "Silent Moon",
+   "desc": "No warning or roulette before events.",
+   "kind": "curse"
+  },
+  {
+   "id": 34,
+   "name": "Glass Moon",
+   "desc": "You take double damage during events.",
+   "kind": "curse"
+  },
+  {
+   "id": 35,
+   "name": "Encore",
+   "desc": "Every event comes back a minute later.",
+   "kind": "curse"
+  },
+  {
+   "id": 38,
+   "name": "Bell Toll",
+   "desc": "Events strike every 3 hours on the clock.",
+   "kind": "curse"
+  },
+  {
+   "id": 39,
+   "name": "Hex",
+   "desc": "Cursed Tag joins every event.",
+   "kind": "curse"
+  }
+ ],
+ "allevents": [
+  {
+   "id": 0,
+   "name": "Bomb Rain"
+  },
+  {
+   "id": 1,
+   "name": "Rupoor Rain"
+  },
+  {
+   "id": 2,
+   "name": "Blood Moon"
+  },
+  {
+   "id": 3,
+   "name": "Joke Event"
+  },
+  {
+   "id": 4,
+   "name": "Moonfall"
+  },
+  {
+   "id": 5,
+   "name": "The Stalker"
+  },
+  {
+   "id": 6,
+   "name": "Poe Hunt (hidden)"
+  },
+  {
+   "id": 7,
+   "name": "Nemesis (hidden)"
+  },
+  {
+   "id": 8,
+   "name": "Phantom Army"
+  },
+  {
+   "id": 9,
+   "name": "Treasure Hunt"
+  },
+  {
+   "id": 10,
+   "name": "Blood Hunger"
+  },
+  {
+   "id": 11,
+   "name": "Searchlights"
+  },
+  {
+   "id": 12,
+   "name": "Terrible Fate"
+  },
+  {
+   "id": 13,
+   "name": "Red Light Green Light"
+  },
+  {
+   "id": 14,
+   "name": "Echo"
+  },
+  {
+   "id": 15,
+   "name": "Moon's Glare (hidden)"
+  },
+  {
+   "id": 16,
+   "name": "Kamikaze Keese (hidden)"
+  },
+  {
+   "id": 17,
+   "name": "Wolf Pack (hidden)"
+  },
+  {
+   "id": 18,
+   "name": "Champion Duel"
+  },
+  {
+   "id": 20,
+   "name": "Time Moves w/ You"
+  },
+  {
+   "id": 21,
+   "name": "Imposters (hidden)"
+  },
+  {
+   "id": 22,
+   "name": "Carpenter Uprising"
+  },
+  {
+   "id": 23,
+   "name": "Procession of the Dead"
+  },
+  {
+   "id": 24,
+   "name": "Poltergeist (hidden)"
+  },
+  {
+   "id": 26,
+   "name": "Mirage"
+  },
+  {
+   "id": 27,
+   "name": "Mirror Dance"
+  },
+  {
+   "id": 28,
+   "name": "Swarm Night (hidden)"
+  },
+  {
+   "id": 29,
+   "name": "Majora Looms (hidden)"
+  },
+  {
+   "id": 31,
+   "name": "Tingle Air Raid"
+  },
+  {
+   "id": 32,
+   "name": "Goron Stampede (hidden)"
+  },
+  {
+   "id": 33,
+   "name": "Cursed Tag"
+  },
+  {
+   "id": 34,
+   "name": "Pop Quiz"
+  },
+  {
+   "id": 35,
+   "name": "Low Gravity"
+  },
+  {
+   "id": 36,
+   "name": "Moonlit Prey"
+  },
+  {
+   "id": 37,
+   "name": "Starfall Bounty"
+  },
+  {
+   "id": 38,
+   "name": "Dowsing Moon"
+  },
+  {
+   "id": 39,
+   "name": "Giant's Gale"
+  },
+  {
+   "id": 40,
+   "name": "Sinking Sands"
+  },
+  {
+   "id": 41,
+   "name": "Frostbite"
+  },
+  {
+   "id": 42,
+   "name": "Scythe Sweep"
+  },
+  {
+   "id": 43,
+   "name": "Moth Swarm"
+  },
+  {
+   "id": 44,
+   "name": "Hex of Silence"
+  },
+  {
+   "id": 45,
+   "name": "Moon Tether"
+  },
+  {
+   "id": 46,
+   "name": "Moon's Grasp"
+  },
+  {
+   "id": 47,
+   "name": "Heartbeat Hex"
+  },
+  {
+   "id": 48,
+   "name": "Moon's Reflex Test"
+  },
+  {
+   "id": 49,
+   "name": "Gorgon's Gaze"
+  },
+  {
+   "id": 50,
+   "name": "Dissonance"
+  },
+  {
+   "id": 51,
+   "name": "Mirror Madness"
+  },
+  {
+   "id": 52,
+   "name": "Volley of Stars"
+  },
+  {
+   "id": 53,
+   "name": "Sleeping Giant"
+  },
+  {
+   "id": 54,
+   "name": "Mask Salesman's Game"
+  },
+  {
+   "id": 55,
+   "name": "Pressure Seals"
+  }
+ ],
+ "allpools": [
+  {
+   "id": 0,
+   "name": "Keese",
+   "tier": 1
+  },
+  {
+   "id": 1,
+   "name": "Fire Keese",
+   "tier": 1
+  },
+  {
+   "id": 2,
+   "name": "Ice Keese",
+   "tier": 1
+  },
+  {
+   "id": 3,
+   "name": "Wolfos",
+   "tier": 1
+  },
+  {
+   "id": 4,
+   "name": "White Wolfos",
+   "tier": 1
+  },
+  {
+   "id": 5,
+   "name": "Stalchild",
+   "tier": 0
+  },
+  {
+   "id": 6,
+   "name": "ReDead",
+   "tier": 1
+  },
+  {
+   "id": 7,
+   "name": "Poe",
+   "tier": 1
+  },
+  {
+   "id": 8,
+   "name": "Chuchu",
+   "tier": 0
+  },
+  {
+   "id": 9,
+   "name": "Tektite",
+   "tier": 0
+  },
+  {
+   "id": 10,
+   "name": "Blue Bubble",
+   "tier": 0
+  },
+  {
+   "id": 11,
+   "name": "Red Bubble",
+   "tier": 1
+  },
+  {
+   "id": 12,
+   "name": "Deku Baba",
+   "tier": 1
+  },
+  {
+   "id": 13,
+   "name": "Dodongo",
+   "tier": 2
+  },
+  {
+   "id": 14,
+   "name": "Guay",
+   "tier": 1
+  },
+  {
+   "id": 15,
+   "name": "Freezard",
+   "tier": 1
+  },
+  {
+   "id": 16,
+   "name": "Beamos",
+   "tier": 1
+  },
+  {
+   "id": 17,
+   "name": "Armos",
+   "tier": 1
+  },
+  {
+   "id": 18,
+   "name": "Real Bombchu",
+   "tier": 1
+  },
+  {
+   "id": 19,
+   "name": "Like Like",
+   "tier": 1
+  },
+  {
+   "id": 20,
+   "name": "Wallmaster",
+   "tier": 1
+  },
+  {
+   "id": 21,
+   "name": "Floormaster",
+   "tier": 1
+  },
+  {
+   "id": 22,
+   "name": "Hiploop",
+   "tier": 0
+  },
+  {
+   "id": 23,
+   "name": "Mad Scrub",
+   "tier": 1
+  },
+  {
+   "id": 24,
+   "name": "Snapper",
+   "tier": 1
+  },
+  {
+   "id": 25,
+   "name": "Dragonfly",
+   "tier": 1
+  },
+  {
+   "id": 26,
+   "name": "Boe",
+   "tier": 1
+  },
+  {
+   "id": 27,
+   "name": "Nejiron",
+   "tier": 1
+  },
+  {
+   "id": 28,
+   "name": "Peahat",
+   "tier": 2
+  },
+  {
+   "id": 29,
+   "name": "Leever",
+   "tier": 1
+  },
+  {
+   "id": 30,
+   "name": "Garo Master",
+   "tier": 3
+  },
+  {
+   "id": 31,
+   "name": "Iron Knuckle",
+   "tier": 3
+  },
+  {
+   "id": 32,
+   "name": "Dinolfos",
+   "tier": 2
+  },
+  {
+   "id": 33,
+   "name": "Big Poe",
+   "tier": 2
+  },
+  {
+   "id": 34,
+   "name": "BOSS: Odolwa",
+   "tier": 1
+  },
+  {
+   "id": 35,
+   "name": "Garo",
+   "tier": 1
+  }
+ ],
+ "uniques": [
+  {
+   "id": 0,
+   "name": "Second Skin",
+   "desc": "The first hit each fight does nothing.",
+   "stat": 0,
+   "at": 5
+  },
+  {
+   "id": 1,
+   "name": "Undying",
+   "desc": "Lives through a killing blow once per fight.",
+   "stat": 0,
+   "at": 10
+  },
+  {
+   "id": 2,
+   "name": "Colossus",
+   "desc": "Twice as big, can't be knocked back, regenerates.",
+   "stat": 0,
+   "at": 20
+  },
+  {
+   "id": 3,
+   "name": "Heavy Hand",
+   "desc": "Its hits knock you down.",
+   "stat": 1,
+   "at": 5
+  },
+  {
+   "id": 4,
+   "name": "Shatter",
+   "desc": "Its hits drain magic. It breaks your guard.",
+   "stat": 1,
+   "at": 10
+  },
+  {
+   "id": 5,
+   "name": "Executioner",
+   "desc": "Below a third of your health, any hit kills you.",
+   "stat": 1,
+   "at": 20
+  },
+  {
+   "id": 6,
+   "name": "Lunge",
+   "desc": "Dashes at you from mid range.",
+   "stat": 2,
+   "at": 5
+  },
+  {
+   "id": 7,
+   "name": "Afterimage",
+   "desc": "Dodges your first swing every few seconds.",
+   "stat": 2,
+   "at": 10
+  },
+  {
+   "id": 8,
+   "name": "Blitz",
+   "desc": "Two quick strikes per attack, twice as fast.",
+   "stat": 2,
+   "at": 20
+  },
+  {
+   "id": 9,
+   "name": "Echolocation",
+   "desc": "Sends 2 Recon Keese at you every 2 minutes.",
+   "stat": 3,
+   "at": 5
+  },
+  {
+   "id": 10,
+   "name": "Bloodscent",
+   "desc": "When you get hurt, it moves one area closer.",
+   "stat": 3,
+   "at": 10
+  },
+  {
+   "id": 11,
+   "name": "Battlethirst",
+   "desc": "In your area, it appears on you and attacks.",
+   "stat": 3,
+   "at": 20
+  }
+ ]
 }

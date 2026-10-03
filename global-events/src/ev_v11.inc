@@ -135,7 +135,12 @@ static Gfx* Card_Draw(PlayState* play, Gfx* gfx, s32 style, const char* name, co
 
 static void Card_ComboName(char* out, s32 size, s32 ev, s32 combo) {
     s32 n;
+    // Doubled: a pick of X combo X (the roulette), or the running doubled event.
+    s32 doubled = (combo == ev) || ((combo < 0) && (ev == sActive) && Ev_IsDoubled());
 
+    if (doubled) {
+        combo = -1;
+    }
     if (Curse_Is(CURSE_UNSEEN)) {
         Ev_Append(out, 0, (combo >= 0) ? "??? + ???" : "???", size);
         return;
@@ -145,6 +150,8 @@ static void Card_ComboName(char* out, s32 size, s32 ev, s32 combo) {
     if (combo >= 0) {
         n = Ev_Append(out, n, " + ", size);
         Ev_Append(out, n, Events_ShortName(combo), size);
+    } else if (doubled) {
+        Ev_Append(out, n, " x2", size);
     }
 }
 
@@ -342,7 +349,9 @@ static s32 Stats_Sum(u16* arr) {
 static u16 sPrevClock = 0;
 
 static s32 Curse_Is(s32 curse) {
-    return gOpt[ID_EV_CURSE] && (sCurse == curse) && Curse_CanUse(curse); // retired curses do nothing
+    // Picked in the Moon Draft this cycle (retired curses do nothing).
+    return gOpt[ID_V2_MUT] && gOpt[ID_EV_CURSE] && (curse >= 0) && (curse < CURSE_COUNT) &&
+           (sCurseMask & (1u << curse)) && Curse_CanUse(curse);
 }
 
 static s32 Curse_CanUse(s32 curse);
@@ -394,16 +403,16 @@ static const char* Curse_Name(s32 curse) {
     }
 }
 
-static void Curse_Describe(char* out, s32 size) {
-    switch (sCurse) {
+static void Curse_DescribeId(s32 curse, char* out, s32 size) {
+    switch (curse) {
         case CURSE_RESTLESS:
-            Ev_Append(out, 0, "Events come 33% more often.", size);
+            Ev_Append(out, 0, "Events come 50% more often.", size);
             break;
         case CURSE_LINGER:
             Ev_Append(out, 0, "Events last 50% longer.", size);
             break;
         case CURSE_FIERCE:
-            Ev_Append(out, 0, "Events are one step harder.", size);
+            Ev_Append(out, 0, "Events hit at Brutal.", size);
             break;
         case CURSE_TWIN:
             Ev_Append(out, 0, "Combo events are much more common.", size);
@@ -460,9 +469,13 @@ static void Curse_Describe(char* out, s32 size) {
             Ev_Append(out, 0, "Low gravity whenever an event is running.", size);
             break;
         default:
-            Ev_Append(out, 0, "No curse this cycle.", size);
+            Ev_Append(out, 0, "No curse picked yet.", size);
             break;
     }
+}
+
+static void Curse_Describe(char* out, s32 size) {
+    Curse_DescribeId(sCurse, out, size);
 }
 
 static s32 Curse_CanUse(s32 curse) {
@@ -500,27 +513,6 @@ static s32 Curse_CanUse(s32 curse) {
     return true;
 }
 
-static void Curse_Roll(void) {
-    s32 options[CURSE_COUNT];
-    s32 count = 0;
-    s32 i;
-
-    for (i = 0; i < CURSE_COUNT; i++) {
-        if ((i != sCurse) && Curse_CanUse(i)) { // a new cycle gets a different curse
-            options[count++] = i;
-        }
-    }
-    if (count == 0) {
-        sCurse = CURSE_RESTLESS;
-    } else {
-        sCurse = options[(s32)(Rand_ZeroOne() * count) % count];
-    }
-    Curse_PickFavorite();
-    sCurseCardPending = gOpt[ID_EV_CURSE];
-    sWrath = 0; // the meter starts over with each new curse
-    sWrathPending = false;
-}
-
 static void Curse_PickFavorite(void) {
     s32 i;
 
@@ -538,7 +530,8 @@ static void Curse_PickFavorite(void) {
     }
 }
 
-// Cheat build: left/right on the Curse row picks any curse (or none).
+// Cheat build: left/right on the Curse row swaps your newest curse pick for another (or none).
+static void Pick_SwapCurse(s32 from, s32 to);
 void Events_CycleCurse(s32 dir) {
     s32 next = sCurse + ((dir < 0) ? -1 : 1);
 
@@ -547,8 +540,7 @@ void Events_CycleCurse(s32 dir) {
     } else if (next >= CURSE_COUNT) {
         next = -1;
     }
-    sCurse = next;
-    Curse_PickFavorite();
+    Pick_SwapCurse(sCurse, next);
     sCurseCardPending = false;
 }
 
@@ -578,7 +570,7 @@ static const char* Events_Description(s32 ev) {
         case EV_PROCESSION: return "A column of ReDeads marches. Don't cross it.";
         case EV_POLTERGEIST: return "Rocks circle you, flash red, then fly at you.";
         case EV_BULLETHELL: return "Mad Scrubs surround you and fire volleys.";
-        case EV_MIRAGE: return "Enemies come with fakes. Find the real one.";
+        case EV_MIRAGE: return "Tough foes come with fakes. Find the real ones.";
         case EV_MIRROR: return "Dancers copy your every move.";
         case EV_SWARM: return "A huge Keese swarm fills the sky.";
         case EV_MAJORA: return "Majora's Mask throws boss masks at your spot.";
@@ -586,8 +578,8 @@ static const char* Events_Description(s32 ev) {
         case EV_TINGLE: return "Tingle drops bombs. Pop his balloon to stop him.";
         case EV_CURSETAG: return "Hit an enemy to pass the curse before it blows.";
         case EV_QUIZ: return "Four questions. Wrong costs half your hearts.";
-        case EV_LOWGRAV: return "Link floats. Jumps and falls go floaty.";
-        case EV_PREY: return "Kill the glowing foe for rupees, or get hurt.";
+        case EV_LOWGRAV: return "Low gravity: you jump higher and fall slowly.";
+        case EV_PREY: return "Kill both glowing foes for rupees, or get hurt.";
         default: return V3_IsEvent(ev) ? V3_Counter(ev) : NULL;
     }
 }
@@ -639,7 +631,7 @@ s32 Events_EnabledCount(s32* total) {
 }
 
 const char* Events_InfoDesc(s32 id) {
-    static char sDesc[64];
+    static char sDesc[96];
 
     if ((id >= ID_SUB_V2) && (id <= ID_V2_LAST)) {
         return V2_Desc(id);
@@ -651,10 +643,15 @@ const char* Events_InfoDesc(s32 id) {
         return Events_Description(id - ID_EV_ON_FIRST);
     }
     if ((id >= ID_EV_GO_FIRST) && (id < ID_EV_GO_FIRST + EV_COUNT)) {
-        return Events_Description(id - ID_EV_GO_FIRST);
+        return "Start it now. Events you start pay no Marks.";
     }
     switch (id) {
         case ID_EV_MASTER: return "Random events on or off. Stays on across saves.";
+        case ID_THEME: return "Color of this menu. Rainbow cycles.";
+        case ID_SOUNDS: return "Clicks and chimes in this menu.";
+#ifdef GE_CHEATS
+        case ID_MOONJUMP: return "Hold L to rise. L also opens the Moon Pouch.";
+#endif
 #ifdef GE_CHEATS
         case ID_ALL_OFF: return "Stops events and every cheat. Moon Marks stay.";
 #else
@@ -663,18 +660,18 @@ const char* Events_InfoDesc(s32 id) {
         case ID_SUB_EVENTS: return "Events, curses, mutators and event settings.";
         case ID_EV_STATUS: return "What's running right now.";
         case ID_EV_TRIGGER: return "Start a random event right now.";
-        case ID_EV_END: return "Stop the current event.";
+        case ID_EV_END: return "Stop the current event. 60 Moon Marks unless you started it.";
         case ID_EV_INTERVAL: return "About how long between events.";
         case ID_EV_DURATION: return "How long timed events last.";
         case ID_EV_INTENSITY: return "How hard events hit: Mild, Normal or Brutal.";
-        case ID_SUB_EV_FEATURES: return "Roulette, combos, curses and Moon Pressure.";
+        case ID_SUB_EV_FEATURES: return "Roulette, combos, curses, timer and sounds.";
         case ID_SUB_EV_LIST: return "Event timing and settings, and which events can happen.";
         case ID_SUB_EV_START: return "Start any event right now.";
         case ID_SUB_EV_SETTINGS: return "Fine-tune each event.";
         case ID_SUB_EV_REPORT: return "Stats for this save: survived, deaths, combos.";
         case ID_EV_ROULETTE: return "A quick spin shows the event before it starts.";
         case ID_EV_COMBOS: return "Now and then two events run at once.";
-        case ID_EV_CURSE: return "Each new cycle rolls a curse for all 3 days.";
+        case ID_EV_CURSE: return "Curses can show up in the Moon Draft.";
         case ID_EV_PRESSURE: return "Events get worse as the moon gets closer.";
         case ID_RR_RESET: return "Clear the run report.";
         case ID_EV_SAFEZONES: return "No events in shops, minigames or boss rooms.";
@@ -684,7 +681,7 @@ const char* Events_InfoDesc(s32 id) {
         case ID_SUB_EV_LOG: return "Your last 10 events and how they went.";
         case ID_EV_STREAKS: return "Cheers every 5 events survived in a row.";
         case ID_EV_HOURS: return "Events any time, only by day or only by night.";
-        case ID_EV_MERCY: return "After an event kills you, the next waits longer.";
+        case ID_EV_MERCY: return "After an event kills you, the next one waits twice as long.";
         case ID_EV_WILD: return "Each event rolls its own random intensity.";
         case ID_SUB_EV_POOL: return "Enemies that events can use.";
         case ID_SUB_EV_CRITTERS: return "Critters the Joke Event can use.";
@@ -699,10 +696,26 @@ const char* Events_InfoDesc(s32 id) {
         case ID_EV_ALL_OFF: return "Turn every event off.";
         default: break;
     }
-    if ((id != ID_EV_CURSE_INFO) || !gOpt[ID_EV_CURSE]) {
+    if (id != ID_EV_CURSE_INFO) {
         return NULL;
     }
+    if (!gOpt[ID_EV_CURSE]) {
+        return "Curses are off (Event Features).";
+    }
     Curse_Describe(sDesc, sizeof(sDesc));
+    {
+        s32 c;
+        s32 more = -1;
+
+        for (c = 0; c < CURSE_COUNT; c++) {
+            more += (sCurseMask >> c) & 1;
+        }
+        if (more > 0) {
+            s32 n = Ui_StrLen(sDesc);
+
+            Ev_Append(sDesc + n, 0, " Your Picks lists the rest.", (s32)sizeof(sDesc) - n);
+        }
+    }
     return sDesc;
 }
 
@@ -819,6 +832,12 @@ static s32 Combo_CanBeSecond(s32 ev) {
     }
 }
 
+// Friend combos only: any event you have on can ride along (the moon's own combos
+// stick to the short list above).
+static s32 Combo_CanBeSecondFriend(s32 ev, s32 primary) {
+    return (ev >= 0) && (ev < EV_COUNT) && (ev != primary) && !Events_IsHidden(ev);
+}
+
 static s32 Combo_Pick(PlayState* play, s32 primary, s32 force) {
     s32 options[EV_COUNT];
     s32 count = 0;
@@ -839,7 +858,8 @@ static s32 Combo_Pick(PlayState* play, s32 primary, s32 force) {
         return -1;
     }
     for (i = 0; i < EV_COUNT; i++) {
-        if ((i != primary) && Combo_CanBeSecond(i) && gOpt[ID_EV_ON_FIRST + i] && Ev_CanRun(play, i)) {
+        if ((i != primary) && Combo_CanBeSecond(i) && !Events_IsHidden(i) && gOpt[ID_EV_ON_FIRST + i] &&
+            Ev_CanRun(play, i) && V3_RandomOk(i)) {
             options[count++] = i;
         }
     }
@@ -885,10 +905,30 @@ static s32 Roulette_RandomName(void) {
     return events[(s32)(Rand_ZeroOne() * n) % n];
 }
 
+// (3.1.8) The moon's next pick, rolled ahead so friends can see it (and wager on it)
+// before it starts. Rolled again if it can't happen where you are now.
+static s32 sMoonNext = -1;
+
+static s32 Ev_MoonNextOk(PlayState* play, s32 ev) {
+    return (ev >= 0) && gOpt[ID_EV_ON_FIRST + ev] && !Events_IsHidden(ev) && Ev_CanRun(play, ev) && V3_RandomOk(ev);
+}
+
+static s32 Ev_PreviewNext(PlayState* play) {
+    if ((sFriendNext >= 0) && gOpt[ID_EV_ON_FIRST + sFriendNext]) {
+        return sFriendNext;
+    }
+    if (!Ev_MoonNextOk(play, sMoonNext) && ((sMoonNext < 0) || ((play->gameplayFrames % 10) == 0))) {
+        sMoonNext = Ev_PickRandom(play);
+    }
+    return sMoonNext;
+}
+
 static void Ev_BeginRandom(PlayState* play) {
-    s32 ev = Ev_PickRandom(play);
+    s32 ev = Ev_MoonNextOk(play, sMoonNext) ? sMoonNext : Ev_PickRandom(play); // (what friends were shown)
     s32 combo;
     s32 friendPick = false;
+
+    sMoonNext = -1;
 
     if (ev < 0) {
         sUntilNext = 30 * FPS; // nothing can run here right now; try again soon
@@ -931,10 +971,13 @@ static void Ev_BeginRandom(PlayState* play) {
     sEncoreEvent = -1;
     if (friendPick) {
         combo = ((sFriendCombo >= 0) && (sFriendCombo != ev) && gOpt[ID_EV_COMBOS] &&
-                 gOpt[ID_EV_ON_FIRST + sFriendCombo] && Combo_CanBePrimary(ev) && Combo_CanBeSecond(sFriendCombo) &&
+                 gOpt[ID_EV_ON_FIRST + sFriendCombo] && Combo_CanBePrimary(ev) && Combo_CanBeSecondFriend(sFriendCombo, ev) &&
                  Ev_CanRun(play, sFriendCombo))
                     ? sFriendCombo
                     : -1;
+        if ((sFriendCombo == ev) && gOpt[ID_EV_COMBOS] && Ev_CanDouble(ev)) {
+            combo = ev; // doubled (X combo X)
+        }
         sFriendCombo = -1;
     } else {
         combo = Combo_Pick(play, ev, sWrathPending);
@@ -1003,7 +1046,7 @@ static Gfx* Roulette_Draw(PlayState* play, Gfx* gfx) {
 
 static void Card_ShowEvent(s32 ev, s32 combo, s32 fromRoulette) {
     Card_ComboName(sCardName, sizeof(sCardName), ev, combo);
-    sCardStyle = (combo >= 0) ? CARD_COMBO : CARD_EVENT;
+    sCardStyle = ((combo >= 0) || Ev_IsDoubled()) ? CARD_COMBO : CARD_EVENT;
     sCardFadeIn = !fromRoulette;
     if (sWrathEvent) {
         Ev_Append(sCardSub, 0, "The moon's wrath!", sizeof(sCardSub));
@@ -1012,6 +1055,8 @@ static void Card_ShowEvent(s32 ev, s32 combo, s32 fromRoulette) {
         Ev_Append(sCardSub, 0, "Something is happening...", sizeof(sCardSub));
     } else if (combo >= 0) {
         Ev_Append(sCardSub, 0, "Two at once!", sizeof(sCardSub));
+    } else if (Ev_IsDoubled()) {
+        Ev_Append(sCardSub, 0, "Doubled: twice as fierce!", sizeof(sCardSub));
     } else if ((ev == EV_BLOOD_MOON) && (sBloodMoonPick >= 0)) {
         Ev_Append(sCardSub, 0, Pool_Name(sBloodMoonPick), sizeof(sCardSub));
     } else if ((ev == EV_NEMESIS) && (sNemPick >= 0)) {
@@ -1381,7 +1426,7 @@ static void Tick_Tingle(PlayState* play) {
 
     // Bombs away: one right where Link stands, the rest close by.
     if (--sTgDropTimer <= 0) {
-        s32 count = LVL3(ID_TA_BOMBS, 1, 2, 3);
+        s32 count = LVL3(ID_TA_BOMBS, 1, 2, 3) * (Ev_IsDoubled() ? 2 : 1);
         Vec3f from = sTgPos;
         Vec3f target = player->actor.world.pos;
         s32 k;
@@ -1944,6 +1989,8 @@ static const QuizSong sQuizSongs[] = {
 #define QUIZ_QUESTIONS 4
 #define QUIZ_LISTEN (2 * FPS)    // the song plays this long before you can answer
 #define QUIZ_RESULT (2 * FPS)    // the answer stays up this long
+#define QUIZ_READ (15)           // text questions: a moment to read before answers count
+#define QUIZ_ANSWER (12 * FPS)   // then this long to answer, or it counts as wrong
 
 typedef enum { QUIZ_WAIT, QUIZ_ASK, QUIZ_RESULT_SHOWN } QuizPhase;
 
@@ -1960,6 +2007,51 @@ static char sQuizQ[40];
 static char sQuizA[4][30];
 static s32 sQuizIsSong = false;
 static s32 V3_QuizQuestion(PlayState* play, char* q, char opts[4][30]); // fills opts[0] = right answer
+
+// Friend Link: a friend's own questions ("question;right;wrong;wrong;wrong"), used by
+// the next Pop Quiz in order. Gone once that quiz is over.
+static char sFQuiz[4][104];
+static s32 sFQuizCount = 0;
+static char sFQuizFrom[6];
+
+static s32 Quiz_FriendQuestion(s32 num, char* q, char opts[4][30]) {
+    const char* p;
+    s32 field = 0;
+    s32 n = 0;
+
+    if ((num < 0) || (num >= sFQuizCount) || (sFQuiz[num][0] == '\0')) {
+        return false;
+    }
+    q[0] = '\0';
+    for (field = 0; field < 4; field++) {
+        opts[field][0] = '\0';
+    }
+    field = 0;
+    for (p = sFQuiz[num]; *p != '\0'; p++) {
+        if (*p == ';') {
+            field++;
+            n = 0;
+            if (field > 4) {
+                break;
+            }
+            continue;
+        }
+        if ((field == 0) && (n < 39)) {
+            q[n++] = *p;
+            q[n] = '\0';
+        } else if ((field > 0) && (n < 29)) {
+            opts[field - 1][n++] = *p;
+            opts[field - 1][n] = '\0';
+        }
+    }
+    return (field >= 4) && (q[0] != '\0') && (opts[0][0] != '\0') && (opts[1][0] != '\0') &&
+           (opts[2][0] != '\0') && (opts[3][0] != '\0');
+}
+
+// Waiting on your answer (the event clock holds still meanwhile).
+static s32 Quiz_Asking(void) {
+    return EV_RUNNING(EV_QUIZ) && (sQuizPhase == QUIZ_ASK);
+}
 
 static void Quiz_Reset(void) {
     sQuizPhase = QUIZ_WAIT;
@@ -1996,7 +2088,11 @@ static void Quiz_NewQuestion(PlayState* play) {
     s32 j;
     char opts[4][30];
 
-    sQuizIsSong = (Rand_ZeroOne() < 0.35f) || !V3_QuizQuestion(play, sQuizQ, opts);
+    if (Quiz_FriendQuestion(sQuizNum, sQuizQ, opts)) {
+        sQuizIsSong = false; // a friend wrote this one
+    } else {
+        sQuizIsSong = (Rand_ZeroOne() < 0.35f) || !V3_QuizQuestion(play, sQuizQ, opts);
+    }
     if (sQuizIsSong) {
         s32 ids[4];
 
@@ -2042,7 +2138,7 @@ static void Quiz_NewQuestion(PlayState* play) {
         }
     }
     sQuizPicked = -1;
-    sQuizTimer = sQuizIsSong ? 0 : QUIZ_LISTEN; // only songs need a listen first
+    sQuizTimer = sQuizIsSong ? 0 : (QUIZ_LISTEN - QUIZ_READ); // songs play first; text gets a moment to read
     sQuizPhase = QUIZ_ASK;
 }
 
@@ -2116,6 +2212,10 @@ static void Tick_Quiz(PlayState* play) {
                     pick = 3;
                 }
             }
+            if ((pick < 0) && (sQuizTimer > QUIZ_LISTEN + QUIZ_ANSWER)) {
+                pick = (sQuizCorrect + 1) & 3; // too slow: counts as wrong
+                Menu_ShowToast("Too slow!");
+            }
             if (pick >= 0) {
                 Quiz_Answer(play, pick);
             }
@@ -2128,6 +2228,7 @@ static void Tick_Quiz(PlayState* play) {
                 if (sQuizNum >= QUIZ_QUESTIONS) {
                     Quiz_Release(play);
                     Menu_ShowToast("Pop Quiz over!");
+                    sFQuizCount = 0; // a friend's questions are used once
                     Ev_End(play);
                     return;
                 }
@@ -2226,9 +2327,19 @@ static Gfx* Quiz_Draw(PlayState* play, Gfx* gfx) {
                           (sQuizPicked == sQuizCorrect) ? 255 : 80, 90, 255);
         Ui_Print(&printer, (SCREEN_WIDTH - Ui_StrLen(verdict) * 8) / 2, 139, verdict);
     } else {
-        GfxPrint_SetColor(&printer, 170, 170, 170, 255);
-        Ui_Print(&printer, (SCREEN_WIDTH - 19 * 8) / 2, 139,
-                 (sQuizTimer <= QUIZ_LISTEN) ? "      Listen...    " : "D-Pad or C: answer");
+        char hint[28];
+        s32 left = (QUIZ_LISTEN + QUIZ_ANSWER - sQuizTimer + FPS - 1) / FPS;
+        s32 hn;
+
+        if (sQuizTimer <= QUIZ_LISTEN) {
+            Ev_Append(hint, 0, sQuizIsSong ? "Listen..." : "Read...", sizeof(hint));
+        } else {
+            hn = Ev_Append(hint, 0, "D-Pad or C: answer (", sizeof(hint));
+            hn = Ev_AppendNum(hint, hn, MAX(left, 0), sizeof(hint));
+            Ev_Append(hint, hn, "s)", sizeof(hint));
+        }
+        GfxPrint_SetColor(&printer, (left <= 3) && (sQuizTimer > QUIZ_LISTEN) ? 255 : 170, 170, 170, 255);
+        Ui_Print(&printer, (SCREEN_WIDTH - Ui_StrLen(hint) * 8) / 2, 139, hint);
     }
     gfx = GfxPrint_Close(&printer);
     GfxPrint_Destroy(&printer);
@@ -2408,7 +2519,7 @@ static s32 Wave5_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8
             *b = 120;
             return true;
         }
-        if (sActive == EV_TINGLE) {
+        if (EV_RUNNING(EV_TINGLE)) {
             Ev_Append(line, 0, "Pop his balloon!", size);
             *r = 255;
             *g = 230;
@@ -2471,11 +2582,11 @@ static s32 Curse_ForcedCombo(PlayState* play, s32 primary) {
 static void Curse_EventTick(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
-    if ((sActive < 0) || (player == NULL) || (sActive == EV_QUIZ)) {
+    if ((sActive < 0) || (player == NULL) || EV_RUNNING(EV_QUIZ)) {
         return;
     }
-    if (Curse_Is(CURSE_METEOR) && (sActive != EV_REDLIGHT) && (sActive != EV_GLARE) && (sActive != EV_STILL) &&
-        (sActive != EV_FATE) && ((sEventFrames % (5 * FPS)) == (3 * FPS))) {
+    if (Curse_Is(CURSE_METEOR) && !EV_RUNNING(EV_REDLIGHT) && !EV_RUNNING(EV_GLARE) && !EV_RUNNING(EV_STILL) &&
+        !EV_RUNNING(EV_FATE) && ((sEventFrames % (5 * FPS)) == (3 * FPS))) {
         CollisionPoly* poly;
         s32 bgId;
         Vec3f target = player->actor.world.pos;
@@ -2495,9 +2606,11 @@ static u16 sHpBeforeChange = 0;
 
 RECOMP_HOOK("Health_ChangeBy") void Events_BeforeHealthChange(PlayState* play, s16 amount) {
     sHpBeforeChange = gSaveContext.save.saveInfo.playerData.health;
+    DD_BeforeHealthChange();
 }
 
 void Events_AfterHealthChange(void) {
+    DD_AfterHealthChange();
     Health_React(sHpBeforeChange);
     sHealthHookSeen = true;
 }
@@ -2506,7 +2619,7 @@ void Events_AfterHealthChange(void) {
 f32 Events_LowGravity(void) {
     static const f32 sFactor[INTENSITY_MAX] = { 0.5f, 0.62f, 0.75f };
 
-    if ((sActive < 0) || (sPauseReason == 1) || !sSceneReady || (sActive == EV_QUIZ)) {
+    if ((sActive < 0) || (sPauseReason == 1) || !sSceneReady || EV_RUNNING(EV_QUIZ)) {
         return 0.0f;
     }
     if (Ev_IsOn(EV_LOWGRAV) || Curse_Is(CURSE_FLOAT)) {
@@ -2627,17 +2740,27 @@ const char* Events_InfoText(s32 id, char* out, s32 maxLen, u8* r, u8* g, u8* b) 
 #ifdef GE_CHEATS
                 Ev_Append(out, 0, "< None >", maxLen);
 #else
-                Ev_Append(out, 0, "Next cycle", maxLen);
+                Ev_Append(out, 0, "None picked", maxLen);
 #endif
                 *r = *g = *b = 150;
             } else {
+                s32 more = -1;
+                s32 c;
+
+                for (c = 0; c < CURSE_COUNT; c++) {
+                    more += (sCurseMask >> c) & 1;
+                }
 #ifdef GE_CHEATS
                 n = Ev_Append(out, 0, "< ", maxLen);
                 n = Ev_Append(out, n, Curse_Name(sCurse), maxLen);
-                Ev_Append(out, n, " >", maxLen);
+                n = Ev_Append(out, n, " >", maxLen);
 #else
-                Ev_Append(out, 0, Curse_Name(sCurse), maxLen);
+                n = Ev_Append(out, 0, Curse_Name(sCurse), maxLen);
 #endif
+                if (more > 0) {
+                    n = Ev_Append(out, n, " +", maxLen);
+                    Ev_AppendNum(out, n, more, maxLen);
+                }
                 *r = 210;
                 *g = 140;
                 *b = 255;

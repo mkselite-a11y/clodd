@@ -608,7 +608,11 @@ void Mods_RunAction(PlayState* play, s32 id) {
 
         case ID_ALL_OFF:
             Mods_TurnAllOff(play);
+#ifdef GE_CHEATS
             Toast_Set("All Mods Turned Off", NULL);
+#else
+            Toast_Set("Events turned off.", NULL);
+#endif
             break;
 
         default:
@@ -781,6 +785,35 @@ RECOMP_HOOK_RETURN("Player_Update") void Mods_AfterPlayerUpdate(void) {
         }
     }
 
+    // Experimental friends: extra speed, gravity and a trampoline.
+    if (gExp.speed != 1.0f) {
+        f32 dx = (player->actor.world.pos.x - player->actor.prevPos.x) * (gExp.speed - 1.0f);
+        f32 dz = (player->actor.world.pos.z - player->actor.prevPos.z) * (gExp.speed - 1.0f);
+
+        if ((SQ(dx) + SQ(dz) > 0.01f) && (SQ(dx) + SQ(dz) < SQ(200.0f))) {
+            Vec3f from;
+            Vec3f to;
+            Vec3f hit;
+            CollisionPoly* poly;
+            s32 bgId;
+
+            from = player->actor.world.pos;
+            from.y += 25.0f;
+            to.x = from.x + dx * 1.5f;
+            to.y = from.y;
+            to.z = from.z + dz * 1.5f;
+            if ((gExp.speed < 1.0f) ||
+                !BgCheck_EntityLineTest1(&play->colCtx, &from, &to, &hit, &poly, true, false, false, true, &bgId)) {
+                player->actor.world.pos.x += dx;
+                player->actor.world.pos.z += dz;
+            }
+        }
+    }
+    if ((gExp.gravity != 1.0f) && !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
+        !(player->stateFlags1 & PLAYER_STATE1_8000000)) {
+        player->actor.velocity.y += player->actor.gravity * (gExp.gravity - 1.0f);
+    }
+
     if (gOpt[ID_MOONJUMP] && sLHeld) {
         player->actor.velocity.y = MOON_JUMP_VELOCITY;
     } else if ((gOpt[ID_LOWGRAV] || (Events_LowGravity() > 0.0f)) &&
@@ -826,8 +859,24 @@ RECOMP_HOOK("Player_Draw") void Mods_BeforePlayerDraw(Actor* thisx, PlayState* p
         thisx->scale.z *= mult;
     }
 
+    // Experimental friends: any size per axis (0 while hidden).
+    if (gExp.invisible || (gExp.scale[0] != 1.0f) || (gExp.scale[1] != 1.0f) || (gExp.scale[2] != 1.0f)) {
+        f32 sx = gExp.invisible ? 0.0001f : gExp.scale[0];
+        f32 sy = gExp.invisible ? 0.0001f : gExp.scale[1];
+        f32 sz = gExp.invisible ? 0.0001f : gExp.scale[2];
+
+        Matrix_Scale(sx, sy, sz, MTXMODE_APPLY);
+        if (sScaledPlayer == NULL) {
+            sSavedPlayerScale = thisx->scale;
+            sScaledPlayer = thisx;
+        }
+        thisx->scale.x *= sx;
+        thisx->scale.y *= sy;
+        thisx->scale.z *= sz;
+    }
+
     // Rainbow tint, same fog trick as the carpenter.
-    if (gOpt[ID_RAINBOWLINK]) {
+    if (gOpt[ID_RAINBOWLINK] || gExp.rainbow) {
         u8 r, g, b;
 
         HueToRgb(BaseHue(play) * 2, &r, &g, &b);
@@ -866,12 +915,17 @@ RECOMP_HOOK_RETURN("Player_Draw") void Mods_AfterPlayerDraw(void) {
 // and zero what the skeleton code would apply afterwards.
 RECOMP_HOOK("Player_OverrideLimbDrawGameplayDefault")
 void Mods_BeforePlayerLimb(PlayState* play, s32 limbIndex, Gfx** dList, Vec3f* pos, Vec3s* rot, Actor* actor) {
-    if (!gOpt[ID_BIGHEAD] || (limbIndex != PLAYER_LIMB_HEAD) || (actor != &GET_PLAYER(play)->actor)) {
+    f32 head = gOpt[ID_BIGHEAD] ? BIG_HEAD_SCALE : 1.0f;
+
+    if (gExp.head != 1.0f) {
+        head = gExp.head; // an Experimental friend's head size wins
+    }
+    if ((head == 1.0f) || (limbIndex != PLAYER_LIMB_HEAD) || (actor != &GET_PLAYER(play)->actor)) {
         return;
     }
 
     Matrix_TranslateRotateZYX(pos, rot);
-    Matrix_Scale(BIG_HEAD_SCALE, BIG_HEAD_SCALE, BIG_HEAD_SCALE, MTXMODE_APPLY);
+    Matrix_Scale(head, head, head, MTXMODE_APPLY);
     pos->x = pos->y = pos->z = 0.0f;
     rot->x = rot->y = rot->z = 0;
 }

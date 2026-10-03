@@ -1,7 +1,7 @@
 """Rebuilds tables.json from the mod's C source, so the panel always matches the game.
 
 Run from remote/relay:  python3 sync_tables.py && python3 build_relay.py
-Sounds and Nemesis stats are kept from the existing tables.json (they're short and
+Sounds are kept from the existing tables.json (they're short and
 hand-written); curse descriptions too, minus the curses the game retired.
 """
 import json
@@ -60,6 +60,8 @@ for t in range(4):
 prim_block = body(v11, "static s32 Combo_CanBePrimary(s32 ev)")
 not_primary = cases_returning(prim_block, "false")
 second = cases_returning(body(v11, "static s32 Combo_CanBeSecond(s32 ev)"), "true")
+# Events a friend can double (X combo X): Ev_CanDouble in events.c.
+doubles = cases_returning(body(events_c, "static s32 Ev_CanDouble(s32 ev)"), "true")
 v3defs = re.findall(r'\{ "([^"]+)", "([^"]+)", (\d), \{', body(v3, "static const V3Def sV3Defs[]"))
 first_v3 = EV["EV_STARFALL"]
 
@@ -69,13 +71,26 @@ for name, i in EV.items():
         continue
     if i >= first_v3:
         n, d, t = v3defs[i - first_v3]
-        events.append({"id": i, "name": n, "desc": d, "second": False, "primary": False, "tier": int(t)})
+        events.append({"id": i, "name": n, "desc": d, "second": True, "primary": False, "tier": int(t),
+                       "double": name in doubles})
         continue
     events.append({
         "id": i, "name": names[name], "desc": descs.get(name, ""),
-        "second": name in second, "primary": name not in not_primary,
+        "second": True, "primary": name not in not_primary,  # friend combos: any event can ride along
         "tier": tier_of.get(name, 1),
+        "double": name in doubles,  # a friend can pair it with itself (runs once, twice as fierce)
     })
+
+# Experimental friends get every event, hidden ones included.
+allevents = []
+removed = {"EV_BULLETHELL", "EV_INFIGHT", "EV_LEVIATHAN"}  # gone for good, even for Experimental friends
+for name, i in EV.items():
+    if name in removed:
+        continue
+    if i >= first_v3:
+        allevents.append({"id": i, "name": v3defs[i - first_v3][0] + (" (hidden)" if name in hidden else "")})
+    else:
+        allevents.append({"id": i, "name": names.get(name, name) + (" (hidden)" if name in hidden else "")})
 
 # --- traits, mutators, pouch ---------------------------------------------------------
 def c_array(src, decl):
@@ -105,7 +120,7 @@ retired_curses = cases_returning(can_use, "false")
 curse_enum = re.search(r"typedef enum \{([^}]*?CURSE_COUNT)", common + events_c + v11, re.S).group(1)
 curse_ids = re.findall(r"(CURSE_\w+)", curse_enum)
 dead = {curse_ids.index(n) for n in retired_curses if n in curse_ids}
-describe = body(v11, "static void Curse_Describe(char* out, s32 size)")
+describe = body(v11, "static void Curse_DescribeId(s32 curse, char* out, s32 size)")
 curse_desc = dict(re.findall(r'case (CURSE_\w+):\s*Ev_Append\(out, 0, "((?:[^"\\]|\\.)*)"', describe))
 curses = []
 for c in old["curses"]:
@@ -117,8 +132,13 @@ for c in old["curses"]:
 # --- enemies that can be bounties / Nemeses -------------------------------------------
 hunt = [int(x) for x in re.search(r"sHuntPool\[\] = \{([^}]*)\}", v2).group(1).split(",")]
 pool_names = c_array(events_c, "const char* Pool_Name(s32 index)")
-old_tier = {p["id"]: p.get("tier", 1) for p in old["pools"]}
-pools = [{"id": i, "name": pool_names[i], "tier": old_tier.get(i, 1), "desc": next((p.get("desc", "") for p in old["pools"] if p["id"] == i), "")} for i in hunt]
+# Tiers come straight from the game's Pool_Tier (default 1).
+pool_tier_block = body(v2, "static s32 Pool_Tier(s32 pool)")
+pool_tier = {}
+for t in range(4):
+    for n in cases_returning(pool_tier_block, str(t)):
+        pool_tier[int(n)] = t
+pools = [{"id": i, "name": pool_names[i], "tier": pool_tier.get(i, 1), "desc": next((p.get("desc", "") for p in old["pools"] if p["id"] == i), "")} for i in hunt]
 
 # --- zones: the game's 77 areas, drawn as a map of the outdoor ones ---------------------
 LAYOUT = {  # area: x, y on a 480 x 430 map, short label
@@ -159,23 +179,25 @@ try:
 except FileNotFoundError:
     pass
 
-# For the DLL: where each area's scene file sits in the ROM (its dmadata index).
+# For the DLL: where every scene's file sits in the ROM (its dmadata index), so the
+# map builder covers all of them (indoors, grottos, dungeons and boss rooms too).
+# The _SYMS entries are real (empty) rows of the ROM's file table, so they count.
 try:
     table = open("../../mm-decomp/include/tables/scene_table.h").read()
-    dma = re.findall(r"DEFINE_DMA_ENTRY\((\w+),", open("../../mm-decomp/include/tables/dmadata/dmadata_table_us.h").read())
+    dma_src = open("../../mm-decomp/include/tables/dmadata/dmadata_table_us.h").read()
+    dma = re.findall(r"^DEFINE_DMA_ENTRY(?:_SYMS)?\((\w+),", dma_src, re.M)
     dma_idx = {n: i for i, n in enumerate(dma)}
     rows = []
     for idx, args in re.findall(r"/\* (0x[0-9A-Fa-f]+) \*/ DEFINE_SCENE\(([^)]*)", table):
         parts = [a.strip() for a in args.split(",")]
         if parts[0] in dma_idx:
             rows.append((int(idx, 16), dma_idx[parts[0]], parts[1]))
-    wanted = {sc for z in zones for sc in z["scenes"]}
     with open("../native/ge_scenes.h", "w") as h:
         h.write("// Generated by remote/relay/sync_tables.py: scene id -> dmadata index of its scene file (US).\n")
+        h.write("// Every scene in the game's scene table that has a scene file.\n")
         h.write("static const unsigned short sSceneRom[][2] = {\n")
         for sid, di, name in rows:
-            if sid in wanted:
-                h.write(f"    {{ {sid}, {di} }}, // {name}\n")
+            h.write(f"    {{ {sid}, {di} }}, // {name}\n")
         h.write("};\n")
 except FileNotFoundError:
     pass
@@ -188,6 +210,48 @@ except FileNotFoundError:
 
 out = dict(old)
 out["aploc"] = aploc
-out.update(events=events, traits=traits, muts=muts, pouch=pouch, curses=curses, pools=pools, zones=zones)
+# The Moon Draft: one list of picks. Mutators keep their ids; a curse is MUT_COUNT + its id.
+picks = [dict(m, kind="mutator") for m in muts] + [dict(c, id=mut_ids.index("MUT_COUNT") + c["id"], kind="curse") for c in curses]
+allpools = [{"id": i, "name": n, "tier": pool_tier.get(i, 1)} for i, n in enumerate(pool_names)]
+out.update(allevents=allevents, allpools=allpools, events=events, traits=traits, muts=muts, pouch=pouch, curses=curses, picks=picks, pools=pools, zones=zones)
+
+# (3.1.8) Nemesis stats and the unique trait each unlocks at 5, 10 and 20.
+stat_names = c_array(v2, "static const char* sNemStatNames[NST_COUNT]")
+uniq_names = c_array(v2, "static const char* sNemUniqNames[NU_COUNT]")
+uniq_descs = c_array(v2, "static const char* sNemUniqDescs[NU_COUNT]")
+stat_descs = ["More health (+25% of its base per point).", "Hits harder (+15% damage per point).",
+              "Moves faster (+3% per point).", "Finds them faster and turns up more often. At 8 it follows them through doors."]
+out["stats"] = [{"id": i, "name": n, "desc": stat_descs[i]} for i, n in enumerate(stat_names)]
+out["uniques"] = [{"id": i, "name": n, "desc": d, "stat": i // 3, "at": [5, 10, 20][i % 3]}
+                  for i, (n, d) in enumerate(zip(uniq_names, uniq_descs))]
+
+# Every sound effect by name, for the panel's Raw sound picker (bank > group > sound).
+import glob, os
+SFX_BANKS = [("system", "Menus and system"), ("player", "Link"), ("voice", "Voices"), ("item", "Items and weapons"),
+             ("enemy", "Enemies"), ("environment", "World"), ("ocarina", "Ocarina")]
+sfx = []
+for key, title in SFX_BANKS:
+    path = "../../mm-decomp/include/tables/sfx/%sbank_table.h" % key
+    groups = {}
+    for m in re.finditer(r"/\*\s*0x([0-9A-Fa-f]+)\s*\*/\s*DEFINE_SFX\(\s*\w+\s*,\s*(NA_SE_\w+)", open(path).read()):
+        sid = int(m.group(1), 16)
+        parts = [x for x in m.group(2).split("_")[3:] if x]  # NA SE XX <rest>
+        if not parts or "DUMMY" in m.group(2) or "UNUSED" in m.group(2):
+            continue
+        g = parts[0].capitalize()
+        rest = " ".join(parts[1:]).lower() or parts[0].lower()
+        groups.setdefault(g, []).append([sid, rest])
+    misc = []
+    tree = []
+    for g in sorted(groups):
+        if len(groups[g]) < 3:
+            misc += [[sid, (g + " " + r).lower() if r != g.lower() else r] for sid, r in groups[g]]
+        else:
+            tree.append([g, groups[g]])
+    if misc:
+        tree.append(["Other", sorted(misc, key=lambda x: x[1])])
+    sfx.append([title, tree])
+json.dump(sfx, open("sfx.json", "w"), separators=(",", ":"))
+print("sfx", sum(len(i) for b in sfx for g in b[1] for i in [g[1]]))
 json.dump(out, open("tables.json", "w"), indent=1)
 print({k: len(v) for k, v in out.items()})

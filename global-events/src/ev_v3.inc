@@ -60,31 +60,31 @@ static const MfColor cText = { 230, 230, 255, 255 };
 typedef struct {
     const char* name;
     const char* counter; // how to beat it, one line
-    u8 tier;             // 0 Mild .. 3 Brutal
+    u8 tier;             // 0 Easy, 1 Normal, 2 Hard, 3 Brutal
     u8 p[3];             // tuning (fixed in V3)
     u8 longEvent;        // runs until done, up to 60 s
 } V3Def;
 
 // Order matches the GlobalEventId entries from EV_STARFALL on.
 static const V3Def sV3Defs[] = {
-    { "Starfall Bounty", "Stand where the stars land!", 0, { 6, 30, 2 }, 0 },
-    { "Dowsing Moon", "Follow the warmth, press A to dig.", 0, { 70, 8, 0 }, 1 },
-    { "Giant's Gale", "Hold the stick INTO the wind.", 0, { 9, 30, 0 }, 0 },
-    { "Sinking Sands", "Keep moving!", 0, { 10, 1, 0 }, 0 },
-    { "Frostbite", "Roll to shake off the frost.", 1, { 3, 35, 6 }, 0 },
-    { "Scythe Sweep", "Jump it or stand in the green gap.", 2, { 5, 11, 4 }, 0 },
-    { "Moth Swarm", "Spin attack to scatter the moths!", 1, { 4, 6, 0 }, 0 },
-    { "Hex of Silence", "Don't press B or the C buttons.", 0, { 2, 0, 0 }, 0 },
-    { "Moon Tether", "Stay inside the drifting circle!", 1, { 16, 15, 3 }, 0 },
-    { "Moon's Grasp", "When it grabs you, MASH A!", 1, { 12, 6, 0 }, 0 },
-    { "Heartbeat Hex", "Press A on every heartbeat.", 1, { 14, 4, 2 }, 0 },
-    { "Moon's Reflex Test", "Press the button that flashes up!", 0, { 12, 3, 0 }, 0 },
+    { "Starfall Bounty", "Stand where the stars land!", 0, { 6, 22, 1 }, 0 },
+    { "Dowsing Moon", "Follow the warmth, press A to dig.", 0, { 90, 5, 0 }, 1 },
+    { "Giant's Gale", "Hold the stick INTO the wind.", 0, { 9, 20, 0 }, 0 },
+    { "Sinking Sands", "Keep moving!", 0, { 6, 1, 0 }, 0 },
+    { "Frostbite", "Roll to shake off the frost.", 1, { 4, 25, 6 }, 0 },
+    { "Scythe Sweep", "Hop it (Z+A) or stand in the gap.", 2, { 4, 11, 4 }, 0 },
+    { "Moth Swarm", "Spin attack to scatter the moths!", 1, { 5, 4, 0 }, 0 },
+    { "Hex of Silence", "Don't press B or the C buttons.", 0, { 4, 0, 0 }, 0 },
+    { "Moon Tether", "Stay inside the drifting circle!", 1, { 12, 24, 4 }, 0 },
+    { "Moon's Grasp", "When it grabs you, MASH A!", 1, { 16, 6, 0 }, 0 },
+    { "Heartbeat Hex", "Press A on every heartbeat.", 1, { 14, 3, 2 }, 0 },
+    { "Moon's Reflex Test", "Press the button that flashes up!", 0, { 8, 3, 0 }, 0 },
     { "Gorgon's Gaze", "Keep your camera AWAY from the eye.", 1, { 7, 4, 6 }, 0 },
-    { "Dissonance", "Play any 3 ocarina notes.", 0, { 3, 1, 0 }, 0 },
-    { "Mirror Madness", "Face the shard, hold Z to break it.", 1, { 15, 5, 1 }, 0 },
+    { "Dissonance", "Play any 3 ocarina notes.", 0, { 2, 2, 0 }, 0 },
+    { "Mirror Madness", "Face the shard, hold Z to break it.", 1, { 15, 3, 2 }, 0 },
     { "Volley of Stars", "Face the star and hold R to guard!", 1, { 15, 4, 4 }, 0 },
     { "Sleeping Giant", "Tiptoe! Running wakes the giant.", 1, { 35, 6, 6 }, 0 },
-    { "Mask Salesman's Game", "Watch the arrows, repeat on D-pad.", 1, { 8, 3, 4 }, 1 },
+    { "Mask Salesman's Game", "Watch the arrows, repeat on D-pad.", 1, { 6, 3, 4 }, 1 },
     { "Pressure Seals", "Step on the seals in order.", 1, { 4, 3, 8 }, 1 },
 };
 _Static_assert(ARRAY_COUNT(sV3Defs) == EV_COUNT - EV_STARFALL, "V3 event table");
@@ -97,11 +97,28 @@ static const V3Def* V3_Def(s32 ev) {
     return V3_IsEvent(ev) ? &sV3Defs[ev - EV_STARFALL] : NULL;
 }
 
+// Runs until you finish it (up to a minute).
+static s32 V3_IsLong(s32 ev) {
+    return V3_IsEvent(ev) && sV3Defs[ev - EV_STARFALL].longEvent;
+}
+
+// The ported event that's running, as either half of a combo (-1: none).
+static s32 V3_Cur(void) {
+    return V3_IsEvent(sActive) ? sActive : V3_IsEvent(sCombo) ? sCombo : -1;
+}
+
 // Tuning value; damage values (index 1 or 2 depending on the event) get the
 // Fierce Moon / Empower bump through V3_Dmg.
+// An Experimental friend can override the running ported event's tuning values.
+static s16 sV3Ovr[3];
+static s32 sV3OvrMask = 0;
+
 static s32 V3_Param(s32 i) {
     const V3Def* d = V3_Def(gEv.id);
 
+    if ((i >= 0) && (i < 3) && (sV3OvrMask & (1 << i))) {
+        return sV3Ovr[i];
+    }
     return (d != NULL) ? d->p[i] : 0;
 }
 #define P(i) V3_Param(i)
@@ -240,8 +257,8 @@ static void V3_GiveMarks(s32 amount, const char* why) {
     static char sWhy[32];
     s32 n;
 
-    if (amount <= 0) {
-        return;
+    if ((amount <= 0) || sEventWasCalled || sEventByExp) {
+        return; // events you started yourself (or an Experimental friend did) pay nothing
     }
     n = Ev_Append(sWhy, 0, why, sizeof(sWhy));
     Ev_Append(sWhy, n, ": +", sizeof(sWhy));
@@ -568,6 +585,29 @@ static void Draw3D_Pillar(Vec3f* pos, f32 radius, f32 height, MfColor c) {
     CLOSE_DISPS(gfxCtx);
 }
 
+// A vertical wall from a to b (ground points), fading out toward the top. Seen from both sides.
+static void Draw3D_Wall(Vec3f* a, Vec3f* b, f32 height, MfColor c) {
+    GraphicsContext* gfxCtx;
+    Vtx* vtx;
+    MfColor top = c;
+
+    if (s3DPlay == NULL) {
+        return;
+    }
+    gfxCtx = s3DPlay->state.gfxCtx;
+    top.a = 0;
+    vtx = GRAPH_ALLOC(gfxCtx, sizeof(Vtx) * 4);
+    V3_SetVtx(&vtx[0], 0, 0, 0, c);
+    V3_SetVtx(&vtx[1], b->x - a->x, b->y - a->y, b->z - a->z, c);
+    V3_SetVtx(&vtx[2], b->x - a->x, b->y - a->y + height, b->z - a->z, top);
+    V3_SetVtx(&vtx[3], 0, height, 0, top);
+    V3_LoadMatrixAt(a, false);
+    OPEN_DISPS(gfxCtx);
+    gSPVertex(POLY_XLU_DISP++, vtx, 4, 0);
+    gSP2Triangles(POLY_XLU_DISP++, 0, 1, 2, 0, 0, 2, 3, 0);
+    CLOSE_DISPS(gfxCtx);
+}
+
 // ===========================================================================
 // The ported events
 // ===========================================================================
@@ -577,14 +617,28 @@ static void AStarfall_Start(PlayState* play) {
     InitHz();
 }
 
+// A free hazard slot (spent ones are reused, so long events keep spawning). -1 if full.
+static s32 V3_FreeHz(void) {
+    s32 i;
+
+    for (i = 0; i < HZ_MAX; i++) {
+        if ((i >= sAHzN) || (sAHz[i].state == 0)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 static void AStarfall_Update(PlayState* play) {
     Player* p = Pl(play);
     s32 i;
     s32 interval = SEC(MF_MAX(1, 10 - P(0)) * 0.5f + 1.0f);
     s32 fall = SEC(P(1) / 10.0f);
 
-    if (Every(interval) && sAHzN < HZ_MAX) {
-        Hz* h = &sAHz[sAHzN++];
+    if (Every(interval) && (V3_FreeHz() >= 0)) {
+        Hz* h = &sAHz[V3_FreeHz()];
+
+        sAHzN = MF_MAX(sAHzN, (s32)(h - sAHz) + 1);
         V3_FindSpot(play, &h->pos, 120.0f, 380.0f, (s16)Rng_Range(0, 0xFFFF));
         h->t = fall;
         h->state = 1;
@@ -597,7 +651,7 @@ static void AStarfall_Update(PlayState* play) {
         }
         if (--h->t <= 0) {
             h->state = 0;
-            if (Mf_DistXZ(&h->pos, &p->actor.world.pos) < 60.0f &&
+            if (Mf_DistXZ(&h->pos, &p->actor.world.pos) < 45.0f &&
                 fabsf(h->pos.y - p->actor.world.pos.y) < 80.0f) {
                 gEv.score++;
                 Mf_HealPlayer(1);
@@ -664,7 +718,7 @@ static void ADowsing_Update(PlayState* play) {
         V3_SetPrompt("Press A to dig!");
         if (Pressed(BTN_A)) {
             s32 bonus = MF_MAX(0, (gEv.duration - gEv.timer) / FPS);
-            gEv.score = P(1) + bonus / 3;
+            gEv.score = P(1) + bonus / 6;
             Sparkle(play, &sAHz[0].pos, 255, 220, 80);
             Mf_Sfx(NA_SE_SY_GET_BOXITEM);
             Mf_HealPlayer(4);
@@ -711,8 +765,7 @@ static void AGale_Update(PlayState* play) {
     p->pushedYaw = windYaw;
     p->pushedSpeed = bracing ? strength * 0.15f : strength;
     if (!bracing && Every(SEC(P(1) / 10.0f + 0.1f))) {
-        Mf_DamagePlayer(1, false, windYaw);
-        gEv.failed = true;
+        gEv.failed = true; // 3.1.8: the wind only shoves you, it never hurts
     }
     if (Every(3)) {
         Vec3f pos = p->actor.world.pos;
@@ -741,7 +794,7 @@ static void AGale_Draw2D(PlayState* play) {
 // E7 Sinking Sands: if you stand still, you sink.
 static void ASinking_Update(PlayState* p0) {
     Player* p = Pl(p0);
-    if (p->speedXZ < 1.5f && Mf_PlayerGrounded()) {
+    if (p->speedXZ < 3.0f && Mf_PlayerGrounded()) { // (shuffling in place doesn't count as moving)
         gEv.hits++;
         if (gEv.hits > SEC(1.0f) && Every(MF_MAX(4, SEC(P(0) / 10.0f)))) {
             Vec3f vel = { 0.0f, 3.0f, 0.0f };
@@ -768,6 +821,9 @@ static void AFrost_Update(PlayState* play) {
     Player* p = Pl(play);
     if (Every(MF_MAX(1, 6 - P(0)))) {
         gEv.hits++;
+        if (Every(2 * MF_MAX(1, 6 - P(0)))) {
+            gEv.hits++; // 3.1.8: builds 1.5x as fast
+        }
     }
     if (Pressed(BTN_A) && Mf_PlayerGrounded() && p->speedXZ > 3.0f) {
         gEv.hits = MF_MAX(0, gEv.hits - P(1));
@@ -794,56 +850,91 @@ static void AFrost_Draw2D(PlayState* play) {
 static Vec3f sScythePlaced; // V3 Friend Link: where a friend put the next sweep
 static s32 sScytheHasPlace = false;
 
+// 3.1.8: each sweep winds up first (a pulsing ring and its gap show where it will go),
+// then expands from slow to full speed; the safe gap is narrower (40 degrees, was 60).
+#define SCYTHE_GAP 0x0E39       // half the safe gap's angle (20 degrees)
+#define SCYTHE_WINDUP SEC(0.8f) // telegraph before it expands
+#define SCYTHE_RAMP 8           // frames to reach full speed
+
 static void AScythe_Start(PlayState* play) {
     InitHz();
     sAHz[0].state = 0;
+    sAHz[1].state = 0;
     sScytheHasPlace = false;
 }
 
 static void AScythe_Update(PlayState* play) {
     Player* p = Pl(play);
-    Hz* h = &sAHz[0];
+    s32 period = SEC(MF_MAX(2, P(0)));
+    s32 sweeps = Ev_IsDoubled() ? 2 : 1; // doubled: a second sweep, half a period behind the first
+    s32 i;
 
-    if (h->state == 0 && Every(SEC(MF_MAX(2, P(0))))) {
-        if (sScytheHasPlace) {
-            h->pos = sScythePlaced;
-            sScytheHasPlace = false;
-        } else {
-            V3_FindSpot(play, &h->pos, 150.0f, 280.0f, (s16)Rng_Range(0, 0xFFFF));
-        }
-        h->r = 0.0f;
-        h->yaw = (s16)Rng_Range(0, 0xFFFF);
-        h->state = 1;
-        Mf_Sfx(NA_SE_IT_SWORD_SWING_HARD);
-    }
-    if (h->state == 1) {
-        f32 prev = h->r;
-        f32 d = Mf_DistXZ(&h->pos, &p->actor.world.pos);
-        h->r += P(1);
-        if (prev < d && h->r >= d) {
-            s16 toPlayer = Mf_YawTo(&h->pos, &p->actor.world.pos);
-            s16 gapDiff = toPlayer - h->yaw;
-            s32 inGap = ABS(gapDiff) < 0x1555;
-            s32 airborne = !Mf_PlayerGrounded();
-            if (!inGap && !airborne) {
-                Mf_DamagePlayer(MF_MAX(1, P(2)), true, toPlayer);
-                gEv.failed = true;
+    sAHzN = MF_MAX(sAHzN, sweeps);
+    for (i = 0; i < sweeps; i++) {
+        Hz* h = &sAHz[i];
+
+        if ((h->state == 0) && (((gEv.timer + i * period / 2) % period) == 0)) {
+            if (sScytheHasPlace) {
+                h->pos = sScythePlaced;
+                sScytheHasPlace = false;
             } else {
-                Sparkle(play, &p->actor.world.pos, 200, 255, 200);
+                V3_FindSpot(play, &h->pos, 150.0f, 280.0f, (s16)Rng_Range(0, 0xFFFF));
             }
+            h->r = 0.0f;
+            h->t = 0;
+            h->yaw = (s16)Rng_Range(0, 0xFFFF);
+            h->state = 2; // winding up
+            Mf_Sfx(NA_SE_SY_WARNING_COUNT_N);
         }
-        if (h->r > 1000.0f) {
-            h->state = 0;
+        if (h->state == 2) {
+            if (++h->t >= SCYTHE_WINDUP) {
+                h->state = 1;
+                h->t = 0;
+                Mf_Sfx(NA_SE_IT_SWORD_SWING_HARD);
+            }
+        } else if (h->state == 1) {
+            f32 prev = h->r;
+            f32 d = Mf_DistXZ(&h->pos, &p->actor.world.pos);
+
+            h->t++;
+            h->r += P(1) * MF_MIN(1.0f, h->t / (f32)SCYTHE_RAMP);
+            if (prev < d && h->r >= d) {
+                s16 toPlayer = Mf_YawTo(&h->pos, &p->actor.world.pos);
+                s16 gapDiff = toPlayer - h->yaw;
+                s32 inGap = ABS(gapDiff) < SCYTHE_GAP;
+                s32 airborne = !Mf_PlayerGrounded();
+                if (!inGap && !airborne) {
+                    Mf_DamagePlayer(MF_MAX(1, P(2)), true, toPlayer);
+                    gEv.failed = true;
+                } else {
+                    Sparkle(play, &p->actor.world.pos, 200, 255, 200);
+                }
+            }
+            if (h->r > 700.0f) {
+                h->state = 0;
+            }
         }
     }
 }
 
 static void AScythe_Draw3D(PlayState* play) {
-    Hz* h = &sAHz[0];
-    if (h->state == 1) {
+    s32 i;
+
+    for (i = 0; i < MF_MIN(sAHzN, 2); i++) {
+        Hz* h = &sAHz[i];
         MfColor gap = { 40, 255, 120, 90 };
-        Draw3D_Ring(&h->pos, h->r, 18.0f, (MfColor){ 255, 40, 200, 200 });
-        Draw3D_Wedge(&h->pos, h->r, h->yaw, 0x1555, gap);
+
+        if (h->state == 1) {
+            Draw3D_Ring(&h->pos, h->r, 18.0f, (MfColor){ 255, 40, 200, 200 });
+            Draw3D_Wedge(&h->pos, h->r, h->yaw, SCYTHE_GAP, gap);
+        } else if (h->state == 2) {
+            // Winding up: a pulsing core and the gap it will leave.
+            f32 pulse = 30.0f + 10.0f * Math_SinS((s16)(h->t * 0x1800));
+            u8 a = (u8)(90 + 110 * h->t / MF_MAX(1, SCYTHE_WINDUP));
+
+            Draw3D_Ring(&h->pos, pulse, 10.0f, (MfColor){ 255, 40, 200, a });
+            Draw3D_Wedge(&h->pos, 260.0f, h->yaw, SCYTHE_GAP, (MfColor){ 40, 255, 120, 60 });
+        }
     }
 }
 
@@ -868,8 +959,10 @@ static void AMoths_Update(PlayState* play) {
     s32 i;
     s32 attached = 0;
 
-    if (Every(SEC(MF_MAX(1, 8 - P(0)) * 0.5f)) && sAHzN < HZ_MAX) {
-        Hz* h = &sAHz[sAHzN++];
+    if (Every(SEC(MF_MAX(1, 8 - P(0)) * (Ev_IsDoubled() ? 0.25f : 0.5f))) && (V3_FreeHz() >= 0)) {
+        Hz* h = &sAHz[V3_FreeHz()];
+
+        sAHzN = MF_MAX(sAHzN, (s32)(h - sAHz) + 1);
         V3_FindSpot(play, &h->pos, 200.0f, 350.0f, (s16)Rng_Range(0, 0xFFFF));
         h->pos.y += 60.0f;
         h->state = 1;
@@ -952,6 +1045,7 @@ static void ASilence_Draw2D(PlayState* play) {
     MfColor c = { 150, 60, 200, (u8)(50 + ((s32)gPlayState_v2->gameplayFrames % 20) * 3) };
     Draw2D_Rect(0, 0, SCREEN_WIDTH, 2, c);
     Draw2D_Rect(0, SCREEN_HEIGHT - 2, SCREEN_WIDTH, 2, c);
+    Draw2D_TextCentered(34, cText, "Silence: no B or C buttons");
 }
 
 // E14 Moon Tether: stay inside the drifting circle.
@@ -1066,7 +1160,7 @@ static void AGrasp_Draw2D(PlayState* play) {
     if (gEv.score == 2) {
         Bar2D(100, (s32)gEv.fa, P(0), (MfColor){ 255, 220, 90, 240 }, "MASH A");
     } else if (gEv.score == 1) {
-        Draw2D_TextCentered(100, (MfColor){ 255, 120, 120, 255 }, "Something reaches up from below...");
+        Draw2D_TextCentered(100, (MfColor){ 255, 120, 120, 255 }, "Get ready to MASH A!");
     }
 }
 
@@ -1308,6 +1402,7 @@ static void AMirror_Draw3D(PlayState* play) {
 }
 
 static void AMirror_Draw2D(PlayState* play) {
+    Draw2D_WorldMarker(play, &sAHz[0].pos, (MfColor){ 200, 240, 255, 255 }, "<>");
     Bar2D(36, gEv.hits, MF_MAX(1, SEC(P(0) / 10.0f)), (MfColor){ 200, 240, 255, 230 }, "Shatter");
 }
 
@@ -1316,6 +1411,12 @@ static void AVolley_Start(PlayState* play) {
     InitHz();
     gEv.hits = SEC(2);
     gEv.score = 0;
+}
+
+static void AVolley_Draw2D(PlayState* play) {
+    if (sAHz[0].state == 1) {
+        Draw2D_WorldMarker(play, &sAHz[0].pos, (MfColor){ 255, 230, 120, 255 }, "*");
+    }
 }
 
 static void AVolley_Update(PlayState* play) {
@@ -1345,7 +1446,7 @@ static void AVolley_Update(PlayState* play) {
             }
         }
         h->state = 0;
-        gEv.hits = SEC(MF_MAX(2, P(2)));
+        gEv.hits = SEC(MF_MAX(2, Ev_IsDoubled() ? P(2) / 2 : P(2))); // doubled: twice as often
     }
 }
 
@@ -1372,7 +1473,10 @@ static void AGiant_Update(PlayState* play) {
     Player* p = Pl(play);
     f32 limit = P(0) / 10.0f;
     if (p->speedXZ > limit && Mf_PlayerGrounded()) {
-        gEv.hits += (s32)((p->speedXZ - limit) * P(1) / 4.0f) + 1;
+        // 3.1.8: the noise builds 1.5x as fast (gEv.fa keeps the fraction)
+        gEv.fa += ((s32)((p->speedXZ - limit) * P(1) / 4.0f) + 1) * 1.5f;
+        gEv.hits += (s32)gEv.fa;
+        gEv.fa -= (s32)gEv.fa;
     } else if (gEv.hits > 0) {
         gEv.hits--;
     }
@@ -1540,9 +1644,11 @@ static void ASeals_Draw2D(PlayState* play) {
     char buf[40];
     MfColor c = Mf_Rainbow(gEv.score * 60, 255);
     buf[0] = '\0';
-    Str_Cat(buf, "Next seal: the one with the light beam (", sizeof(buf));
+    Str_Cat(buf, "Next seal: ", sizeof(buf));
     Str_CatInt(buf, gEv.score + 1, sizeof(buf));
-    Str_Cat(buf, ")", sizeof(buf));
+    Str_Cat(buf, " of ", sizeof(buf));
+    Str_CatInt(buf, sAHzN, sizeof(buf));
+    Str_Cat(buf, " (follow the beam)", sizeof(buf));
     Draw2D_TextCentered(34, c, buf);
 }
 
@@ -1586,7 +1692,7 @@ static const V3Fns sV3Fns[] = {
     { AGorgon_Start, AGorgon_Update, AGorgon_Draw3D, AGorgon_Draw2D, NULL },
     { NULL, ADissonance_Update, NULL, ADissonance_Draw2D, NULL },
     { AMirror_Start, AMirror_Update, AMirror_Draw3D, AMirror_Draw2D, NULL },
-    { AVolley_Start, AVolley_Update, AVolley_Draw3D, NULL, NULL },
+    { AVolley_Start, AVolley_Update, AVolley_Draw3D, AVolley_Draw2D, NULL },
     { NULL, AGiant_Update, NULL, AGiant_Draw2D, NULL },
     { ASimon_Start, ASimon_Update, NULL, ASimon_Draw2D, NULL },
     { ASeals_Start, ASeals_Update, ASeals_Draw3D, ASeals_Draw2D, ASeals_End },
@@ -1598,10 +1704,37 @@ static const V3Fns* V3_Fns(s32 ev) {
 }
 
 static s32 sV3Running = -1; // which ported event gEv belongs to
+static s32 sV3Frames = 0;   // frames it has really been running
+static s32 sV3StartedFor = -1; // set up once for this event (room changes don't restart it)
+static s32 sV3StartScene = -1;
+static s32 sV3Grace = 0;       // a moment after a room change before it can hurt you
 
 static s32 V3_CanRun(PlayState* play, s32 ev) {
     if (ev == EV_DISSONANCE) {
         return INV_CONTENT(ITEM_OCARINA_OF_TIME) == ITEM_OCARINA_OF_TIME;
+    }
+    return true;
+}
+
+// Can Link spin attack? Any sword does: Kokiri, Razor or Gilded (equipped, or on
+// B), or the Great Fairy's Sword.
+static s32 V3_CanSpin(void) {
+    u8 b = BUTTON_ITEM_EQUIP(0, EQUIP_SLOT_B);
+
+    if (GET_CUR_EQUIP_VALUE(EQUIP_TYPE_SWORD) != EQUIP_VALUE_SWORD_NONE) {
+        return true;
+    }
+    if (((b >= ITEM_SWORD_KOKIRI) && (b <= ITEM_SWORD_GILDED)) || (b == ITEM_SWORD_GREAT_FAIRY)) {
+        return true;
+    }
+    return INV_CONTENT(ITEM_SWORD_GREAT_FAIRY) == ITEM_SWORD_GREAT_FAIRY;
+}
+
+// Extra checks for the moon's own picks (random events and its combos). A friend
+// can still start these.
+static s32 V3_RandomOk(s32 ev) {
+    if (ev == EV_MOTHS) {
+        return V3_CanSpin(); // the only counter is a spin attack
     }
     return true;
 }
@@ -1613,11 +1746,12 @@ static void V3_OnStart(PlayState* play, s32 ev) {
         return;
     }
     bzero(&gEv, sizeof(gEv));
+    sV3StartedFor = -1;
     gEv.id = ev;
     gEv.notesAtStart = sV3Notes;
     sV3Running = -1; // set up once the area is ready
     sV3Prompt = NULL;
-    if (d->longEvent) {
+    if (d->longEvent && !sInComboPass) { // (as a combo's second half it keeps its own minute)
         sTotalFrames = sFramesLeft = 60 * FPS; // runs until you finish, up to a minute
     }
 }
@@ -1630,9 +1764,41 @@ static void V3_SceneSetup(PlayState* play) {
     }
     sV3Input = &play->state.input[0];
     gEv.id = sActive;
-    gEv.timer = 0;
     gEv.duration = sTotalFrames;
     sV3Running = sActive;
+    if ((sV3StartedFor == sActive) && (sV3StartScene == play->sceneId)) {
+        sV3Grace = FPS; // same area, new room: everything stays where it was (a second to get your bearings)
+        return;
+    }
+    if (sV3StartedFor == sActive) {
+        // A new area: hazards have to be placed again, but progress carries over.
+        s32 score = gEv.score;
+        s32 failed = gEv.failed;
+
+        if (f->start != NULL) {
+            f->start(play);
+        }
+        gEv.failed = failed;
+        if ((sActive == EV_SEALS) || (sActive == EV_SIMON)) {
+            s32 i;
+
+            gEv.score = score;
+            for (i = 0; (sActive == EV_SEALS) && (i < score) && (i < HZ_MAX); i++) {
+                sAHz[i].state = 0; // already pressed
+            }
+            if (sActive == EV_SIMON) {
+                ASimon_NewRound();
+            }
+        }
+        sV3StartScene = play->sceneId;
+        sV3Grace = FPS;
+        return;
+    }
+    gEv.timer = 0;
+    sV3Frames = 0;
+    sV3StartedFor = sActive;
+    sV3StartScene = play->sceneId;
+    sV3Grace = 0;
     if (f->start != NULL) {
         f->start(play);
     }
@@ -1644,15 +1810,25 @@ static void V3_Tick(PlayState* play) {
     if ((f == NULL) || (sV3Running != sActive)) {
         return;
     }
+    // Nothing happens while the title and how-to are still up (the meter is hidden then).
+    if (sBannerTimer > 0) {
+        return;
+    }
+    if (sV3Grace > 0) {
+        sV3Grace--;
+        return;
+    }
     sV3Input = &play->state.input[0];
     gEv.id = sActive;
-    gEv.timer = sEventFrames;
+    gEv.timer = ++sV3Frames; // frames since its meter showed (from 1, so nothing fires at once)
     gEv.duration = sTotalFrames;
     sV3Prompt = NULL;
     if (f->update != NULL) {
         f->update(play);
     }
-    if (gEv.succeeded && (sFramesLeft > 1)) {
+    if (gEv.succeeded && sInComboPass) {
+        Ev_End(play); // a combo's second half: this half is cleared
+    } else if (gEv.succeeded && (sFramesLeft > 1)) {
         sFramesLeft = 1; // beaten: ends as survived
     }
 }
@@ -1669,7 +1845,7 @@ static void V3_OnEnd(PlayState* play, s32 success) {
 
 // Did the player slip up on the running ported event? (halves the pay)
 static s32 V3_Failed(void) {
-    return V3_IsEvent(sActive) && gEv.failed;
+    return (V3_Cur() >= 0) && (gEv.failed || (V3_IsLong(V3_Cur()) && !gEv.succeeded));
 }
 
 // Every frame: ocarina notes (the event itself doesn't run while you play).
@@ -1694,31 +1870,70 @@ static void V3_Always(PlayState* play) {
         sV3NoteLast = msgCtx->ocarinaStaff->pos;
         sV3Notes++;
     }
-    if ((sActive == EV_DISSONANCE) && (sV3Notes - gEv.notesAtStart >= 3) && !gEv.succeeded) {
+    if (EV_RUNNING(EV_DISSONANCE) && (sV3Notes - gEv.notesAtStart >= 3) && !gEv.succeeded) {
         gEv.succeeded = true;
         Audio_PlaySfx(NA_SE_SY_CORRECT_CHIME);
         Menu_ShowToast("The melody is answered.");
-        if (sFramesLeft > 1) {
+        if ((sActive == EV_DISSONANCE) && (sFramesLeft > 1)) {
             sFramesLeft = 1;
         }
     }
 }
 
-static void V3_DrawWorld(PlayState* play) {
-    const V3Fns* f = V3_Fns(sActive);
+// A friend's "look here": a solid column of light (like the Pressure Seals pillars), fading out at the end.
+static s32 Beam_Draw3D(void) {
+    s32 k;
+    s32 any = false;
 
-    if ((f == NULL) || (f->draw3d == NULL) || !sSceneReady || (sV3Running != sActive)) {
+    for (k = 0; k < (s32)ARRAY_COUNT(sBeams); k++) {
+        if (sBeams[k].timer > 0) {
+            f32 fade = CLAMP(sBeams[k].timer / (f32)FPS, 0.0f, 1.0f);
+
+            Draw3D_Pillar(&sBeams[k].pos, 22.0f, 420.0f, (MfColor){ 255, 230, 120, (u8)(150 * fade) });
+            Draw3D_Pillar(&sBeams[k].pos, 9.0f, 520.0f, (MfColor){ 255, 255, 235, (u8)(230 * fade) });
+            any = true;
+        }
+    }
+    return any;
+}
+
+// (3.1.8) Surprise areas: a low see-through purple wall along the edges near you (pieces from Sur_Walls).
+static void Sur_DrawWalls(PlayState* play) {
+    s32 k;
+
+    for (k = 0; k < sSurWallCount; k++) {
+        f32 pulse = 0.8f + 0.2f * Math_SinS((s16)(play->gameplayFrames * 0x700 + k * 0x1000));
+
+        Draw3D_Wall(&sSurWall[k].a, &sSurWall[k].b, 70.0f, (MfColor){ 190, 90, 255, (u8)(sSurWall[k].alpha * pulse) });
+    }
+}
+
+static void V3_DrawWorld(PlayState* play) {
+    const V3Fns* f = V3_Fns(V3_Cur());
+    s32 ev = (f != NULL) && (f->draw3d != NULL) && sSceneReady && (sV3Running == V3_Cur());
+    s32 beams = false;
+    s32 k;
+
+    for (k = 0; k < (s32)ARRAY_COUNT(sBeams); k++) {
+        beams |= (sBeams[k].timer > 0);
+    }
+    beams |= (sSurWallCount > 0);
+    if (!ev && !(beams && sSceneReady)) {
         return;
     }
     Draw3D_Begin(play);
-    f->draw3d(play);
+    if (ev) {
+        f->draw3d(play);
+    }
+    Beam_Draw3D();
+    Sur_DrawWalls(play);
     Draw3D_End();
 }
 
 static Gfx* V3_Draw2D(PlayState* play, Gfx* gfx) {
-    const V3Fns* f = V3_Fns(sActive);
+    const V3Fns* f = V3_Fns(V3_Cur());
 
-    if ((f == NULL) || !sSceneReady || (sV3Running != sActive) || (sPauseReason == 1)) {
+    if ((f == NULL) || !sSceneReady || (sV3Running != V3_Cur()) || (sPauseReason == 1)) {
         return gfx;
     }
     sV3Gfx = &gfx;
@@ -1770,7 +1985,6 @@ static const V3Riddle sV3Riddles[] = {
     { "Which song slows time down?", { "Inverted Time", "Soaring", "Oath", "Elegy" } },
     { "7 x 6 = ?", { "42", "36", "48", "56" } },
     { "Which mask lets you roll fast?", { "Goron", "Zora", "Deku", "Bunny" } },
-    { "What does Tatl shout the most?", { "Hey!", "Listen!", "Watch out!", "Hi!" } },
     { "13 + 29 = ?", { "42", "41", "43", "32" } },
     { "Where is Romani Ranch?", { "Milk Road", "Ikana", "The Swamp", "Snowhead" } },
     { "What can a Zora do?", { "Swim fast", "Fly", "Roll", "Burrow" } },
@@ -1792,21 +2006,21 @@ static const V3Riddle sV3Riddles[] = {
     { "Which boss guards Stone Tower?", { "Twinmold", "Gyorg", "Odolwa", "Goht" } },
     { "Which song calls Epona?", { "Epona's Song", "Song of Storms", "Sonata", "Elegy" } },
     { "Who runs the Swordsman's School?", { "Swordsman", "Kafei", "Gorman", "Mutoh" } },
-    { "What falls from the observatory?", { "Moon's Tear", "A star", "Rupees", "A mask" } },
+    { "What falls near the observatory?", { "Moon's Tear", "A star", "Rupees", "A mask" } },
     { "Who is the head carpenter?", { "Mutoh", "Gorman", "Toto", "Tingle" } },
     { "Where is Zora Hall?", { "Zora Cape", "Ikana", "The Swamp", "Milk Road" } },
-    { "What sings in the Goron shrine?", { "The Goron baby", "A Deku", "A Zora", "Tatl" } },
+    { "Who cries in the Goron Shrine?", { "The Goron baby", "A Deku", "A Zora", "Tatl" } },
     { "Which mask makes you tiny and wooden?", { "Deku", "Goron", "Zora", "Bunny" } },
     { "How many masks exist in total?", { "24", "20", "12", "30" } },
     { "How many heart pieces make a heart?", { "4", "2", "5", "3" } },
-    { "What does the Postman fear most?", { "Being late", "Ghosts", "Dogs", "Moons" } },
+    { "The Postman lives by his...", { "Schedule", "Bike", "Mailbag", "Hat" } },
     { "Which song opens the Great Bay Temple?", { "New Wave Bossa Nova", "Oath to Order", "Sonata", "Elegy" } },
     { "Which song opens Woodfall Temple?", { "Sonata of Awakening", "Goron Lullaby", "Elegy", "Oath" } },
     { "Which song calls the four giants?", { "Oath to Order", "Song of Time", "Soaring", "Healing" } },
     { "Which song makes empty shells?", { "Elegy of Emptiness", "Oath to Order", "Sonata", "Storms" } },
     { "The Song of Soaring warps you to...", { "Owl statues", "Fairy fountains", "Clock Town only", "Shops" } },
     { "Great Fairies were scattered into...", { "Stray Fairies", "Rupees", "Masks", "Hearts" } },
-    { "Who stole Kafei's mask?", { "Sakon", "Skull Kid", "Tingle", "Gorman" } },
+    { "Who stole the Sun's Mask?", { "Sakon", "Skull Kid", "Tingle", "Gorman" } },
     { "Where do the Gorman brothers live?", { "Milk Road", "Ikana", "Clock Town", "Snowhead" } },
     { "What attacks Romani Ranch at night?", { "Aliens", "Wolves", "Keese", "Skull Kid" } },
     { "15 x 4 = ?", { "60", "45", "64", "54" } },
@@ -1824,10 +2038,36 @@ static const V3Riddle sV3Riddles[] = {
     { "The Bombers want you to find...", { "Hidden kids", "Bombs", "Masks", "Fairies" } },
     { "Which item lets you see the invisible?", { "Lens of Truth", "Mirror Shield", "Hookshot", "Bow" } },
     { "What does the Keaton mask summon?", { "Keaton quizzes", "Rain", "Horses", "Guards" } },
-    { "Which Moon Mark item delays events?", { "Omen Scroll", "Lunar Tonic", "Stasis Orb", "Smoke Veil" } },
-    { "Nemeses gain a stat when they...", { "Kill you", "Sleep", "Swim", "Eat bounties" } },
+    { "Which Moon Pouch item ends an event?", { "Stillwater Charm", "Lunar Tonic", "Smoke Veil", "Moon Dash" } },
+    { "Nemeses level up when they...", { "Kill you", "Sleep", "Swim", "Eat bounties" } },
 };
 #define QZ_LEN 30
+
+// The quiz's name for an actor that's here, or NULL if it isn't one of the quiz's.
+static const char* V3_PresentName(Actor* a) {
+    s32 p;
+
+    switch (a->id) {
+        case ACTOR_EN_ST: return "Skulltula";
+        case ACTOR_EN_OKUTA: return "Octorok";
+        case ACTOR_EN_NIW: return "Cucco";
+        case ACTOR_EN_DG: return "Dog";
+        case ACTOR_EN_COW: return "Cow";
+        case ACTOR_EN_DAIKU: return "Carpenter";
+        default: break;
+    }
+    if (a->category != ACTORCAT_ENEMY) {
+        return NULL;
+    }
+    p = Dir_PoolOfActorId(a->id);
+    switch (p) {
+        case 0: case 1: case 2: return "Keese";
+        case 3: case 4: return "Wolfos";
+        case 10: case 11: return "Bubble";
+        case 5: case 8: case 9: case 12: case 13: case 14: case 23: case 28: case 29: return Pool_Name(p);
+        default: return NULL;
+    }
+}
 
 // Fills opts with the right answer first and three different wrong ones
 // taken from a list of names. Returns false if there aren't enough.
@@ -1915,51 +2155,48 @@ static s32 V3_QuizQuestion(PlayState* play, char* q, char opts[4][30]) {
                 static const char* sAll[] = { "Wolfos", "Stalchild", "Keese", "Chuchu", "Tektite", "Deku Baba",
                                               "Leever", "Guay", "Dodongo", "Peahat", "Bubble", "Cucco",
                                               "Dog", "Cow", "Carpenter", "Skulltula", "Octorok", "Mad Scrub" };
-                const char* present = NULL;
-                Actor* a = play->actorCtx.actorLists[ACTORCAT_ENEMY].first;
+                const char* seen[ARRAY_COUNT(sAll)];
+                const char* present;
                 const char* pool[ARRAY_COUNT(sAll)];
+                s32 ns = 0;
                 s32 n = 0;
+                s32 c;
 
-                while ((a != NULL) && (present == NULL)) {
-                    if (a->update != NULL) {
-                        s32 p = Dir_PoolOfActorId(a->id);
+                // Everything that's really here and visible, in this room (or ours, which have no room).
+                for (c = 0; c < ACTORCAT_MAX; c++) {
+                    Actor* a;
 
-                        if (a->id == ACTOR_EN_ST) {
-                            present = "Skulltula";
-                        } else if (a->id == ACTOR_EN_OKUTA) {
-                            present = "Octorok";
-                        } else if ((p >= 0) && (p != 1) && (p != 2) && (p != 11)) {
-                            present = (p == 0) ? "Keese" : (p == 10) ? "Bubble" : Pool_Name(p);
+                    for (a = play->actorCtx.actorLists[c].first; a != NULL; a = a->next) {
+                        const char* name;
+                        s32 k;
+                        s32 dup = false;
+
+                        if ((a->update == NULL) || (a->draw == NULL) ||
+                            ((a->room >= 0) && (a->room != play->roomCtx.curRoom.num))) {
+                            continue;
+                        }
+                        name = V3_PresentName(a);
+                        for (k = 0; (name != NULL) && (k < ns); k++) {
+                            dup = dup || Str_Eq(seen[k], name);
+                        }
+                        if ((name != NULL) && !dup && (ns < (s32)ARRAY_COUNT(seen))) {
+                            seen[ns++] = name;
                         }
                     }
-                    a = a->next;
                 }
-                for (a = play->actorCtx.actorLists[ACTORCAT_NPC].first; (a != NULL) && (present == NULL); a = a->next) {
-                    if (a->id == ACTOR_EN_NIW) {
-                        present = "Cucco";
-                    } else if (a->id == ACTOR_EN_DG) {
-                        present = "Dog";
-                    } else if (a->id == ACTOR_EN_COW) {
-                        present = "Cow";
-                    } else if (a->id == ACTOR_EN_DAIKU) {
-                        present = "Carpenter";
-                    }
-                }
-                if (present == NULL) {
+                if (ns == 0) {
                     break;
                 }
+                present = seen[(s32)(Rand_ZeroOne() * ns) % ns];
+                // Wrong answers: only things that aren't here at all.
                 for (i = 0; i < (s32)ARRAY_COUNT(sAll); i++) {
-                    s32 found = false;
+                    s32 k;
+                    s32 here = false;
 
-                    // Leave out anything that's also here.
-                    for (a = play->actorCtx.actorLists[ACTORCAT_ENEMY].first; a != NULL; a = a->next) {
-                        s32 p = Dir_PoolOfActorId(a->id);
-
-                        if ((p >= 0) && (Pool_Name(p)[0] == sAll[i][0]) && (Pool_Name(p)[1] == sAll[i][1])) {
-                            found = true;
-                        }
+                    for (k = 0; k < ns; k++) {
+                        here = here || Str_Eq(seen[k], sAll[i]);
                     }
-                    if (!found && (sAll[i] != present)) {
+                    if (!here) {
                         pool[n++] = sAll[i];
                     }
                 }

@@ -77,8 +77,9 @@ typedef enum {
     EV_COUNT
 } GlobalEventId;
 
-#define POOL_COUNT 35 // Blood Moon enemy pool (last one is a boss)
-#define POOL_FIRST_BOSS 34
+#define POOL_COUNT 36 // Blood Moon enemy pool (new entries go at the end, after Odolwa)
+#define POOL_FIRST_BOSS 34 // Odolwa, the only boss (entries after him are normal enemies)
+#define POOL_IS_BOSS(p) ((p) == POOL_FIRST_BOSS)
 #define CRIT_COUNT 8  // Joke Event critter types
 #define GIVE_ITEM_COUNT 16 // cheat build: single items you can give yourself
 #define GIVE_MASK_COUNT 24
@@ -392,6 +393,8 @@ typedef enum {
     ID_V2_BELITE = ID_V2_BACCEPT + 1, // WANTED-only trait
     ID_V2_BBONUS = ID_V2_BELITE + 1, // bounty bonus objective
     ID_V2_BUPGRADE = ID_V2_BBONUS + 1, // bounty details: buy a star
+    ID_V2_NUNIQ_FIRST, // 3.1.8: Nemesis unique traits (12)
+    ID_V2_NUNIQ_LAST = ID_V2_NUNIQ_FIRST + 11,
     // V3 menu: Overview rows and the event details page
     ID_OV_NEM,
     ID_OV_BNT_FIRST,
@@ -404,7 +407,8 @@ typedef enum {
     ID_LNK_FR_FIRST,
     ID_LNK_FR_LAST = ID_LNK_FR_FIRST + 11,
     ID_LNK_APROOM, // V3.1.2: type your Archipelago room for the friends' heatmap
-    ID_V2_LAST = ID_LNK_APROOM,
+    ID_LNK_EXPUNDO, // V3.1.5: undo everything Experimental friends did
+    ID_V2_LAST = ID_LNK_EXPUNDO,
     ID_MAX
 } MenuEntryId;
 
@@ -433,7 +437,22 @@ typedef enum { LVL_LOW, LVL_MID, LVL_HIGH, LVL_MAX } Level3Mode;
 // Generic four-step choice (names differ per entry).
 typedef enum { STEP_1, STEP_2, STEP_3, STEP_4, STEP_MAX } Step4Mode;
 
+// Shown in the menu footer. Keep it in step with mod.toml / mod_cheats.toml (file names stay "_v3").
+#define GE_VERSION "v3.1.8"
+
 extern u8 gOpt[ID_MAX];
+
+// Experimental friends (Friend Link sandbox): what they did to Link, read by mods.c.
+typedef struct {
+    f32 scale[3];   // Link's size per axis (1 = normal)
+    f32 head;       // head size (1 = normal)
+    f32 speed;      // extra ground speed (1 = normal)
+    f32 gravity;    // gravity in the air (1 = normal, 0 = floaty, 3 = heavy)
+    f32 hop;        // auto-bounce speed when he lands (0 = off)
+    s32 rainbow;    // rainbow tint
+    s32 invisible;  // not drawn
+} ExpFx;
+extern ExpFx gExp;
 
 // Shared helpers
 void HueToRgb(s32 hue, u8* r, u8* g, u8* b);
@@ -497,7 +516,9 @@ s32 Carpenter_BoardSpot(Vec3f* out, s16* yaw); // 0: Moon Marks page, 1: mutator
 const char* V2_Label(s32 id);
 extern s32 gV2InfoBounty;
 extern s32 gEvDetail; // V3: the event on the details page
-s32 V2_NemStatValue(s32 k); // V3: menu stat bars (-1: none)
+s32 V2_NemBar(s32 id);     // 3.1.8 Nemesis page bars: 0-1000 fill, -1 none
+s32 V2_NemCount(void);     // how many Nemeses hunt you
+u16 V2_NemUniqMask(void);  // unique traits of the Nemesis the page shows
 s32 V2_RowUnaffordable(s32 id); // V3: shop price in red
 s32 V2_BountyActive(s32 i);
 s32 V2_BountyElite(s32 i);

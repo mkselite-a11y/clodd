@@ -96,9 +96,9 @@ static const u16 sMainEntries[] = { ID_SUB_EVENTS, ID_SUB_V2, ID_SUB_V2_NEM, ID_
 s32 gMenuAtBoard = false;
 // Moon Marks: money, the board, the shop and the pouch.
 static const u16 sV2Entries[] = { ID_V2_MARKS,  ID_SUB_V2_BOUNTY, ID_SUB_V2_SHOP, ID_V2_BOUNTY,  ID_V2_POUCH,
-                                  ID_V2_REMOTE, ID_V2_TRACKER,    ID_V2_AUTOSAVE, ID_V2_SAVECODE };
-static const u16 sV2LinkEntries[] = { ID_V2_LINK, ID_V2_LINKSTATE, ID_LNK_APROOM };
-static u16 sV2LinkDyn[3 + 12];
+                                  ID_V2_REMOTE, ID_V2_TRACKER,    ID_V2_AUTOSAVE };
+static const u16 sV2LinkEntries[] = { ID_V2_LINK, ID_V2_LINKSTATE, ID_LNK_APROOM, ID_LNK_EXPUNDO };
+static u16 sV2LinkDyn[4 + 12];
 static u16 sV2BountyDyn[V2_BOUNTY_SLOTS + 2 + 3];
 static const u16 sV2NemEntries[] = { ID_V2_NEMROW_FIRST,     ID_V2_NEMROW_FIRST + 1, ID_V2_NEMROW_FIRST + 2,
                                      ID_V2_NEMROW_FIRST + 3, ID_V2_NEMROW_FIRST + 4, ID_V2_NEMROW_FIRST + 5,
@@ -108,7 +108,7 @@ static const u16 sV2MutEntries[] = { ID_V2_MUTROW_FIRST,     ID_V2_MUTROW_FIRST 
 static const u16 sV2DraftEntries[] = { ID_V2_DRAFT_A, ID_V2_DRAFT_B, ID_V2_DRAFT_REROLL, ID_V2_MARKS };
 s32 gV2InfoBounty = 0;
 static u16 sV2InfoEntries[5 + 16 + 4];
-static u16 sV2NemDyn[16 + 16];
+static u16 sV2NemDyn[48];
 
 // Rows for one trait mask, in trait order.
 static s32 Menu_TraitRows(u16* out, s32 n, u16 mask) {
@@ -235,7 +235,6 @@ static void Menu_BuildLists(void) {
     sReportEntries[sReportCount++] = ID_RR_COMBOS;
     sReportEntries[sReportCount++] = ID_RR_STREAK;
     sReportEntries[sReportCount++] = ID_RR_BEST;
-    sReportEntries[sReportCount++] = ID_RR_WRATH;
     for (i = 0; i < 10; i++) {
         sLogEntries[i] = ID_LOG_FIRST + i;
     }
@@ -400,14 +399,22 @@ static const u16* Menu_Entries(s32 page, s32* count) {
 
             sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 0;
             sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 1;
-            sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 2;
-            if (V2_NemStatValue(0) >= 0) {
+            if (V2_NemCount() > 0) {
+                u16 um = V2_NemUniqMask();
+                s32 u;
+
+                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 2;  // level
+                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 6;  // points / trait pick waiting
+                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 8;  // Health
+                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 9;  // Power
+                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 10; // Speed
+                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 11; // Tracking
+                for (u = 0; u < 12; u++) {
+                    if (um & (1 << u)) {
+                        sV2NemDyn[n++] = ID_V2_NUNIQ_FIRST + u;
+                    }
+                }
                 sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 4; // nature
-                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 8; // stats with bars
-                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 9;
-                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 10;
-                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 11;
-                sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 6; // free points
             }
             n = Menu_TraitRows(sV2NemDyn, n, V2_NemTraitMask());
             sV2NemDyn[n++] = ID_V2_NEMROW_FIRST + 5;
@@ -577,7 +584,7 @@ static const char* Menu_PageTitle(s32 page) {
         case MENU_OVERVIEW:
             return "Overview";
         case MENU_EV_DETAIL:
-            return Events_Name(gEvDetail);
+            return Events_ShortName(gEvDetail); // (full names run into the header)
         case MENU_EVENTS:
             return "Events";
         case MENU_EV_LIST:
@@ -661,9 +668,9 @@ static const char* Menu_PageTitle(s32 page) {
         case MENU_V2_NEM:
             return "Nemesis";
         case MENU_V2_MUTS:
-            return "Active Mutators";
+            return "Your Picks";
         case MENU_V2_DRAFT:
-            return "Choose a Mutator";
+            return "Moon Draft";
         case MENU_V2_BINFO:
             return "Bounty Details";
         case MENU_V2_ITEMS:
@@ -922,8 +929,11 @@ static EntryType Entry_Type(s32 id) {
         return ENTRY_CHOICE;
     }
     if ((id == ID_V2_BACCEPT) || (id == ID_V2_BUPGRADE) || ((id >= ID_LNK_FR_FIRST) && (id <= ID_LNK_FR_LAST)) ||
-        (id == ID_LNK_APROOM)) {
+        (id == ID_LNK_APROOM) || (id == ID_LNK_EXPUNDO)) {
         return ENTRY_ACTION;
+    }
+    if ((id == ID_V2_NEMROW_FIRST) && (V2_NemCount() > 1)) {
+        return ENTRY_ACTION; // (A: look at the next Nemesis)
     }
     if ((id == ID_V2_MARKS) || (id == ID_V2_STREAK) || (id == ID_V2_RANK) || (id == ID_V2_LINKSTATE) || ((id >= ID_V2_CON_FIRST) && (id < ID_V2_SHOP_FIRST)) ||
         ((id >= ID_V2_NEMROW_FIRST) && (id <= ID_V2_LAST))) {
@@ -1294,7 +1304,7 @@ static const char* Entry_Label(s32 id) {
         case ID_EV_COMBOS:
             return "Combo Events";
         case ID_EV_CURSE:
-            return "Cycle Curse";
+            return "Curses In Draft";
         case ID_EV_PRESSURE:
             return "Moon Pressure";
         case ID_EV_SAFEZONES:
@@ -1510,7 +1520,11 @@ static const char* Entry_Label(s32 id) {
         case ID_SOUNDS:
             return "Menu Sounds";
         case ID_ALL_OFF:
+#ifdef GE_CHEATS
             return "Turn Off All Mods";
+#else
+            return "Stop All Events";
+#endif
 
         default:
             return "???";
@@ -2426,7 +2440,7 @@ static void Menu_HandleInput(PlayState* play, Input* input) {
     } else if (CHECK_BTN_ANY(press, BTN_B)) {
         if (sPage == MENU_V2_DRAFT) {
             // A mutator must be chosen.
-            Menu_ShowToast("Pick a mutator with A.");
+            Menu_ShowToast("Pick one with A.");
         } else if (Menu_IsTabRoot(sPage)) {
             Menu_Close(play);
         } else {
@@ -2603,28 +2617,33 @@ static void Menu_DrawPanel(PlayState* play, Gfx** gfxP) {
                             230);
     }
 
-    // Nemesis stat bars: 10 points fills the bar, and from there it glows rainbow.
+    // Nemesis bars: level (toward its next trait) and its 4 stats (20 fills
+    // them, then they glow rainbow; ticks at the unique traits, 5 and 10).
     for (i = 0; (i < VISIBLE_ROWS) && (scroll + i < count); i++) {
         s32 id = entries[scroll + i];
 
-        if ((id >= ID_V2_NEMROW_FIRST + 8) && (id < ID_V2_NEMROW_FIRST + 12)) {
-            s32 val = V2_NemStatValue(id - ID_V2_NEMROW_FIRST - 8);
+        if ((id == ID_V2_NEMROW_FIRST + 2) || ((id >= ID_V2_NEMROW_FIRST + 8) && (id <= ID_V2_NEMROW_FIRST + 11))) {
+            s32 val = V2_NemBar(id);
             s32 rowY = LIST_TOP + i * ROW_H;
             s32 bx = PANEL_X + 110;
-            s32 bw = 140;
-            s32 fill = bw * CLAMP(val, 0, 10) / 10;
+            s32 bw = 120;
+            s32 fill = bw * CLAMP(val, 0, 1000) / 1000;
             u8 cr, cg, cb;
 
             if (val < 0) {
                 continue;
             }
-            if (val >= 10) {
+            if (val >= 1000) {
                 HueToRgb((play->gameplayFrames * 9 + i * 50) % 360, &cr, &cg, &cb);
             } else {
                 Menu_ThemeColor(play, 0, &cr, &cg, &cb);
             }
             gfx = Ui_DrawRect(gfx, bx, rowY + 1, bx + bw, rowY + 7, 30, 30, 40, 220);
             gfx = Ui_DrawRect(gfx, bx, rowY + 1, bx + fill, rowY + 7, cr, cg, cb, 240);
+            if (id != ID_V2_NEMROW_FIRST + 2) {
+                gfx = Ui_DrawRect(gfx, bx + bw / 4, rowY, bx + bw / 4 + 1, rowY + 8, 220, 220, 220, 230);
+                gfx = Ui_DrawRect(gfx, bx + bw / 2, rowY, bx + bw / 2 + 1, rowY + 8, 220, 220, 220, 230);
+            }
         }
     }
 
@@ -2822,10 +2841,10 @@ static void Menu_DrawPanel(PlayState* play, Gfx** gfxP) {
             }
         } else {
             Ui_Print(&printer, PANEL_X + 8, FOOTER_Y + 2, "A: Select   B: Back");
-            Ui_Print(&printer, PANEL_X + 8, FOOTER_Y + 12, "L / R: switch tabs");
+            Ui_Print(&printer, PANEL_X + 8, FOOTER_Y + 12, "L / R / Z: switch tabs");
         }
         GfxPrint_SetColor(&printer, 120, 120, 150, 255);
-        Ui_Print(&printer, PANEL_X + PANEL_W - 42, FOOTER_Y + 22, "v3.0");
+        Ui_Print(&printer, PANEL_X + PANEL_W - 8 - (s32)(sizeof(GE_VERSION) - 1) * 8, FOOTER_Y + 22, GE_VERSION);
     }
 
     gfx = GfxPrint_Close(&printer);

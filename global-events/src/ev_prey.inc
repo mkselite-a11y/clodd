@@ -1,20 +1,23 @@
 // ---------------------------------------------------------------------------
-// Moonlit Prey (2.1): the moon marks one enemy in the area (spawning one if
-// there's nothing suitable). It glows, won't fight back and runs from you.
-// Kill it in time for a pile of rupees; let it live and it costs half your
-// max health. Included after ev_v2.inc.
+// Moonlit Prey (2.1): the moon marks enemies in the area (spawning them if
+// there's nothing suitable). They glow, won't fight back and run from you.
+// 3.1.8: two targets; kill both in time for a pile of rupees; let one live and
+// it costs half your max health. Included after ev_v2.inc.
 // ---------------------------------------------------------------------------
+
+#define PREY_COUNT 2
 
 // Melee enemies only: their attacks are colliders we can switch off.
 // Wolfos, White Wolfos, Stalchild, Chuchu, Tektite, Dodongo, Snapper, Dinolfos
 static const u8 sPreyPool[] = { 3, 4, 5, 8, 9, 13, 24, 32 };
-static Actor* sPrey = NULL;
+static Actor* sPrey[PREY_COUNT];
+static s32 sPreyDone[PREY_COUNT]; // this target is slain
 static s32 sPreyValid = false; // a target was marked at some point during this event
 static s32 sPreyTimer = 0;
 static s32 sPreyTries = 0;
-static s32 sPreyLastHp = 0;
-static LightNode* sPreyLight = NULL;
-static LightInfo sPreyLightInfo;
+static s32 sPreyLastHp[PREY_COUNT];
+static LightNode* sPreyLight[PREY_COUNT];
+static LightInfo sPreyLightInfo[PREY_COUNT];
 
 static s32 Prey_OkType(Actor* actor) {
     s32 pool = V2_PoolOfActor(actor);
@@ -34,11 +37,29 @@ static s32 Prey_TimeFrames(void) {
     return (s32)(sSeconds[Intensity()] * FPS * Ev_DurationMult());
 }
 
-static void Prey_RemoveLight(PlayState* play) {
-    if (sPreyLight != NULL) {
-        LightContext_RemoveLight(play, &play->lightCtx, sPreyLight);
-        sPreyLight = NULL;
+static void Prey_RemoveLight(PlayState* play, s32 k) {
+    if (sPreyLight[k] != NULL) {
+        LightContext_RemoveLight(play, &play->lightCtx, sPreyLight[k]);
+        sPreyLight[k] = NULL;
     }
+}
+
+static void Prey_RemoveLights(PlayState* play) {
+    s32 k;
+
+    for (k = 0; k < PREY_COUNT; k++) {
+        Prey_RemoveLight(play, k);
+    }
+}
+
+static s32 Prey_SlainCount(void) {
+    s32 k;
+    s32 n = 0;
+
+    for (k = 0; k < PREY_COUNT; k++) {
+        n += sPreyDone[k] ? 1 : 0;
+    }
+    return n;
 }
 
 // Still in the enemy list (dead or alive)? Only enemies count, so a new actor
@@ -46,6 +67,9 @@ static void Prey_RemoveLight(PlayState* play) {
 static s32 Prey_Present(PlayState* play, Actor* target) {
     Actor* actor = play->actorCtx.actorLists[ACTORCAT_ENEMY].first;
 
+    if (target == NULL) {
+        return false;
+    }
     while (actor != NULL) {
         if (actor == target) {
             return actor->update != NULL;
@@ -55,9 +79,34 @@ static s32 Prey_Present(PlayState* play, Actor* target) {
     return false;
 }
 
+static s32 Prey_IsLiveTarget(PlayState* play, s32 k) {
+    return !sPreyDone[k] && (sPrey[k] != NULL) && Prey_Present(play, sPrey[k]) && (sPrey[k]->colChkInfo.health > 0);
+}
+
 // Is there a marked prey right now?
 static s32 Prey_HasTarget(PlayState* play) {
-    return (sActive == EV_PREY) && (sPrey != NULL) && Prey_Present(play, sPrey) && (sPrey->colChkInfo.health > 0);
+    s32 k;
+
+    if (!EV_RUNNING(EV_PREY)) {
+        return false;
+    }
+    for (k = 0; k < PREY_COUNT; k++) {
+        if (Prey_IsLiveTarget(play, k)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static s32 Prey_IsMarked(Actor* actor) {
+    s32 k;
+
+    for (k = 0; k < PREY_COUNT; k++) {
+        if ((actor != NULL) && (sPrey[k] == actor)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static Actor* Prey_FindNative(PlayState* play) {
@@ -67,7 +116,8 @@ static Actor* Prey_FindNative(PlayState* play) {
 
     while ((actor != NULL) && (count < 12)) {
         if ((actor->update != NULL) && (actor->colChkInfo.health > 0) && (Tag_Of(actor) == TAG_NONE) &&
-            Prey_OkType(actor) && (actor->xzDistToPlayer < 1500.0f) && (fabsf(actor->playerHeightRel) < 250.0f)) {
+            Prey_OkType(actor) && !Prey_IsMarked(actor) && (actor->xzDistToPlayer < 1500.0f) &&
+            (fabsf(actor->playerHeightRel) < 250.0f)) {
             list[count++] = actor;
         }
         actor = actor->next;
@@ -76,90 +126,127 @@ static Actor* Prey_FindNative(PlayState* play) {
 }
 
 static void Prey_OnStart(PlayState* play) {
+    s32 k;
+
     if (!sInComboPass) {
         sTotalFrames = sFramesLeft = Prey_TimeFrames();
     }
-    sPrey = NULL;
+    for (k = 0; k < PREY_COUNT; k++) {
+        sPrey[k] = NULL;
+        sPreyDone[k] = false;
+    }
     sPreyValid = false;
     sPreyTimer = FPS;
     sPreyTries = 0;
 }
 
 static void Prey_SceneSetup(PlayState* play) {
-    sPrey = NULL;
+    s32 k;
+
+    for (k = 0; k < PREY_COUNT; k++) {
+        sPrey[k] = NULL; // targets already slain stay slain
+    }
     sPreyTimer = FPS;
     sPreyTries = 0;
 }
 
-static void Prey_Slain(PlayState* play) {
+static void Prey_Slain(PlayState* play, s32 k) {
     static const u8 sRupees[INTENSITY_MAX] = { 50, 100, 200 };
     static char sMsg[40];
     s32 amount = sRupees[Intensity()];
     s32 n;
 
-    sPrey = NULL;
+    sPreyDone[k] = true;
+    sPrey[k] = NULL;
+    Prey_RemoveLight(play, k);
+    if (Prey_SlainCount() < PREY_COUNT) {
+        Menu_ShowToast("One prey down! Now the other.");
+        Audio_PlaySfx(NA_SE_SY_CORRECT_CHIME);
+        sPreyTimer = FPS / 2;
+        return;
+    }
+    // Both slain: the payout.
     sPreyValid = false;
     Rupees_ChangeBy(amount);
     Contract_Add(CT_PREY, 1);
     if (amount > 0) {
-        n = Ev_Append(sMsg, 0, "Prey slain! +", sizeof(sMsg));
+        n = Ev_Append(sMsg, 0, "Both prey slain! +", sizeof(sMsg));
         n = Ev_AppendNum(sMsg, n, amount, sizeof(sMsg));
         Ev_Append(sMsg, n, " rupees", sizeof(sMsg));
     } else {
-        Ev_Append(sMsg, 0, "Prey slain!", sizeof(sMsg));
+        Ev_Append(sMsg, 0, "Both prey slain!", sizeof(sMsg));
     }
     Menu_ShowToast(sMsg);
     Audio_PlaySfx(NA_SE_SY_CORRECT_CHIME);
     Ev_End(play);
 }
 
+// Moonlight on a marked prey: a pale glow, a light, and sparkles falling on it.
+static void Prey_Glow(PlayState* play, s32 k) {
+    Actor* prey = sPrey[k];
+
+    if (prey->colorFilterTimer == 0) {
+        Actor_SetColorFilter(prey, COLORFILTER_COLORFLAG_BLUE, 160, COLORFILTER_BUFFLAG_OPA, 30);
+    }
+    if (sPreyLight[k] == NULL) {
+        sPreyLight[k] = LightContext_InsertLight(play, &play->lightCtx, &sPreyLightInfo[k]);
+    }
+    Lights_PointGlowSetInfo(&sPreyLightInfo[k], prey->world.pos.x, prey->world.pos.y + 40.0f, prey->world.pos.z, 170,
+                            200, 255, 300);
+    if (((sEventFrames + k) % 3) == 0) {
+        static Color_RGBA8 sPrim = { 230, 240, 255, 255 };
+        static Color_RGBA8 sEnv = { 110, 150, 255, 0 };
+        Vec3f pos;
+        Vec3f vel = { 0.0f, -3.0f, 0.0f };
+        Vec3f accel = { 0.0f, -0.05f, 0.0f };
+
+        pos.x = prey->world.pos.x + Rand_CenteredFloat(50.0f);
+        pos.y = prey->world.pos.y + 120.0f + Rand_ZeroOne() * 100.0f;
+        pos.z = prey->world.pos.z + Rand_CenteredFloat(50.0f);
+        EffectSsKirakira_SpawnSmall(play, &pos, &vel, &accel, &sPrim, &sEnv);
+    }
+}
+
 static void Tick_Prey(PlayState* play) {
     Player* player = GET_PLAYER(play);
+    s32 k;
 
     if (player == NULL) {
         return;
     }
-    if (sPrey != NULL) {
-        if (!Prey_Present(play, sPrey)) {
-            if (sPreyLastHp == 0) {
-                Prey_Slain(play);
-                return;
+    for (k = 0; k < PREY_COUNT; k++) {
+        if (sPreyDone[k] || (sPrey[k] == NULL)) {
+            continue;
+        }
+        if (!Prey_Present(play, sPrey[k])) {
+            if (sPreyLastHp[k] == 0) {
+                Prey_Slain(play, k);
+                if (!EV_RUNNING(EV_PREY)) {
+                    return;
+                }
+                continue;
             }
             // Gone some other way: the moon marks another.
-            sPrey = NULL;
+            sPrey[k] = NULL;
             sPreyTimer = FPS;
-            Prey_RemoveLight(play);
-        } else if (sPrey->colChkInfo.health == 0) {
-            Prey_Slain(play);
-            return;
+            Prey_RemoveLight(play, k);
+        } else if (sPrey[k]->colChkInfo.health == 0) {
+            Prey_Slain(play, k);
+            if (!EV_RUNNING(EV_PREY)) {
+                return;
+            }
         } else {
-            Actor* prey = sPrey;
-
-            sPreyLastHp = prey->colChkInfo.health;
-            // Moonlight: a pale glow, a light, and sparkles falling on it.
-            if (prey->colorFilterTimer == 0) {
-                Actor_SetColorFilter(prey, COLORFILTER_COLORFLAG_BLUE, 160, COLORFILTER_BUFFLAG_OPA, 30);
-            }
-            if (sPreyLight == NULL) {
-                sPreyLight = LightContext_InsertLight(play, &play->lightCtx, &sPreyLightInfo);
-            }
-            Lights_PointGlowSetInfo(&sPreyLightInfo, prey->world.pos.x, prey->world.pos.y + 40.0f, prey->world.pos.z,
-                                    170, 200, 255, 300);
-            if ((sEventFrames % 3) == 0) {
-                static Color_RGBA8 sPrim = { 230, 240, 255, 255 };
-                static Color_RGBA8 sEnv = { 110, 150, 255, 0 };
-                Vec3f pos;
-                Vec3f vel = { 0.0f, -3.0f, 0.0f };
-                Vec3f accel = { 0.0f, -0.05f, 0.0f };
-
-                pos.x = prey->world.pos.x + Rand_CenteredFloat(50.0f);
-                pos.y = prey->world.pos.y + 120.0f + Rand_ZeroOne() * 100.0f;
-                pos.z = prey->world.pos.z + Rand_CenteredFloat(50.0f);
-                EffectSsKirakira_SpawnSmall(play, &pos, &vel, &accel, &sPrim, &sEnv);
-            }
+            sPreyLastHp[k] = sPrey[k]->colChkInfo.health;
+            Prey_Glow(play, k);
         }
     }
-    if (sPrey == NULL) {
+    // Mark the next target that's missing.
+    for (k = 0; k < PREY_COUNT; k++) {
+        if (!sPreyDone[k] && (sPrey[k] == NULL)) {
+            break;
+        }
+    }
+    if (k < PREY_COUNT) {
         Actor* actor;
 
         if (sPreyTimer > 0) {
@@ -172,22 +259,23 @@ static void Tick_Prey(PlayState* play) {
             // Prefer enemies you have on in the enemy pool (any of them if none are).
             s32 picks[ARRAY_COUNT(sPreyPool)];
             s32 np = 0;
-            s32 k;
+            s32 j;
 
-            for (k = 0; k < (s32)ARRAY_COUNT(sPreyPool); k++) {
-                if (gOpt[ID_POOL_FIRST + sPreyPool[k]]) {
-                    picks[np++] = sPreyPool[k];
+            for (j = 0; j < (s32)ARRAY_COUNT(sPreyPool); j++) {
+                if (gOpt[ID_POOL_FIRST + sPreyPool[j]]) {
+                    picks[np++] = sPreyPool[j];
                 }
             }
             actor = V2_SpawnEnemy(play, (np > 0) ? picks[V2_Rand(np)] : sPreyPool[V2_Rand(ARRAY_COUNT(sPreyPool))],
                                   NULL, 400.0f, 800.0f, TAG_EVENT);
         }
         if (actor != NULL) {
-            sPrey = actor;
-            sPreyLastHp = actor->colChkInfo.health;
+            sPrey[k] = actor;
+            sPreyLastHp[k] = actor->colChkInfo.health;
             sPreyValid = true;
+            sPreyTries = 0;
             Audio_PlaySfx(NA_SE_EV_CHINCLE_SPELL_EFFECT);
-        } else if ((++sPreyTries > 20) && !sInComboPass) {
+        } else if ((++sPreyTries > 20) && !sInComboPass && !Prey_HasTarget(play)) {
             // Nothing can be marked here (small room, cleared area): no penalty.
             Menu_ShowToast(sPreyValid ? "The moon lost its prey." : "The moon found nothing to hunt.");
             Ev_Abort(play);
@@ -233,7 +321,7 @@ static void Prey_AfterActorUpdate(PlayState* play, Actor* actor) {
     Player* player = GET_PLAYER(play);
     s32 i;
 
-    if ((actor != sPrey) || (sActive != EV_PREY) || (actor->colChkInfo.health == 0) || (player == NULL) ||
+    if (!Prey_IsMarked(actor) || !EV_RUNNING(EV_PREY) || (actor->colChkInfo.health == 0) || (player == NULL) ||
         (actor->category != ACTORCAT_ENEMY)) {
         return;
     }
@@ -284,39 +372,56 @@ static void Prey_OnTimeout(PlayState* play) {
 }
 
 static void Prey_OnEnd(PlayState* play) {
-    Prey_RemoveLight(play);
-    sPrey = NULL;
+    s32 k;
+
+    Prey_RemoveLights(play);
+    for (k = 0; k < PREY_COUNT; k++) {
+        sPrey[k] = NULL;
+    }
     sPreyValid = false;
 }
 
 static void Prey_ResetForPlayInit(void) {
-    sPreyLight = NULL; // the new scene has a fresh light list
-    sPrey = NULL;
+    s32 k;
+
+    for (k = 0; k < PREY_COUNT; k++) {
+        sPreyLight[k] = NULL; // the new scene has a fresh light list
+        sPrey[k] = NULL;
+    }
 }
 
 static void Prey_OnRoomChange(PlayState* play) {
-    sPrey = NULL;
+    s32 k;
+
+    for (k = 0; k < PREY_COUNT; k++) {
+        sPrey[k] = NULL;
+    }
     sPreyTries = 0;
-    Prey_RemoveLight(play);
+    Prey_RemoveLights(play);
 }
 
 static void Prey_DrawWorld(PlayState* play) {
-    if ((sPrey != NULL) && (sActive == EV_PREY) && Prey_Present(play, sPrey) && (sPrey->colChkInfo.health > 0)) {
-        u8 a = 140 + (u8)(Math_SinS((s16)(play->gameplayFrames * 0x900)) * 60.0f);
+    s32 k;
 
-        Ev_DrawGroundCircle(play, &sPrey->world.pos, NULL, 0.8f, 180, 210, 255, a);
+    for (k = 0; k < PREY_COUNT; k++) {
+        if (EV_RUNNING(EV_PREY) && Prey_IsLiveTarget(play, k)) {
+            u8 a = 140 + (u8)(Math_SinS((s16)(play->gameplayFrames * 0x900)) * 60.0f);
+
+            Ev_DrawGroundCircle(play, &sPrey[k]->world.pos, NULL, 0.8f, 180, 210, 255, a);
+        }
     }
 }
 
 static s32 Prey_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b) {
-    if (sActive != EV_PREY) {
+    s32 n;
+
+    if (!EV_RUNNING(EV_PREY)) {
         return false;
     }
-    if ((sPrey != NULL) && (V2_PoolOfActor(sPrey) >= 0)) {
-        s32 n = Ev_Append(line, 0, "Slay the moonlit ", size);
-
-        n = Ev_Append(line, n, Pool_Name(V2_PoolOfActor(sPrey)), size);
-        Ev_Append(line, n, "!", size);
+    if (Prey_HasTarget(play)) {
+        n = Ev_Append(line, 0, "Slay both moonlit prey! ", size);
+        n = Ev_AppendNum(line, n, Prey_SlainCount(), size);
+        Ev_Append(line, n, "/2", size);
     } else {
         Ev_Append(line, 0, "The moon seeks its prey...", size);
     }

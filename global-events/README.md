@@ -52,6 +52,53 @@ New in 3.1.1:
 - **Radar zoom**: mouse wheel, pinch, + and -, "Whole area" and "Near them".
 - **Archipelago heatmap (spoilers)** on the Map tab, off until a friend turns it on. You set your room once in game: **Friends tab > Archipelago room** (address like `archipelago.gg:38281`, and your slot name). It's remembered; update it when your room's port changes. The page connects as a read-only tracker and colors each area by how many important items are left there. Rooms with a password aren't supported.
 
+New in 3.1.8:
+
+- **A new Nemesis system.** Its level is the number of skill points it has earned. A strong level-up (it kills you, you flee its area, or it gets away) gives 5-6 points; any other fall gives 1-3. Friends spend points on Health, Power, Speed and Tracking (the game spends them after 2 minutes). Every 5 points it gains a trait friends pick. Each stat unlocks a unique trait at 5, 10 and 20: Second Skin, Undying, Colossus, Heavy Hand, Shatter, Executioner, Lunge, Afterimage, Blitz, Echolocation, Bloodscent and Battlethirst. Every extra friend gets their own Nemesis (up to 4 in all), handed out to whoever's died longest ago. Killing one pays a flat 40 Moon Marks, and a Thief keeps what it stole.
+- **Events.** Infighting and Sky Leviathan are gone. Searchlights sends more backup. Mirror Dance is Normal. Mirage has two sets of 3 (2 real with 3x health, tougher enemies). Giant's Gale no longer hurts. Moonlit Prey has 2 targets. Frostbite and Sleeping Giant build faster. Scythe Sweep winds up before it swings, with a smaller safe gap. Moth Swarm is never random without a sword. Friends can pick the same event twice in a combo to double it (where that makes sense).
+- **Enemies.** Garo Master is Brutal; Garo (new) and Like Like are Medium.
+- **Friend page.** Radar icons: red skull Nemesis, yellow skull bounty, red dot enemy, purple surprise zones; drag to pan. Surprises are a box you drag, any size, and in game a purple wall shows only when you're very close to its edge. Friends see the next event and can only wager before it starts (that locks it in). Teleport is click-to-teleport on their map. Event difficulty reads Easy, Normal, Hard, Brutal. The quiz writer starts collapsed.
+
+New in 3.1.7:
+
+- **Better maps.** Every area is mapped now, indoors too (dungeons, houses, grottos, boss rooms). Every walkable surface is drawn, and the ground you can actually reach is bright while the rest is dimmed. Reach is worked out from doors, exits, grottos and every enemy, NPC and chest, and follows ramps, ladders, vines and narrow paths. The old maps also read the wrong ROM files for every area, which made them look broken; that's fixed. Your game rebuilds and re-uploads the maps once after you update `worker.js`.
+- **Double Defense switch.** A free Moon Service that turns your Double Defense off for a harder run, or back on. It only works once you've earned Double Defense (from the Great Fairy or the randomizer), and it never takes it away: the game's own flag stays set.
+- **Look here** is a solid pillar of light now, like the Pressure Seals pillars.
+- **Bullet Hell is gone.**
+- **Experimental, trimmed and fixed.** No more pop-ups for a friend's Experimental moves. Gone: Bounce, Launch spin, Health/magic/rupees, Look, Explosion, Bomb Rain, Meteors, Earthquake, Drops, the Moon Draft card and "End it now". Resize Link caps at 15x, no timer goes past 300 seconds, and settings move in steps of 0.1 or more. The Sky has Eerie purple and Sickly green. Raw sound picks from a tree of every sound by name. Tune the running event, the Director and event timing are one card. Each move that uses a spot has a Pick spot button that opens their map right there. Tick boxes untick again, and ticked values really send.
+- **Frozen fix.** A freeze with no length could hold Link (and the clock) forever. Freezes now always let go, Experimental freezes last 20 seconds at most, and Undo releases a freeze and borrowed invincibility.
+
+New in 3.1.6 (harder, and lots of polish):
+
+- **Harder events.** Frostbite, Moon Tether, Mirror Madness, Moth Swarm, Hex of Silence, Sinking Sands, Dissonance, Moon's Grasp, Reflex Test, Heartbeat Hex, Scythe Sweep, Giant's Gale and the Mask Salesman's Game are all tougher. Bomb Rain drops more often and the aimed bombs land where you're heading. Pop Quiz gives you 12 seconds per question.
+- **Fairer events.** Changing rooms no longer restarts an event's progress (seals, Simon rounds). Volley of Stars and Mirror Madness show where to look. The quiz's "what's here" question only counts what's really in the room, and some confusing riddles are fixed. Combos show which half is left.
+- **Less free money.** Bounties, the Nemesis, Starfall and Dowsing pay less. A missed Treasure Hunt pays nothing and freezes you longer. Events you start yourself (and Experimental ones) give no Marks or contract progress. Ending an event the moon sent costs 60 Moon Marks (free after 2 minutes, or if you started it).
+- **Shop.** Second Wind 320, Banish 300, Hire a Bounty 190, Nemesis Lure 120, New Contracts 40 (only swaps unfinished ones). Adding a star to a bounty costs more for higher stars. Moon Shield holds 2.
+- **Fixes.** A Thief Nemesis no longer pays back twice. Restarting the game can't re-earn finished contracts, a second WANTED or the hunt streak. Turning the Moon Draft off drops your picks. Lots of menu text fixed.
+- **Friends.** Helping costs more (heal, gifts, pouch items priced by what they're worth); hurting is a bit cheaper. Friend bounties pay half. Plenty of panel fixes, and the relay uses much less of Cloudflare's free plan.
+
+Update `worker.js` on Cloudflare along with the mod.
+
+New in 3.1.5:
+
+- **Experimental friends.** A 4th friend mode (Friends tab: Full > Experimental > Helpful > Blocked). Experimental friends get a sandbox tab on their page with about 30 moves and lots of settings each: resize Link, speed, gravity, launch, teleport, juiced explosive arrows, spawn any enemy at any size (hitboxes grow too), change every enemy at once, Nemesis level and stats, explosions, bomb rain, meteors, time, sky, quakes, drops, critters, camera zoom, start any event, tune events, the Director, Moon Marks, the Moon Draft, banners and raw sounds. Free, one a second, and it can kill you. "Undo Experimental stuff" in your Friends tab clears it all. It never touches your items or anything that could give a randomizer check, and nothing it spawns or starts pays Marks or counts for contracts.
+- **Friends write Pop Quizzes.** Up to 4 questions with their own answers.
+- **Moon Marks rebalanced.** Contracts wait for the next dawn instead of renewing at once, pay less, and you can hold 999 at most. Shop prices are up, and there are new things to spend on: Rupee Exchange, Moon Insurance, Training Dummy and Hire a Bounty.
+- **Fixes.** The event clock waits while Pop Quiz waits for your answer. Sleeping Giant, Reaction Test, Dissonance and the other newer events wait until their meter shows before they can hurt you. Your Nemesis heals fully when it levels up and never keeps damage between fights. Leevers can't become your Nemesis.
+- The menu shows the exact version now.
+
+Update `worker.js` on Cloudflare along with the mod.
+
+New in 3.1.4:
+
+- **Moon Draft.** Curses and mutators are one draft now. Each dawn and dusk you pick 1 of 2 from a mix of both. Picks last the cycle, up to 6, and each one adds 10% to your Moon Marks. There's no random curse at the start of a cycle anymore. "Shed Last Pick" in the shop removes your newest one. Friends rig your next draft with any two.
+- **Friend combos can use any event.** If either half has a goal (Nemesis, Champion, Pop Quiz, or one that runs until you finish), you have to clear both to end it.
+- **Friends list fixed.** Only friends who are here show up. They drop off a few seconds after closing the page. Your Blocked and Helpful settings are still remembered.
+- **Panel:** Forced Ambush is a "Forced" checkbox on the Ambush card (its cost updates with it). Grant Moon Marks is under Help them; the Marks tax and Message are under Pranks. The Termina map is bigger.
+- More special Nemesis names, and they show up twice as often (1 in 16).
+
+Update `worker.js` on Cloudflare along with the mod.
+
 New in 3.1.3:
 
 - **One Map tab.** The live view around you and the Termina map are side by side. Friends click any area on Termina to look at it and hide a surprise at an exact spot ("Surprise spot"), then "Back to them" for the live view, strikes, steering and placing.

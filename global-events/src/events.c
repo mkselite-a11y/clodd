@@ -116,6 +116,7 @@ typedef struct {
     s16 v3timer;  // lunges, shield breaks
 } TagData;
 #define TAGF3_FLED (1 << 0)
+#define TAGF3_EXP (1 << 1) // spawned by an Experimental friend: worth nothing
 static s32 gChillTimer = 0; // chilled: the control stick only goes half as far
 
 static ActorExtensionId sTagExt;
@@ -143,9 +144,50 @@ static s32 Tag_IsOurs(u8 tag) {
 // ---------------------------------------------------------------------------
 
 static s32 sCombo = -1;         // second event of a combo, or -1
+// Is this event running, as either half of a combo?
+#define EV_RUNNING(e) ((sActive == (e)) || (sCombo == (e)))
+// Combo halves that are cleared: 1 the first, 2 the second. A combo only ends
+// once every half with an end goal is cleared (friend combos can pair anything).
+static s32 sComboHalt = 0;
+static s32 sEndQuiet; // (set in ev_v11.inc)
+static s32 sEventFailed; // (ev_v11.inc)
+static s32 sFQuizCount;  // (ev_v11.inc)
+#define END_PRICE 60      // Moon Marks to end an event the moon sent
 static s32 sInComboPass = false; // running the combo's second event right now
 static s32 sComboPrimary = -1;  // the first event, while the second one runs
-static s32 sCurse = -1;         // this cycle's curse
+
+// Doubled: a friend paired an event with itself (X combo X). It runs once, as
+// one event (sCombo stays -1), throwing twice as much at you for the same time.
+// Only friends double an event (friend start paths and Experimental op 40):
+// the moon's own combos never pair an event with itself.
+static s32 sDoubled = false;
+
+// Events that can be doubled, and what doubling does to them.
+static s32 Ev_CanDouble(s32 ev) {
+    switch (ev) {
+        case EV_BOMB_RAIN:   // bombs twice as often
+        case EV_RUPOOR_RAIN: // rupoors twice as often
+        case EV_BLOOD_MOON:  // twice the horde (Odolwa stays one)
+        case EV_MOONFALL:    // rocks twice as often
+        case EV_SEARCH:      // twice the backup when a light catches you
+        case EV_TINGLE:      // twice the bombs per drop
+        case EV_SCYTHE:      // two sweeps on the go
+        case EV_MOTHS:       // moths arrive twice as fast
+        case EV_VOLLEY:      // volleys twice as often
+            return true;
+        default:
+            return false; // (rules, puzzles and one-off threats don't double)
+    }
+}
+
+static s32 sActive; // (defined below)
+
+// Is the running event doubled?
+static s32 Ev_IsDoubled(void) {
+    return sDoubled && (sActive >= 0);
+}
+static s32 sCurse = -1;         // the most recently picked curse (-1: none)
+static u32 sCurseMask = 0;      // every curse picked this cycle (the Moon Draft)
 static s32 sCurseFavorite = -1; // Moon's Favorite: the favored event
 
 typedef enum {
@@ -176,10 +218,23 @@ static s32 Curse_Is(s32 curse);
 static s32 Curse_CanUse(s32 curse);
 // V3 events (ev_v3.inc)
 static s32 V3_IsEvent(s32 ev);
+static s32 V3_IsLong(s32 ev);
+// Experimental friends (ev_exp.inc)
+static s32 Exp_AnyActive(void);
+static void Exp_Panic(PlayState* play);
+static f32 Exp_DrawScale(Actor* actor);
+static s32 Exp_Frozen(Actor* actor);
+static const char* Exp_Run(PlayState* play, s32 op, const char* t);
+static void Exp_Update(PlayState* play, s32 playing);
+static f32 sDirMult = 1.0f; // an Experimental friend can scale the Director's budget
+static s32 sDirPicks = 0;   // Moon Draft picks held (kept in step by ev_v2.inc)
+static s32 V3_Cur(void);
+static s32 Quiz_Asking(void);
 static const char* V3_Name(s32 ev);
 static const char* V3_Counter(s32 ev);
 static s32 V3_Tier(s32 ev);
 static s32 V3_CanRun(PlayState* play, s32 ev);
+static s32 V3_RandomOk(s32 ev);
 static void V3_OnStart(PlayState* play, s32 ev);
 static void V3_SceneSetup(PlayState* play);
 static void V3_Tick(PlayState* play);
@@ -277,8 +332,7 @@ static void Link_DropFriendNow(void);
 static s32 sFriendNow = -1;     // "start now" that had to wait (event running, can't run here)
 static s32 sStartByFriend = false; // V3: the event about to start was your friend's doing (+25% pay)
 static s32 sEventByFriend = false;
-static u16 sNemBonusTraits = 0; // traits your friend gave your Nemesis (always active)
-static char sNemCustom[16] = ""; // a name your friend gave it
+#define sNemCustom (sNem.custom) // a name your friend gave the current Nemesis (ev_v2.inc)
 static s32 sLinkDeaths = 0;     // this session, for the panel
 static s32 sLinkSurvived = 0;
 static s32 sEvSeq = 0;          // events ended this session (for wagers)
@@ -343,10 +397,12 @@ static const SpawnDef sPool[POOL_COUNT] = {
     { ACTOR_EN_DINOFOS, OBJECT_DINOFOS, 0x0000, 0, 0 },        // Dinolfos
     { ACTOR_EN_BIGPO, OBJECT_BIGPO, (s16)0xFF00, 0, 0 },       // Big Poe (no switch flag)
     { ACTOR_BOSS_01, OBJECT_BOSS01, 0x0000, 0, 0 },            // Odolwa
+    { ACTOR_EN_JSO, OBJECT_JSO, 0x0000, 0, 0 },                // Garo (no ring of fire; see Garo_BeforeInit)
 };
 
 #define POOL_ODOLWA 34
 #define POOL_BIGPOE 33
+#define POOL_GARO 35 // (appended after Odolwa so saved pool ids stay put)
 
 const char* Pool_Name(s32 index) {
     static const char* sNames[POOL_COUNT] = {
@@ -355,7 +411,7 @@ const char* Pool_Name(s32 index) {
         "Deku Baba",   "Dodongo",     "Guay",        "Freezard",     "Beamos",       "Armos",
         "Real Bombchu", "Like Like",  "Wallmaster",  "Floormaster",  "Hiploop",      "Mad Scrub",
         "Snapper",     "Dragonfly",   "Boe",         "Nejiron",      "Peahat",       "Leever",
-        "Garo Master", "Iron Knuckle", "Dinolfos",   "Big Poe",      "BOSS: Odolwa",
+        "Garo Master", "Iron Knuckle", "Dinolfos",   "Big Poe",      "BOSS: Odolwa", "Garo",
     };
 
     return ((index >= 0) && (index < POOL_COUNT)) ? sNames[index] : "???";
@@ -479,10 +535,12 @@ const char* Events_StartLabel(s32 ev) {
 // Retired events: kept in the code, but never offered or picked.
 s32 Events_IsHidden(s32 ev) {
     // (The Nemesis event was folded into Champion Duel in 2.9.)
-    // V3: Majora Looms (Moonfall), Imposters (Mirage), Poltergeist (Bullet Hell), Swarm Night (Blood Moon).
+    // V3: Majora Looms (Moonfall), Imposters (Mirage), Poltergeist, Swarm Night (Blood Moon).
+    // 3.1.7: Bullet Hell is gone too. 3.1.8: Infighting and Sky Leviathan.
     return (ev == EV_POE_HUNT) || (ev == EV_GLARE) || (ev == EV_WOLFPACK) || (ev == EV_STAMPEDE) ||
            (ev == EV_KAMIKAZE) || (ev == EV_NEMESIS) || (ev == EV_MAJORA) || (ev == EV_IMPOSTER) ||
-           (ev == EV_POLTERGEIST) || (ev == EV_SWARM);
+           (ev == EV_POLTERGEIST) || (ev == EV_SWARM) || (ev == EV_BULLETHELL) || (ev == EV_INFIGHT) ||
+           (ev == EV_LEVIATHAN);
 }
 
 static const char* Events_Flavor(s32 ev);
@@ -494,14 +552,14 @@ static const char* Events_Flavor(s32 ev) {
     switch (ev) {
         case EV_BOMB_RAIN: return "Take cover!";
         case EV_RUPOOR_RAIN: return "Guard your wallet!";
-        case EV_BLOOD_MOON: return "The moon hungers...";
+        case EV_BLOOD_MOON: return "Kill the whole horde to end it early.";
         case EV_JOKE: return "What is happening?";
         case EV_MOONFALL: return "Change direction!";
         case EV_STALKER: return "It knows where you are.";
         case EV_POE_HUNT: return "They are coming for you.";
         case EV_NEMESIS: return "Kill it to move on.";
         case EV_PHANTOM: return "Only the Lens sees them.";
-        case EV_TREASURE: return "Find it before time's up!";
+        case EV_TREASURE: return "Follow the beeps and the golden glow.";
         case EV_HUNGER: return "Kill to live.";
         case EV_SEARCH: return "Stay out of the light.";
         case EV_FATE: return "Don't look away.";
@@ -601,7 +659,7 @@ void Events_SetDefaults(void) {
     }
     gOpt[ID_POOL_HORDE] = HORDE_20;
     for (i = 0; i < POOL_COUNT; i++) {
-        gOpt[ID_POOL_FIRST + i] = (i < POOL_FIRST_BOSS); // bosses start off
+        gOpt[ID_POOL_FIRST + i] = !POOL_IS_BOSS(i); // bosses start off
     }
     gOpt[ID_CRIT_AMOUNT] = CRITAMT_100;
     for (i = 0; i < CRIT_COUNT; i++) {
@@ -1222,7 +1280,7 @@ static void Ev_KillOurs(PlayState* play) {
 // Atmosphere: darkness and color tints, sky filter, a dim light on Link.
 // ---------------------------------------------------------------------------
 
-typedef enum { ENV_NONE, ENV_DARK, ENV_RED, ENV_ORANGE, ENV_COLD } EnvStyle;
+typedef enum { ENV_NONE, ENV_DARK, ENV_RED, ENV_ORANGE, ENV_COLD, ENV_PURPLE, ENV_GREEN } EnvStyle;
 
 static s32 sSkySaved = false;
 static u8 sSavedSkyFilterOn;
@@ -1335,7 +1393,16 @@ static void Ev_ApplyEnv(PlayState* play, EnvStyle style, f32 f) {
         static const s16 sRed[3][3] = { { 60, -40, -40 }, { 90, -60, -60 }, { 150, 0, 0 } };
         static const s16 sOrange[3][3] = { { 50, 5, -50 }, { 80, 20, -70 }, { 210, 90, 20 } };
         static const s16 sCold[3][3] = { { -30, -5, 40 }, { -40, -5, 50 }, { 150, 175, 215 } };
-        const s16(*tint)[3] = (style == ENV_RED) ? sRed : (style == ENV_COLD) ? sCold : sOrange;
+        static const s16 sPurple[3][3] = { { 30, -30, 50 }, { 50, -45, 70 }, { 120, 40, 170 } };
+        static const s16 sGreen[3][3] = { { -15, 35, -35 }, { -25, 55, -50 }, { 95, 150, 55 } };
+        static const u8 sFilter[7][3] = { { 0, 0, 0 },     { 0, 0, 0 },    { 160, 0, 0 }, { 230, 90, 0 },
+                                          { 120, 170, 230 }, { 130, 40, 190 }, { 110, 170, 40 } };
+        const s16(*tint)[3] = (style == ENV_RED)      ? sRed
+                              : (style == ENV_COLD)   ? sCold
+                              : (style == ENV_PURPLE) ? sPurple
+                              : (style == ENV_GREEN)  ? sGreen
+                                                      : sOrange;
+        s32 k = CLAMP((s32)style, 0, 6);
 
         for (i = 0; i < 3; i++) {
             adj->ambientColor[i] = (s16)(tint[0][i] * f);
@@ -1345,9 +1412,9 @@ static void Ev_ApplyEnv(PlayState* play, EnvStyle style, f32 f) {
         }
         adj->fogNear = 0;
         play->envCtx.customSkyboxFilter = true;
-        play->envCtx.skyboxFilterColor[0] = (style == ENV_RED) ? 160 : (style == ENV_COLD) ? 120 : 230;
-        play->envCtx.skyboxFilterColor[1] = (style == ENV_RED) ? 0 : (style == ENV_COLD) ? 170 : 90;
-        play->envCtx.skyboxFilterColor[2] = (style == ENV_COLD) ? 230 : 0;
+        play->envCtx.skyboxFilterColor[0] = sFilter[k][0];
+        play->envCtx.skyboxFilterColor[1] = sFilter[k][1];
+        play->envCtx.skyboxFilterColor[2] = sFilter[k][2];
         play->envCtx.skyboxFilterColor[3] = (u8)(150.0f * f);
     }
 }
@@ -1626,16 +1693,17 @@ static s32 Ev_PickRandom(PlayState* play) {
     s32 i;
 
     for (i = 0; i < EV_COUNT; i++) {
-        if (gOpt[ID_EV_ON_FIRST + i] && Ev_CanRun(play, i) && (i != sLastEvent)) {
+        if (gOpt[ID_EV_ON_FIRST + i] && Ev_CanRun(play, i) && V3_RandomOk(i) && (i != sLastEvent)) {
             // Moon's Favorite (curse): half of all picks.
-            if ((sCurse == CURSE_FAVORITE) && gOpt[ID_EV_CURSE] && (i == sCurseFavorite) && (Rand_ZeroOne() < 0.5f)) {
+            if (Curse_Is(CURSE_FAVORITE) && (i == sCurseFavorite) && (Rand_ZeroOne() < 0.5f)) {
                 return i;
             }
             candidates[count++] = i;
         }
     }
     // If the only option is the one that just ran, allow it anyway.
-    if ((count == 0) && (sLastEvent >= 0) && gOpt[ID_EV_ON_FIRST + sLastEvent] && Ev_CanRun(play, sLastEvent)) {
+    if ((count == 0) && (sLastEvent >= 0) && gOpt[ID_EV_ON_FIRST + sLastEvent] && Ev_CanRun(play, sLastEvent) &&
+        V3_RandomOk(sLastEvent)) {
         candidates[count++] = sLastEvent;
     }
     if (count == 0) {
@@ -1651,7 +1719,7 @@ static s32 Ev_PickPoolEnemy(s32 allowBosses) {
 
     for (i = 0; i < POOL_COUNT; i++) {
         // V3: Big Poes are no fun to fight: never picked.
-        if (gOpt[ID_POOL_FIRST + i] && (allowBosses || (i < POOL_FIRST_BOSS)) && (i != POOL_BIGPOE)) {
+        if (gOpt[ID_POOL_FIRST + i] && (allowBosses || !POOL_IS_BOSS(i)) && (i != POOL_BIGPOE)) {
             candidates[count++] = i;
         }
     }
@@ -1762,9 +1830,39 @@ static void Linger_Update(PlayState* play, s32 playing) {
     }
 }
 
+// Must be cleared to end: untimed events and the ported ones that run until you finish.
+static s32 Ev_HasGoal(s32 ev) {
+    return (ev == EV_NEMESIS) || (ev == EV_CHAMPION) || (ev == EV_QUIZ) || V3_IsLong(ev);
+}
+
 static void Ev_End(PlayState* play) {
     if (sActive < 0) {
         return;
+    }
+    // A combo half finishing (won, found, timed out) while the other half still has a goal:
+    // that half stops, and the combo keeps going until the other is cleared too.
+    if ((sCombo >= 0) && !sEndQuiet && (sComboHalt != 3)) {
+        s32 half = sInComboPass ? 2 : 1;
+
+        sComboHalt |= half;
+        if ((sComboHalt != 3) && ((half == 2) || Ev_HasGoal(sCombo))) {
+            static char sHalfToast[48];
+            s32 n = Ev_Append(sHalfToast, 0, "Now clear ", sizeof(sHalfToast));
+
+            n = Ev_Append(sHalfToast, n, Events_ShortName((half == 2) ? sComboPrimary : sCombo), sizeof(sHalfToast));
+            Ev_Append(sHalfToast, n, (half == 2) ? " to end it." : "!", sizeof(sHalfToast));
+            if ((half == 2) && !Ev_HasGoal(sComboPrimary)) {
+                n = Ev_Append(sHalfToast, 0, "Now survive ", sizeof(sHalfToast));
+                n = Ev_Append(sHalfToast, n, Events_ShortName(sComboPrimary), sizeof(sHalfToast));
+                Ev_Append(sHalfToast, n, ".", sizeof(sHalfToast));
+            }
+            Menu_ShowToast(sHalfToast);
+            return;
+        }
+    }
+    sComboHalt = 0;
+    if (EV_RUNNING(EV_QUIZ)) {
+        sFQuizCount = 0; // a friend's questions are for this quiz only
     }
     if ((sActive == EV_SEARCH) || (sCombo == EV_SEARCH)) {
         Linger_Keep(play, 10 * FPS);
@@ -1789,12 +1887,15 @@ static void Ev_End(PlayState* play) {
 
     sActive = -1;
     sCombo = -1;
+    sDoubled = false;
     sInComboPass = false;
     sBannerTimer = 0;
     sUntilNext = Ev_NextDelay();
 }
 
 // Starts an event, optionally with a second one running alongside (combo).
+// combo == ev doubles it (friends only, see sDoubled); other combos of an event
+// with itself are dropped.
 static void V3_DrawWorld(PlayState* play);
 
 static void Ev_StartFull(PlayState* play, s32 ev, s32 combo, s32 fromRoulette) {
@@ -1804,6 +1905,8 @@ static void Ev_StartFull(PlayState* play, s32 ev, s32 combo, s32 fromRoulette) {
 
     sActive = ev;
     sCombo = -1;
+    sDoubled = (combo == ev) && Ev_CanDouble(ev);
+    sComboHalt = 0;
     sBombMarkCount = 0;
     sDirSpent = 0;
     sBloodSpawned = 0;
@@ -1825,6 +1928,7 @@ static void Ev_StartFull(PlayState* play, s32 ev, s32 combo, s32 fromRoulette) {
     if ((combo >= 0) && (combo != ev)) {
         sCombo = combo;
         EV_COMBO_PASS(Wave2_OnStart(play, sActive));
+        EV_COMBO_PASS(V3_OnStart(play, sActive));
     }
     Stats_OnStart(ev, sCombo);
     Card_ShowEvent(ev, sCombo, fromRoulette);
@@ -1981,6 +2085,117 @@ RECOMP_HOOK_RETURN("Boss01_Update") void Events_AfterOdolwaUpdate(void) {
 }
 
 // ---------------------------------------------------------------------------
+// A plain Garo (EnJso) away from Ikana. The game only spawns it from a ring of
+// fire (EnEncount3), whose cutscene id it reads in its setup, and it plays an
+// intro cutscene and a hint conversation when beaten. A Garo with no parent gets
+// a stand-in parent for its setup, skips the intro and fights at once, and
+// bursts into flames when beaten (no conversation).
+// ---------------------------------------------------------------------------
+
+#define ENJSO_ACTION(actor) ACTOR_FIELD(actor, s16, 0x27C)       // EnJso.action
+#define ENJSO_LOCKED_ON(actor) ACTOR_FIELD(actor, s16, 0x28C)    // EnJso.isPlayerLockedOn
+#define ENJSO_ATTACKING(actor) ACTOR_FIELD(actor, s16, 0x28E)    // EnJso.isAttacking
+#define ENJSO_CSID(actor) ACTOR_FIELD(actor, s16, 0x4B8)         // EnJso.csId
+#define ENJSO_CS_STATE(actor) ACTOR_FIELD(actor, s16, 0x4C0)     // EnJso.cutsceneState
+#define ENJSO_SUBCAM(actor) ACTOR_FIELD(actor, s16, 0x4C2)       // EnJso.subCamId
+#define ENJSO_SKEL(actor) ACTOR_FIELD(actor, SkelAnime, 0x144)   // EnJso.skelAnime
+#define ENJSO_ANIM_END(actor) ACTOR_FIELD(actor, f32, 0x350)     // EnJso.animEndFrame
+#define ENJSO_ACTION_FALL_DOWN_AND_TALK 14
+#define ENENCOUNT3_CSID_OFFSET 0x15A                              // EnEncount3.csId
+#define ENENCOUNT3_SIZE 0x1CC
+// EnJso_Draw sits this far after EnJso_Update in the same overlay (0x809B0BB0 - 0x809B02CC).
+#define ENJSO_DRAW_FROM_UPDATE 0x8E4
+
+void EnJso_SetupJumpBack(Actor* thisx);
+void EnJso_SetupReappear(Actor* thisx, PlayState* play);
+void EnJso_Guard(Actor* thisx, PlayState* play);
+
+static u64 sGaroFakeParent[(ENENCOUNT3_SIZE + 7) / 8];
+static Actor* sGaroIniting = NULL;
+static Actor* sGaroUpdating = NULL;
+static PlayState* sGaroPlay = NULL;
+
+RECOMP_HOOK("EnJso_Init") void Garo_BeforeInit(Actor* thisx, PlayState* play) {
+    sGaroIniting = NULL;
+    if (thisx->parent != NULL) {
+        return; // a real ring-of-fire Garo
+    }
+    bzero(sGaroFakeParent, sizeof(sGaroFakeParent));
+    *(s16*)((u8*)sGaroFakeParent + ENENCOUNT3_CSID_OFFSET) = CS_ID_NONE;
+    thisx->parent = (Actor*)sGaroFakeParent;
+    sGaroIniting = thisx;
+}
+
+RECOMP_HOOK_RETURN("EnJso_Init") void Garo_AfterInit(void) {
+    Actor* thisx = sGaroIniting;
+
+    if (thisx == NULL) {
+        return;
+    }
+    sGaroIniting = NULL;
+    thisx->parent = NULL;
+    // What the end of its intro cutscene does.
+    ENJSO_CSID(thisx) = CS_ID_NONE;
+    ENJSO_CS_STATE(thisx) = 0;
+    ENJSO_SUBCAM(thisx) = SUB_CAM_ID_DONE;
+    thisx->draw = (ActorFunc)((uintptr_t)thisx->update + ENJSO_DRAW_FROM_UPDATE);
+    thisx->shape.yOffset = 970.0f;
+    thisx->shape.shadowScale = 16.0f;
+    thisx->flags &= ~(ACTOR_FLAG_FREEZE_EXCEPTION | ACTOR_FLAG_LOCK_ON_DISABLED);
+    thisx->flags |= ACTOR_FLAG_ATTENTION_ENABLED;
+    EnJso_SetupJumpBack(thisx); // draws both swords and hops back, then circles Link
+}
+
+// Removed mid-attack (an event ending, a Mirage fake fading): the overlay's
+// shared "a Garo is attacking" flag would stay set and the other Garos would
+// never attack again. Clear it first.
+RECOMP_HOOK("EnJso_Destroy") void Garo_BeforeDestroy(Actor* thisx, PlayState* play) {
+    if ((thisx->parent == NULL) && ENJSO_ATTACKING(thisx)) {
+        // Its guard step, at the end of its animation, clears the flag (no sounds or effects).
+        ENJSO_SKEL(thisx).curFrame = ENJSO_ANIM_END(thisx);
+        EnJso_Guard(thisx, play);
+    }
+}
+
+RECOMP_HOOK("EnJso_Update") void Garo_BeforeUpdate(Actor* thisx, PlayState* play) {
+    sGaroUpdating = (thisx->parent == NULL) ? thisx : NULL;
+    sGaroPlay = play;
+}
+
+RECOMP_HOOK_RETURN("EnJso_Update") void Garo_AfterUpdate(void) {
+    static Vec3f sFlameVel[] = {
+        { 1.0f, 0.0f, 0.5f },   { 1.0f, 0.0f, -0.5f },  { -1.0f, 0.0f, 0.5f },
+        { -1.0f, 0.0f, -0.5f }, { 0.5f, 0.0f, 1.0f },   { -0.5f, 0.0f, 1.0f },
+        { 0.5f, 0.0f, -1.0f },  { -0.5f, 0.0f, -1.0f }, { 0.0f, 0.0f, 0.0f },
+    };
+    Actor* thisx = sGaroUpdating;
+    PlayState* play = sGaroPlay;
+    Vec3f pos;
+    s32 i;
+
+    sGaroUpdating = NULL;
+    if ((thisx == NULL) || (play == NULL) || (thisx->update == NULL) ||
+        (ENJSO_ACTION(thisx) != ENJSO_ACTION_FALL_DOWN_AND_TALK)) {
+        return;
+    }
+    // Beaten: it would sit down and talk. Burn it away instead.
+    pos = thisx->world.pos;
+    pos.y = thisx->floorHeight;
+    if (ENJSO_ATTACKING(thisx) || ENJSO_LOCKED_ON(thisx)) {
+        EnJso_SetupReappear(thisx, play); // (only to clear the overlay's "a Garo is attacking" flags)
+    }
+    for (i = 0; i < ARRAY_COUNT(sFlameVel); i++) {
+        Vec3f firePos = pos;
+
+        firePos.x += Rand_CenteredFloat(30.0f);
+        firePos.z += Rand_CenteredFloat(30.0f);
+        func_800B3030(play, &firePos, &sFlameVel[i], &sFlameVel[i], (s16)(Rand_ZeroFloat(100.0f) + 100.0f), 20, 1);
+    }
+    SoundSource_PlaySfxEachFrameAtFixedWorldPos(play, &pos, 10, NA_SE_EN_COMMON_EXTINCT_LEV - SFX_FLAG);
+    Actor_Kill(thisx);
+}
+
+// ---------------------------------------------------------------------------
 // Dogs need a path to walk along, so they get little loops near Link.
 // ---------------------------------------------------------------------------
 
@@ -2066,7 +2281,7 @@ static void Ev_SceneSetupEvent(PlayState* play) {
                 sBloodMoonPick = Ev_PickPoolEnemy(false);
             }
             if (sBloodMoonPick >= 0) {
-                sSpawnsLeft = (sBloodMoonPick >= POOL_FIRST_BOSS) ? 1 : HordeSize();
+                sSpawnsLeft = POOL_IS_BOSS(sBloodMoonPick) ? 1 : HordeSize() * (Ev_IsDoubled() ? 2 : 1);
             }
             Ev_StartMusic(NA_BGM_MINI_BOSS);
             break;
@@ -2136,6 +2351,7 @@ static void Ev_SceneSetup(PlayState* play) {
     Ev_SceneSetupEvent(play);
     EV_COMBO_PASS(Ev_SceneSetupEvent(play));
     V3_SceneSetup(play);
+    EV_COMBO_PASS(V3_SceneSetup(play));
 
     // An area's own music can start a little after we arrive; check back.
     sMusicCheckFrames = 5 * FPS;
@@ -2157,7 +2373,7 @@ static void Ev_SpawnLinkBomb(PlayState* play, Vec3f* pos, s16 timer) {
 // V3: bombs drop from high up (about 2 seconds of fall), a red mark shows where
 // each lands, and nothing lands under a roof or overhang, so cover works.
 static void Tick_BombRain(PlayState* play) {
-    static const u8 sInterval[INTENSITY_MAX] = { 16, 12, 7 };
+    static const u8 sInterval[INTENSITY_MAX] = { 14, 10, 6 };
     Player* player = GET_PLAYER(play);
     Vec3f spot;
     Vec3f probe;
@@ -2174,15 +2390,25 @@ static void Tick_BombRain(PlayState* play) {
         }
     }
     sBombMarkCount = m;
-    if ((sEventFrames % sInterval[Intensity()]) != 0) {
+    if ((sEventFrames % (Ev_IsDoubled() ? MAX(sInterval[Intensity()] / 2, 2) : sInterval[Intensity()])) != 0) {
         return;
     }
-    if (play->actorCtx.actorLists[ACTORCAT_EXPLOSIVES].length >= 16) {
+    if (play->actorCtx.actorLists[ACTORCAT_EXPLOSIVES].length >= (Ev_IsDoubled() ? 24 : 16)) {
         return;
     }
-    // About one in eight aims right at Link.
-    if (Rand_ZeroOne() < 0.12f) {
-        if (!Ev_FindSpot(play, 0.0f, 50.0f, 0, 0x7FFF, false, &spot)) {
+    // About one in six aims where Link is heading.
+    if (Rand_ZeroOne() < 0.18f) {
+        Vec3f ahead = player->actor.world.pos;
+        f32 floorY;
+
+        ahead.x += player->actor.velocity.x * 15.0f;
+        ahead.z += player->actor.velocity.z * 15.0f;
+        ahead.y += 60.0f;
+        floorY = BgCheck_EntityRaycastFloor3(&play->colCtx, &poly, &bgId, &ahead);
+        if (floorY > BGCHECK_Y_MIN + 10.0f) {
+            spot = ahead;
+            spot.y = floorY;
+        } else if (!Ev_FindSpot(play, 0.0f, 50.0f, 0, 0x7FFF, false, &spot)) {
             return;
         }
     } else if (!Ev_FindSpot(play, 40.0f, reach, player->actor.shape.rot.y, 0x7FFF, false, &spot)) {
@@ -2321,10 +2547,10 @@ static void Tick_RupoorRain(PlayState* play) {
     Player* player = GET_PLAYER(play);
     Vec3f spot;
 
-    if ((sEventFrames % sInterval[Intensity()]) != 0) {
+    if ((sEventFrames % (Ev_IsDoubled() ? MAX(sInterval[Intensity()] / 2, 2) : sInterval[Intensity()])) != 0) {
         return;
     }
-    if (Ev_CountTagged(play, ACTORCAT_MISC, TAG_RUPOOR) >= 40) {
+    if (Ev_CountTagged(play, ACTORCAT_MISC, TAG_RUPOOR) >= (Ev_IsDoubled() ? 60 : 40)) {
         return;
     }
     if (!Ev_FindSpot(play, 0.0f, 350.0f, player->actor.shape.rot.y, 0x7FFF, false, &spot)) {
@@ -2419,8 +2645,8 @@ static s32 Ev_StepToward(PlayState* play, Actor* actor, Vec3f* target, f32 speed
 static s32 Dir_PoolOfActorId(s16 actorId) {
     s32 i;
 
-    for (i = 0; i < POOL_FIRST_BOSS; i++) {
-        if (sPool[i].actorId == actorId) {
+    for (i = 0; i < POOL_COUNT; i++) {
+        if ((sPool[i].actorId == actorId) && !POOL_IS_BOSS(i)) {
             return i;
         }
     }
@@ -2437,6 +2663,13 @@ static s32 Dir_Cost(s16 actorId) {
 static s32 Dir_EventTier(void) {
     s32 tier = (sActive >= 0) ? Ev_Tier(sActive) : 1;
 
+    {
+        s32 other = sInComboPass ? sComboPrimary : sCombo;
+
+        if ((other >= 0) && (other != sActive)) {
+            tier = MAX(tier, Ev_Tier(other)); // a combo spends like its harder half
+        }
+    }
     if (Intensity() >= INTENSITY_BRUTAL) {
         tier++; // Fierce Moon, Empower
     }
@@ -2449,7 +2682,13 @@ static s32 Dir_Budget(void) {
     f32 scale = (hearts <= 10) ? (0.7f + 0.3f * (hearts - 3) / 7.0f) : (1.0f + 0.04f * (hearts - 10));
 
     scale = CLAMP(scale, 0.7f, 1.4f);
-    return MAX((s32)(sBudget[Dir_EventTier()] * scale + 0.5f), 2);
+    if (gOpt[ID_V2_MUT]) {
+        scale *= 1.0f + 0.05f * sDirPicks; // each Moon Draft pick: 5% more enemies (they pay 10% more)
+    }
+    if (Ev_IsDoubled()) {
+        scale *= 2.0f; // doubled: twice the enemies
+    }
+    return MAX((s32)(sBudget[Dir_EventTier()] * scale * sDirMult + 0.5f), (sDirMult <= 0.0f) ? 0 : 2);
 }
 
 // Threat of our event enemies alive right now.
@@ -2478,17 +2717,19 @@ static s32 Dir_Allow(PlayState* play, s16 actorId) {
     if (cost == 0) {
         return true;
     }
-    if ((pool >= 0) && (Pool_Tier(pool) >= 2) && (Dir_EventTier() < 2) && (sActive != EV_BLOOD_MOON)) {
+    if ((pool >= 0) && (Pool_Tier(pool) >= 2) && (Dir_EventTier() < 2) && !EV_RUNNING(EV_BLOOD_MOON)) {
         return false; // tough enemies stay out of the easier events
     }
-    if (sDirSpent + cost > budget * 2) {
+    if (sDirSpent + cost > budget * 2 + (EV_RUNNING(EV_SEARCH) ? 6 : 0)) {
         return false; // the whole pool (counted twice over a long event) is spent
     }
-    return Dir_AliveCost(play) + cost <= MAX(budget / 2, cost);
+    // Searchlights' backup gets a little more room (one more enemy at a time).
+    return Dir_AliveCost(play) + cost <= MAX(budget / 2 + (EV_RUNNING(EV_SEARCH) ? 2 : 0), cost);
 }
 
-static s32 Dir_Exhausted(void) {
-    return sDirSpent >= Dir_Budget() * 2 - 1;
+// Out of budget for another enemy of this cost.
+static s32 Dir_Exhausted(s32 cost) {
+    return sDirSpent + MAX(cost, 1) > Dir_Budget() * 2;
 }
 
 static s32 sSpawnNear = false;
@@ -2552,7 +2793,7 @@ static void Tick_BloodMoon(PlayState* play) {
         }
     }
     // V3: wipe out the whole horde and the Blood Moon sets early.
-    if ((sBloodSpawned > 0) && ((sSpawnsLeft <= 0) || Dir_Exhausted()) && (Ev_CountOurEnemies(play) == 0) &&
+    if ((sBloodSpawned > 0) && ((sSpawnsLeft <= 0) || Dir_Exhausted(Dir_Cost(sPool[sBloodMoonPick].actorId))) && (Ev_CountOurEnemies(play) == 0) &&
         (sFramesLeft > 1) && !sInComboPass) {
         Menu_ShowToast("The horde is broken!");
         sFramesLeft = 1;
@@ -2634,8 +2875,8 @@ static void Ev_Upkeep(PlayState* play) {
 void Events_ShouldActorUpdate(PlayState* play, Actor* actor, bool* should) {
     Player* player;
 
-    if (V2_ShouldFreeze(actor)) {
-        *should = false; // Moon Hourglass
+    if (V2_ShouldFreeze(actor) || Exp_Frozen(actor)) {
+        *should = false; // Moon Hourglass, or an Experimental friend froze it
     } else {
         V2_Perception(play, actor); // Smoke Veil and Decoy
     }
@@ -2643,7 +2884,7 @@ void Events_ShouldActorUpdate(PlayState* play, Actor* actor, bool* should) {
     Wave4_ShouldActorUpdate(play, actor, should);
 
     // Champion Duel: enemies that were already around wait out the duel.
-    if ((sActive == EV_CHAMPION) && gOpt[ID_CD_FREEZE] && (actor->category == ACTORCAT_ENEMY)) {
+    if (EV_RUNNING(EV_CHAMPION) && gOpt[ID_CD_FREEZE] && (actor->category == ACTORCAT_ENEMY)) {
         TagData* t = Tag_Get(actor);
 
         if ((t != NULL) && (t->tag == TAG_NONE) && (t->flags & TAGF_DUEL_HOLD) && (sNemActor != NULL)) {
@@ -2786,10 +3027,11 @@ static void Tick_Moonfall(PlayState* play) {
         Actor_RequestQuake(play, 4, 45);
         Rumble_Request(0.0f, 150, 10, 60);
     }
-    if (!Ev_IsOutdoors(play) || ((sEventFrames % sInterval[Intensity()]) != 0)) {
+    if (!Ev_IsOutdoors(play) ||
+        ((sEventFrames % (Ev_IsDoubled() ? sInterval[Intensity()] / 2 : sInterval[Intensity()])) != 0)) {
         return;
     }
-    if (Ev_CountTagged(play, ACTORCAT_MISC, TAG_SKYROCK) >= 8) {
+    if (Ev_CountTagged(play, ACTORCAT_MISC, TAG_SKYROCK) >= (Ev_IsDoubled() ? 12 : 8)) {
         return;
     }
 
@@ -2911,7 +3153,7 @@ static void Ev_UpdateMoonGlow(Actor* thisx) {
     if ((t == NULL) || !Ev_IsMoonType(thisx)) {
         return;
     }
-    if ((sActive == EV_REDLIGHT) || (sActive == EV_GLARE)) {
+    if (EV_RUNNING(EV_REDLIGHT) || EV_RUNNING(EV_GLARE)) {
         if (!t->glowSaved) {
             t->savedGlow = moon->eyeGlowIntensity;
             t->glowSaved = true;
@@ -3005,7 +3247,7 @@ static void Ev_SetRedMoonLights(PlayState* play) {
 
 // The distant moon used by most areas.
 RECOMP_HOOK("EnFall_LodMoon_Draw") void Events_BeforeLodMoonDraw(Actor* thisx, PlayState* play) {
-    if (sActive == EV_BLOOD_MOON) {
+    if (EV_RUNNING(EV_BLOOD_MOON)) {
         Ev_SetRedMoonLights(play);
     }
 }
@@ -3015,7 +3257,7 @@ static PlayState* sMoonTintPlay = NULL;
 // The full-detail moon in Termina Field.
 RECOMP_HOOK("EnFall_Moon_Draw") void Events_BeforeMoonDraw(Actor* thisx, PlayState* play) {
     sMoonTintPlay = NULL;
-    if (sActive != EV_BLOOD_MOON) {
+    if (!EV_RUNNING(EV_BLOOD_MOON)) {
         return;
     }
     Ev_SetRedMoonLights(play);
@@ -3168,12 +3410,37 @@ static f32 Ev_DistXZ(Vec3f* a, Vec3f* b) {
 // Freezing Link in place for a moment (Treasure Hunt penalty, Terrible Fate grab)
 // ---------------------------------------------------------------------------
 
+void DD_BeforeHealthChange(void);
+void DD_AfterHealthChange(void);
+static s32 sFateGrab; // (set up with the Terrible Fate code below)
 static s32 sFreezeFrames = 0;
+static s32 sFreezeRelease = 0; // frames after a freeze where we make sure Link really let go
+
+static void Freeze_Stop(PlayState* play) {
+    Player* player = GET_PLAYER(play);
+
+    if (sFreezeFrames <= 0) {
+        return;
+    }
+    sFreezeFrames = 0;
+    sFreezeRelease = 10;
+    if (player != NULL) {
+        Player_SetCsAction(play, NULL, PLAYER_CSACTION_END);
+        EffectSsIcePiece_SpawnBurst(play, &player->actor.world.pos, player->actor.scale.x);
+        Audio_PlaySfx(NA_SE_PL_ICE_BROKEN);
+    }
+}
 
 static void Freeze_Start(PlayState* play, s32 frames) {
     Player* player = GET_PLAYER(play);
 
     if (player == NULL) {
+        return;
+    }
+    // A zero-length hold would never be let go: treat it as "unfreeze".
+    frames = MIN(frames, 30 * FPS);
+    if (frames <= 0) {
+        Freeze_Stop(play);
         return;
     }
     sFreezeFrames = frames;
@@ -3186,13 +3453,20 @@ static void Freeze_Update(PlayState* play) {
     Player* player = GET_PLAYER(play);
 
     if (sFreezeFrames <= 0) {
+        // Just let go: if Link is still held (the release didn't take, say mid-air),
+        // keep asking for a few frames. Only when nothing else is holding him.
+        if (sFreezeRelease > 0) {
+            sFreezeRelease--;
+            if ((player != NULL) && (player->csAction == PLAYER_CSACTION_WAIT) &&
+                (play->csCtx.state == CS_STATE_IDLE) && !gMenuOpen && (sFateGrab < 0)) {
+                Player_SetCsAction(play, NULL, PLAYER_CSACTION_END);
+            }
+        }
         return;
     }
-    sFreezeFrames--;
-    if ((sFreezeFrames == 0) && (player != NULL)) {
-        Player_SetCsAction(play, NULL, PLAYER_CSACTION_END);
-        EffectSsIcePiece_SpawnBurst(play, &player->actor.world.pos, player->actor.scale.x);
-        Audio_PlaySfx(NA_SE_PL_ICE_BROKEN);
+    if (--sFreezeFrames == 0) {
+        sFreezeFrames = 1; // (Freeze_Stop does the letting go)
+        Freeze_Stop(play);
     }
 }
 
@@ -3248,6 +3522,7 @@ static s32 sNemGlowing = false;
 
 RECOMP_HOOK("Actor_Draw") void Events_BeforeActorDraw(PlayState* play, Actor* actor) {
     f32 size = 1.0f;
+    f32 expMult;
     u8 r;
     u8 g;
     u8 b;
@@ -3259,6 +3534,7 @@ RECOMP_HOOK("Actor_Draw") void Events_BeforeActorDraw(PlayState* play, Actor* ac
         return;
     }
     tag = Tag_Of(actor);
+    expMult = Exp_DrawScale(actor);
     if ((tag == TAG_NEMV2) || (tag == TAG_BOUNTY)) {
         // 2.0: your Nemesis pulses red, bounty targets glow gold.
         f32 w = (Math_SinS((s16)(play->gameplayFrames * 0x0C00)) + 1.0f) * 0.5f;
@@ -3268,9 +3544,13 @@ RECOMP_HOOK("Actor_Draw") void Events_BeforeActorDraw(PlayState* play, Actor* ac
         b = 0;
         fogFar = 1700;
         sNemGlowing = true;
+    } else if ((sActive < 0) && (expMult != 1.0f)) {
+        r = g = b = 0; // (an Experimental friend resized it: no glow)
+        fogFar = 1000;
+        sNemGlowing = false;
     } else if (sActive < 0) {
         return;
-    } else if ((sActive == EV_NEMESIS) && (actor == sNemActor) && (tag == TAG_NEMESIS)) {
+    } else if (EV_RUNNING(EV_NEMESIS) && (actor == sNemActor) && (tag == TAG_NEMESIS)) {
         // Bigger, pulsing red.
         size = Nemesis_Size();
         r = 170 + (s32)(Math_SinS((s16)(play->gameplayFrames * 0x0C00)) * 60.0f);
@@ -3278,7 +3558,7 @@ RECOMP_HOOK("Actor_Draw") void Events_BeforeActorDraw(PlayState* play, Actor* ac
         b = 0;
         fogFar = 1600;
         sNemGlowing = gOpt[ID_NEM_GLOW];
-    } else if ((sActive == EV_MIRAGE) && ((tag == TAG_MIRAGE_REAL) || (tag == TAG_MIRAGE_FAKE))) {
+    } else if (EV_RUNNING(EV_MIRAGE) && ((tag == TAG_MIRAGE_REAL) || (tag == TAG_MIRAGE_FAKE))) {
         // Real and fake shimmer alike, each at its own pace.
         f32 w = (Math_SinS((s16)(play->gameplayFrames * 0x0900 + (s32)((uintptr_t)actor >> 3) * 0x3D1)) + 1.0f) * 0.5f;
 
@@ -3294,9 +3574,14 @@ RECOMP_HOOK("Actor_Draw") void Events_BeforeActorDraw(PlayState* play, Actor* ac
         b = 210;
         fogFar = 1700;
         sNemGlowing = true;
+    } else if (expMult != 1.0f) {
+        r = g = b = 0;
+        fogFar = 1000;
+        sNemGlowing = false;
     } else {
         return;
     }
+    size *= expMult;
     sNemDrawing = actor;
     sNemDrawPlay = play;
     sNemSavedScale = actor->scale;
@@ -3351,7 +3636,7 @@ static void Nemesis_Spawn(PlayState* play) {
     if (Flags_GetClear(play, play->roomCtx.curRoom.num)) {
         return;
     }
-    if (sActive == EV_CHAMPION) {
+    if (EV_RUNNING(EV_CHAMPION)) {
         // The champion steps up in front of you.
         if (!Ev_FindSpot(play, 250.0f, 400.0f, player->actor.shape.rot.y, 0x3000, false, &spot) &&
             !Ev_FindSpot(play, 250.0f, 500.0f, 0, 0x7FFF, false, &spot)) {
@@ -3372,7 +3657,7 @@ static void Nemesis_Spawn(PlayState* play) {
     if (!sNemStarted) {
         s32 base = (actor->colChkInfo.health > 0) ? actor->colChkInfo.health : 1;
 
-        if (sActive == EV_CHAMPION) {
+        if (EV_RUNNING(EV_CHAMPION)) {
             static const f32 sChampMult[LVL_MAX] = { 1.0f, 1.5f, 2.0f };
 
             sNemMaxHealth = CLAMP((s32)(base * sChampMult[OptLvl(ID_CD_HEALTH)] + 0.5f), 1, 255);
@@ -3388,7 +3673,7 @@ static void Nemesis_Spawn(PlayState* play) {
     sNemZeroFrames = 0;
     sNemFarFrames = 0;
     sNemWaitFrames = 0;
-    if (sActive == EV_CHAMPION) {
+    if (EV_RUNNING(EV_CHAMPION)) {
         Duel_MarkHolds(play);
     }
     Audio_PlaySfx(NA_SE_SY_WARNING_COUNT_E);
@@ -3396,7 +3681,7 @@ static void Nemesis_Spawn(PlayState* play) {
 
 static void Nemesis_Defeated(PlayState* play) {
     Audio_PlaySfx(NA_SE_SY_CORRECT_CHIME);
-    Menu_ShowToast((sActive == EV_CHAMPION) ? "You beat the champion!" : "The Nemesis has fallen!");
+    Menu_ShowToast(EV_RUNNING(EV_CHAMPION) ? "You beat the champion!" : "The Nemesis has fallen!");
     sNemActor = NULL;
     Ev_End(play);
 }
@@ -3418,9 +3703,9 @@ static void Tick_Nemesis(PlayState* play) {
 
     if (actor == NULL) {
         // A champion that can't show up here calls off the duel.
-        if ((sActive == EV_CHAMPION) && (++sNemWaitFrames > 15 * FPS)) {
+        if (EV_RUNNING(EV_CHAMPION) && (++sNemWaitFrames > 15 * FPS)) {
             Menu_ShowToast("The champion never showed.");
-            Ev_End(play);
+            Ev_Abort(play); // nothing to fight: no reward either
             return;
         }
         if (sNemRespawnTimer > 0) {
@@ -3822,9 +4107,9 @@ static f32 Search_Radius(void) {
 }
 
 static s32 Search_Backup(void) {
-    static const u8 sCounts[STEP_MAX] = { 1, 2, 3, 5 };
+    static const u8 sCounts[STEP_MAX] = { 2, 3, 4, 6 }; // 3.1.8: one more each time
 
-    return sCounts[OptStep(ID_SL_BACKUP)];
+    return sCounts[OptStep(ID_SL_BACKUP)] * (Ev_IsDoubled() ? 2 : 1);
 }
 
 static void Search_RemoveLights(PlayState* play) {
@@ -4333,7 +4618,7 @@ static void RL_StartGreen(void) {
     static const u8 sHi[LVL_MAX] = { 80, 120, 180 };
 
     sRLPhase = RL_GREEN;
-    if (sActive == EV_GLARE) {
+    if (EV_RUNNING(EV_GLARE)) {
         // The moon looks away for a while; less on higher intensity.
         static const u8 sGlareLo[INTENSITY_MAX] = { 100, 70, 45 };
         static const u8 sGlareHi[INTENSITY_MAX] = { 160, 120, 80 };
@@ -4346,7 +4631,7 @@ static void RL_StartGreen(void) {
 
 // How strongly the moon's eyes glow right now (0 to 1).
 static f32 RL_MoonGlow(void) {
-    if ((sActive != EV_REDLIGHT) && (sActive != EV_GLARE)) {
+    if (!EV_RUNNING(EV_REDLIGHT) && !EV_RUNNING(EV_GLARE)) {
         return 0.0f;
     }
     if (sRLPhase == RL_RED) {
@@ -4387,7 +4672,7 @@ static void Tick_RedLight(PlayState* play) {
         case RL_WARN:
             if (--sRLTimer <= 0) {
                 sRLPhase = RL_RED;
-                s32 lenId = (sActive == EV_GLARE) ? ID_MG_LENGTH : ID_RL_RED;
+                s32 lenId = EV_RUNNING(EV_GLARE) ? ID_MG_LENGTH : ID_RL_RED;
 
                 sRLTimer = RL_RandomRange(sRedLo[OptLvl(lenId)], sRedHi[OptLvl(lenId)]);
                 sRLRedFrames = 0;
@@ -4400,11 +4685,11 @@ static void Tick_RedLight(PlayState* play) {
             s32 moving = (fabsf(player->speedXZ) > 1.0f) ||
                          ((player->rideActor != NULL) && (fabsf(player->rideActor->speed) > 1.0f));
 
-            s32 reactId = (sActive == EV_GLARE) ? ID_MG_REACT : ID_RL_REACT;
+            s32 reactId = EV_RUNNING(EV_GLARE) ? ID_MG_REACT : ID_RL_REACT;
 
             sRLRedFrames++;
             if (moving && (sRLRedFrames > sGrace[OptLvl(reactId)]) && (sRLImmune == 0)) {
-                if (sActive == EV_GLARE) {
+                if (EV_RUNNING(EV_GLARE)) {
                     // The moon strikes you with a fireball.
                     Glare_Strike(play);
                     sRLImmune = 25;
@@ -4924,7 +5209,7 @@ static void Duel_MarkHolds(PlayState* play) {
 
 // Ground fighters from sPool: Wolfos, White Wolfos, Stalchild, ReDead, Dodongo,
 // Iron Knuckle, Dinolfos.
-static const u8 sFighters[] = { 3, 4, 5, 6 }; // V3: Mild event, no heavies
+static const u8 sFighters[] = { 3, 4, 5, 6 }; // V3: Easy event, no heavies
 
 static s32 sTeamPick[2] = { -1, -1 };
 static s32 sTeamToSpawn[2] = { 0, 0 };
@@ -5155,7 +5440,7 @@ RECOMP_CALLBACK("*", recomp_after_actor_update) void Events_AfterActorUpdate(Pla
             return;
         }
         V2_AfterActorUpdate(play, actor);
-        if (sActive == EV_PREY) {
+        if (EV_RUNNING(EV_PREY)) {
             Prey_AfterActorUpdate(play, actor);
         }
     }
@@ -5173,9 +5458,9 @@ RECOMP_CALLBACK("*", recomp_after_actor_update) void Events_AfterActorUpdate(Pla
             actor->shape.rot.y = actor->world.rot.y = actor->yawTowardsPlayer;
         }
     }
-    if ((sActive == EV_WOLFPACK) && (t->tag == TAG_WOLF) && (sWolfPhase == WOLF_CIRCLE)) {
+    if (EV_RUNNING(EV_WOLFPACK) && (t->tag == TAG_WOLF) && (sWolfPhase == WOLF_CIRCLE)) {
         Wolf_HoldCircle(play, actor, t);
-    } else if ((sActive == EV_INFIGHT) && ((t->tag == TAG_TEAM_A) || (t->tag == TAG_TEAM_B))) {
+    } else if (EV_RUNNING(EV_INFIGHT) && ((t->tag == TAG_TEAM_A) || (t->tag == TAG_TEAM_B))) {
         Infight_Brawl(play, actor, t);
     } else {
         Wave4_AfterActorUpdate(play, actor, t);
@@ -5461,7 +5746,7 @@ static void Tick_Imposters(PlayState* play) {
 // ---------------------------------------------------------------------------
 
 s32 Events_IsRainbowCarpenter(Actor* actor) {
-    return ((sActive == EV_UPRISING) && (Tag_Of(actor) == TAG_UPRISING)) || (Tag_Of(actor) == TAG_BOARD);
+    return (EV_RUNNING(EV_UPRISING) && (Tag_Of(actor) == TAG_UPRISING)) || (Tag_Of(actor) == TAG_BOARD);
 }
 
 s32 Events_IsEventActor(Actor* actor) {
@@ -6189,7 +6474,9 @@ static void Tick_BulletHell(PlayState* play) {
 // hurt you and vanish when hit.
 // ---------------------------------------------------------------------------
 
-static const u8 sMirageTypes[] = { 3, 4, 5, 9 }; // V3: Wolfos, White Wolfos, Stalchild, Tektite (no heavies)
+// 3.1.8: Medium and Hard enemies (no Brutal ones): Wolfos, White Wolfos, Poe, Red Bubble,
+// Like Like, Snapper, Garo, Dodongo, Peahat, Dinolfos.
+static const u8 sMirageTypes[] = { 3, 4, 7, 11, 19, 24, POOL_GARO, 13, 28, 32 };
 
 static u8 sMirageGroup = 1;
 
@@ -6240,15 +6527,24 @@ static void Tick_Mirage(PlayState* play) {
     static const u8 sCats[] = { ACTORCAT_ENEMY, ACTORCAT_PROP };
     s32 c;
 
+    // Two sets of three at a time (one real, two fakes each). The real ones are
+    // tougher enemies than the Director lets a Normal event have, so only the
+    // event's total budget limits them, and they take three times the hits.
     if (((sEventFrames % 30) == 0) && (Ev_CountTagAll(play, TAG_MIRAGE_REAL) < 2) &&
         (sSpawnFailFrames < 200)) {
         const SpawnDef* def = &sPool[sMirageTypes[(s32)(Rand_ZeroOne() * ARRAY_COUNT(sMirageTypes)) %
                                                    ARRAY_COUNT(sMirageTypes)]];
+        s32 cost = Dir_Cost(def->actorId);
         s32 fakes = 2;
         s32 f;
+        Actor* real = NULL;
 
-        if (Dir_Allow(play, def->actorId) && (Mirage_SpawnOne(play, def, TAG_MIRAGE_REAL, sMirageGroup) != NULL)) {
-            sDirSpent += Dir_Cost(def->actorId);
+        if (sDirSpent + cost <= Dir_Budget() * 2) {
+            real = Mirage_SpawnOne(play, def, TAG_MIRAGE_REAL, sMirageGroup);
+        }
+        if (real != NULL) {
+            sDirSpent += cost;
+            real->colChkInfo.health = (u8)MIN(real->colChkInfo.health * 3, 255);
             for (f = 0; f < fakes; f++) {
                 Mirage_SpawnOne(play, def, TAG_MIRAGE_FAKE, sMirageGroup);
             }
@@ -7095,15 +7391,15 @@ static void Wave4_ShouldActorUpdate(PlayState* play, Actor* actor, bool* should)
     } else if (tag == TAG_PROCESSION) {
         *should = false;
         Puppet_RegisterCollider(play, actor, ENRD_COLLIDER(actor));
-    } else if ((sActive == EV_STILL) && sStillFreeze && Still_ShouldFreeze(play, actor)) {
+    } else if (EV_RUNNING(EV_STILL) && sStillFreeze && Still_ShouldFreeze(play, actor)) {
         *should = false;
     }
 }
 
 static void Wave4_AfterActorUpdate(PlayState* play, Actor* actor, TagData* t) {
-    if ((sActive == EV_MIRAGE) && (t->tag == TAG_MIRAGE_FAKE)) {
+    if (EV_RUNNING(EV_MIRAGE) && (t->tag == TAG_MIRAGE_FAKE)) {
         Mirage_StripAttacks(play, actor);
-    } else if ((sActive == EV_MIRROR) && (t->tag == TAG_MIRROR)) {
+    } else if (EV_RUNNING(EV_MIRROR) && (t->tag == TAG_MIRROR)) {
         Mirror_Dance(play, actor, t);
     } else if (Ev_IsOn(EV_SWARM) && (t->tag == TAG_SWARM)) {
         Swarm_Orbit(play, actor, t);
@@ -7111,9 +7407,9 @@ static void Wave4_AfterActorUpdate(PlayState* play, Actor* actor, TagData* t) {
 }
 
 static void Wave4_DrawWorldEvent(PlayState* play) {
-    if (sActive == EV_MAJORA) {
+    if (EV_RUNNING(EV_MAJORA)) {
         Majora_Draw(play);
-    } else if (sActive == EV_LEVIATHAN) {
+    } else if (EV_RUNNING(EV_LEVIATHAN)) {
         Leviathan_Draw(play);
     }
 }
@@ -7125,14 +7421,14 @@ static void Wave4_DrawWorld(PlayState* play) {
 }
 
 static s32 Wave4_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b) {
-    if ((sActive == EV_STILL) && sStillFreeze) {
+    if (EV_RUNNING(EV_STILL) && sStillFreeze) {
         Ev_Append(line, 0, "Time stands still", size);
         *r = 150;
         *g = 210;
         *b = 255;
         return true;
     }
-    if ((sActive == EV_PROCESSION) && (sProcBanner > 0)) {
+    if (EV_RUNNING(EV_PROCESSION) && (sProcBanner > 0)) {
         Ev_Append(line, 0, "The dead turn on you!", size);
         *r = 255;
         *g = 80;
@@ -7162,7 +7458,9 @@ static void Wave2_OnStart(PlayState* play, s32 ev) {
             sNemRespawnTimer = FPS;
             break;
         case EV_TREASURE:
-            sTotalFrames = sFramesLeft = Treasure_TimeFrames();
+            if (!sInComboPass) { // (as a combo's second half it doesn't set the whole combo's clock)
+                sTotalFrames = sFramesLeft = Treasure_TimeFrames();
+            }
             sTreasureValid = false;
             break;
         case EV_HUNGER:
@@ -7311,13 +7609,14 @@ static void Wave2_Tick(PlayState* play) {
 
 // Time ran out (timed events only).
 static void Wave2_OnTimeout(PlayState* play) {
-    if (sActive == EV_PREY) {
+    if (EV_RUNNING(EV_PREY)) {
         Prey_OnTimeout(play);
     }
-    if ((sActive == EV_TREASURE) && sTreasureValid) {
-        static const u8 sFreeze[INTENSITY_MAX] = { 20, 30, 50 };
+    if (EV_RUNNING(EV_TREASURE) && sTreasureValid) {
+        static const u8 sFreeze[INTENSITY_MAX] = { 40, 60, 80 };
 
         sTreasureValid = false;
+        sEventFailed = true; // missed it: no Marks, no streak
         Freeze_Start(play, sFreeze[Intensity()]);
         Menu_ShowToast("Too slow! Frozen!");
     }
@@ -7367,6 +7666,7 @@ static void Wave2_ResetForPlayInit(void) {
     sNemActor = NULL;
     sEchoGhost = NULL;
     sFreezeFrames = 0;
+    sFreezeRelease = 0;
     Echo_Reset();
     Wave4_ResetForPlayInit();
 }
@@ -7437,10 +7737,10 @@ RECOMP_HOOK_RETURN("Actor_DrawAll") void Events_AfterDrawAll(void) {
     if ((play == NULL) || !sSceneReady) {
         return;
     }
-    if ((sActive == EV_SEARCH) && (sSpotCount > 0)) {
+    if (EV_RUNNING(EV_SEARCH) && (sSpotCount > 0)) {
         Search_Draw(play);
     }
-    if ((sActive == EV_TREASURE) && sTreasureValid) {
+    if (EV_RUNNING(EV_TREASURE) && sTreasureValid) {
         Treasure_Draw(play);
     }
     if (Ev_IsOn(EV_BOMB_RAIN)) {
@@ -7476,6 +7776,7 @@ RECOMP_HOOK_RETURN("Actor_DrawAll") void Events_AfterDrawAll(void) {
 #include "ev_prey.inc"
 #include "ev_remote.inc"
 #include "ev_v3.inc"
+#include "ev_exp.inc"
 
 // ---------------------------------------------------------------------------
 // Scheduler
@@ -7517,9 +7818,11 @@ static void Ev_TickEvent(PlayState* play) {
 static void Curse_EventTick(PlayState* play);
 
 static void Ev_Tick(PlayState* play) {
-    Ev_TickEvent(play);
+    if (!(sComboHalt & 1)) {
+        Ev_TickEvent(play);
+    }
     Curse_EventTick(play);
-    if (sCombo >= 0) {
+    if ((sCombo >= 0) && !(sComboHalt & 2)) {
         s32 spawnsLeft = sSpawnsLeft;
         s32 failFrames = sSpawnFailFrames;
 
@@ -7636,6 +7939,7 @@ void Events_Update(PlayState* play) {
         sEndOnDeath = false;
         if (sActive >= 0) {
             Menu_ShowToast("You fell. The event is over.");
+            sComboHalt = 3; // both halves end
             Ev_End(play);
         }
         return;
@@ -7695,11 +7999,22 @@ void Events_Update(PlayState* play) {
             }
             sEventFrames++;
             // Time Moves When You Move: its clock only runs while you do.
-            if (Wave2_IsTimed() && !((sActive == EV_STILL) && sStillFreeze)) {
+            // The clock waits while Time Moves When You Move holds still, while a Pop Quiz
+            // waits for your answer, and while a ported event's how-to is still up.
+            if (Wave2_IsTimed() && !(EV_RUNNING(EV_STILL) && sStillFreeze) && !Quiz_Asking() &&
+                !((V3_Cur() >= 0) && (sBannerTimer > 0))) {
                 sFramesLeft--;
-                if (sFramesLeft <= 0) {
+                if ((sFramesLeft <= 0) && (sCombo >= 0) && !(sComboHalt & 2) && Ev_HasGoal(sCombo) &&
+                    !(V3_IsLong(sCombo) && (sEventFrames >= 60 * FPS + 5 * FPS))) {
+                    // Time's up for the first half; the second still has to be cleared.
+                    sFramesLeft = 0;
+                    if (!(sComboHalt & 1)) {
+                        Wave2_OnTimeout(play);
+                        Ev_End(play); // marks the first half cleared
+                    }
+                } else if (sFramesLeft <= 0) {
                     static char sEndToast[40];
-                    s32 hasOwnMessage = (sActive == EV_TREASURE) || Prey_HasTarget(play);
+                    s32 hasOwnMessage = EV_RUNNING(EV_TREASURE) || Prey_HasTarget(play);
                     s32 n;
 
                     if (!hasOwnMessage) {
@@ -7710,6 +8025,7 @@ void Events_Update(PlayState* play) {
                         Menu_ShowToast(sEndToast);
                     }
                     Wave2_OnTimeout(play);
+                    sComboHalt = 3; // time's up for everything still running
                     Ev_End(play); // may replace the message with a streak or wrath one
                 }
             }
@@ -7796,6 +8112,11 @@ void Events_OnPlayInit(PlayState* play) {
     sMoonUpdating = NULL;
     sMoonTintPlay = NULL;
     sOdolwaUpdating = NULL;
+    sGaroIniting = NULL;
+    sGaroUpdating = NULL;
+    if (sActive < 0) {
+        sDoubled = false; // (a running doubled event stays doubled in the new area)
+    }
     Wave2_ResetForPlayInit();
     sPlayReady = true;
 }
@@ -7844,28 +8165,22 @@ void Events_ResetForNewCycle(void) {
 RECOMP_HOOK("Sram_SaveEndOfCycle") void Events_OnEndOfCycle(PlayState* play) {
     Events_ResetForNewCycle();
     V2_OnNewCycle();
-    Curse_Roll();
 }
 
 RECOMP_CALLBACK("*", recomp_on_moon_crash) void Events_OnMoonCrash(void* sramCtx) {
     Events_ResetForNewCycle();
     V2_OnNewCycle();
-    Curse_Roll();
 }
 
 RECOMP_CALLBACK("*", recomp_after_load_save) void Events_OnLoadSave(void* fileSelect, void* sramCtx) {
     Events_ResetForNewCycle();
     V2_OnLoadSave(false);
-    if (sCurse < 0) {
-        Curse_Roll();
-    }
 }
 
 RECOMP_CALLBACK("*", recomp_after_init_save) void Events_OnInitSave(void* fileSelect, void* sramCtx) {
     Events_ResetForNewCycle();
     V2_OnLoadSave(true);
     Stats_Reset();
-    Curse_Roll();
 }
 
 // ---------------------------------------------------------------------------
@@ -7917,6 +8232,8 @@ void Events_StatusText(char* out, s32 maxLen) {
                       maxLen);
         if (sCombo >= 0) {
             n = Ev_Append(out, n, "+", maxLen);
+        } else if (Ev_IsDoubled()) {
+            n = Ev_Append(out, n, " x2", maxLen);
         }
         if (Wave2_IsTimed()) {
             Ev_FormatTime(time, sFramesLeft); // untimed events (Nemesis, Pop Quiz...) show no clock
@@ -7940,6 +8257,16 @@ void Events_StatusText(char* out, s32 maxLen) {
     }
 }
 
+// An event the moon sent, early on: skipping it costs Moon Marks (End Current Event),
+// so nothing else ends it for free. (Free in the cheats build, or after 2 minutes.)
+static s32 Ev_MoonSentRunning(void) {
+#ifdef GE_CHEATS
+    return false;
+#else
+    return (sActive >= 0) && V2_ON(ID_V2_BOUNTY) && !sEventWasCalled && !sEventByExp && (sEventFrames < 120 * FPS);
+#endif
+}
+
 s32 Events_RunAction(PlayState* play, s32 id) {
     s32 i;
 
@@ -7947,6 +8274,10 @@ s32 Events_RunAction(PlayState* play, s32 id) {
         return V2_RunAction(play, id);
     }
     if (id == ID_EV_TRIGGER) {
+        if (Ev_MoonSentRunning()) {
+            Menu_ShowToast("Finish or end this event first.");
+            return false;
+        }
         if (Ev_PickRandom(play) >= 0) {
             if (sActive >= 0) {
                 Ev_Abort(play);
@@ -7960,11 +8291,21 @@ s32 Events_RunAction(PlayState* play, s32 id) {
         }
         Menu_ShowToast("No event can run here.");
     } else if (id == ID_ALL_OFF) {
-        // "Turn Off All Mods" also stops events.
-        Ev_Abort(play);
+        // "Turn Off All Mods" also stops events (one the moon just sent still runs out).
+        if (!Ev_MoonSentRunning()) {
+            Ev_Abort(play);
+        }
         sRouletteTimer = 0;
         gOpt[ID_EV_MASTER] = false;
     } else if (id == ID_EV_END) {
+        // Skipping an event the moon sent costs Moon Marks (free if you started it, or after 2 minutes).
+        if (Ev_MoonSentRunning()) {
+            if (sMarks < END_PRICE) {
+                Menu_ShowToast("Ending it costs 60 Moon Marks.");
+                return false;
+            }
+            sMarks -= END_PRICE;
+        }
         if ((sActive >= 0) || (sRouletteTimer > 0)) {
             Ev_Abort(play);
             sRouletteTimer = 0;
@@ -7982,6 +8323,10 @@ s32 Events_RunAction(PlayState* play, s32 id) {
             Menu_ShowToast("You banned it this cycle.");
             return false;
         }
+        if (Ev_MoonSentRunning()) {
+            Menu_ShowToast("Finish or end this event first.");
+            return false;
+        }
         if (!Ev_CanRun(play, ev)) {
             Menu_ShowToast((ev == EV_MOONFALL)      ? "Moonfall needs to be outdoors."
                        : (ev == EV_BLOOD_MOON) ? "No enemy for it here."
@@ -7997,47 +8342,50 @@ s32 Events_RunAction(PlayState* play, s32 id) {
         for (i = 0; i < EV_COUNT; i++) {
             gOpt[ID_EV_ON_FIRST + i] = (id == ID_EV_ALL_ON);
         }
-        Menu_ShowToast((id == ID_EV_ALL_ON) ? "All events enabled" : "All events disabled");
+        Menu_ShowToast((id == ID_EV_ALL_ON) ? "All events on." : "All events off.");
     } else if (id == ID_POOL_ALL_ON) {
-        for (i = 0; i < POOL_FIRST_BOSS; i++) {
-            gOpt[ID_POOL_FIRST + i] = true;
+        for (i = 0; i < POOL_COUNT; i++) {
+            if (!POOL_IS_BOSS(i)) {
+                gOpt[ID_POOL_FIRST + i] = true;
+            }
         }
         Menu_ShowToast("All enemies on (bosses unchanged)");
     } else if (id == ID_POOL_ALL_OFF) {
         for (i = 0; i < POOL_COUNT; i++) {
             gOpt[ID_POOL_FIRST + i] = false;
         }
-        Menu_ShowToast("All enemies off");
+        Menu_ShowToast("All enemies off.");
     }
     return false;
 }
 
 void Events_OnOptionChanged(PlayState* play, s32 id) {
+    if ((id == ID_V2_MUT) && !gOpt[ID_V2_MUT] && (sMutCount > 0)) {
+        while (sMutCount > 0) {
+            Pick_RemoveLast(); // turning the Moon Draft off drops your picks (and their Marks bonus)
+        }
+        Menu_ShowToast("Moon Draft off: picks dropped.");
+    }
     if ((id == ID_V2_AUTOSAVE) && gOpt[ID_V2_AUTOSAVE] && (sAutoKey[0] == '\0')) {
-        Menu_ShowToast("Auto-Save starts next time you load a file.");
+        Menu_ShowToast("Auto-Save starts on your next load.");
     }
     if (id == ID_EV_MASTER) {
         if (gOpt[ID_EV_MASTER]) {
             sUntilNext = Ev_NextDelay();
-            if (gOpt[ID_EV_CURSE] && (sCurse < 0)) {
-                Curse_Roll();
-            }
-            sCurseCardPending = gOpt[ID_EV_CURSE] && (sCurse >= 0);
             Menu_ShowToast("Global Events: ON");
         } else {
-            Ev_Abort(play);
+            if (!Ev_MoonSentRunning()) {
+                Ev_Abort(play);
+                Menu_ShowToast("Global Events: OFF");
+            } else {
+                Menu_ShowToast("Events off. This one runs out first.");
+            }
             sRouletteTimer = 0;
-            Menu_ShowToast("Global Events: OFF");
         }
     } else if (id == ID_EV_INTERVAL) {
         sUntilNext = Ev_NextDelay();
     } else if (id == ID_EV_CURSE) {
-        if (gOpt[ID_EV_CURSE]) {
-            if (sCurse < 0) {
-                Curse_Roll();
-            }
-            sCurseCardPending = true;
-        } else {
+        if (!gOpt[ID_EV_CURSE]) {
             sCurseCardPending = false;
             sCurseCardTimer = 0;
         }
@@ -8139,7 +8487,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
         return true;
     }
 
-    if (false && (sActive == EV_TREASURE) && sTreasureValid && (player != NULL)) { // V3: no hints, just the rupee
+    if (false && EV_RUNNING(EV_TREASURE) && sTreasureValid && (player != NULL)) { // V3: no hints, just the rupee
         f32 dist = Math_Vec3f_DistXYZ(&player->actor.world.pos, &sTreasurePos);
         s32 n = Ev_Append(line, 0, Treasure_Temperature(dist, r, g, b), size);
 
@@ -8150,7 +8498,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
         *meter = CLAMP(1.0f - dist / MAX(sTreasureStartDist, 1.0f), 0.0f, 1.0f);
         return true;
     }
-    if (sActive == EV_HUNGER) {
+    if (EV_RUNNING(EV_HUNGER)) {
         char num[8];
         s32 k = sHungerKills;
         s32 n = 0;
@@ -8175,7 +8523,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
         *b = 90;
         return true;
     }
-    if ((sActive == EV_NEMESIS) && (sNemActor == NULL)) {
+    if (EV_RUNNING(EV_NEMESIS) && (sNemActor == NULL)) {
         Ev_Append(line, 0, Flags_GetClear(play, play->roomCtx.curRoom.num) ? "Lurking... move on" : "It's coming...",
                   size);
         *r = 255;
@@ -8183,7 +8531,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
         *b = 120;
         return true;
     }
-    if ((sActive == EV_CHAMPION) && (sNemActor == NULL)) {
+    if (EV_RUNNING(EV_CHAMPION) && (sNemActor == NULL)) {
         Ev_Append(line, 0,
                   Flags_GetClear(play, play->roomCtx.curRoom.num) ? "It waits elsewhere..." : "A challenger approaches",
                   size);
@@ -8192,7 +8540,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
         *b = 90;
         return true;
     }
-    if (sActive == EV_INFIGHT) {
+    if (EV_RUNNING(EV_INFIGHT)) {
         char num[4];
         s32 n;
         s32 a = MIN(Infight_CountTeam(play, 0), 9);
@@ -8222,7 +8570,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
     if (Wave4_SubLine(play, line, size, r, g, b)) {
         return true;
     }
-    if (sActive == EV_WOLFPACK) {
+    if (EV_RUNNING(EV_WOLFPACK)) {
         if (sWolfPhase == WOLF_CIRCLE) {
             Ev_Append(line, 0, "The pack circles...", size);
             *r = 200;
@@ -8241,7 +8589,11 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
     }
     // V3: otherwise, the one line on how to beat it.
     if ((sActive >= 0) && !Curse_Is(CURSE_UNSEEN)) {
-        const char* how = Events_Flavor(sActive);
+        // A combo shows both halves' how-to in turn (only the second's once the first is done).
+        s32 which = ((sCombo >= 0) && !(sComboHalt & 2) && ((sComboHalt & 1) || ((sEventFrames / (3 * FPS)) & 1)))
+                        ? sCombo
+                        : sActive;
+        const char* how = Events_Flavor(which);
 
         if ((how != NULL) && (how[0] != '\0')) {
             Ev_Append(line, 0, how, size);
@@ -8272,14 +8624,25 @@ static Gfx* Ev_DrawTimer(PlayState* play, Gfx* gfx) {
         // Compact: just the clock (or a short name for untimed events), no bars.
         if (sActive < 0) {
             Ev_Append(line, 0, "Incoming...", sizeof(line));
+        } else if ((sComboHalt & 1) && (sCombo >= 0)) {
+            Ev_Append(line, 0, Events_ShortName(sCombo), sizeof(line));
         } else if (Wave2_IsTimed()) {
             Ev_FormatTime(line, sFramesLeft);
         } else {
             Ev_Append(line, 0, Curse_Is(CURSE_UNSEEN) ? "???" : Events_ShortName(sActive), sizeof(line));
         }
-    } else if ((sActive == EV_NEMESIS) || (sActive == EV_CHAMPION)) {
-        n = Ev_Append(line, 0, (sActive == EV_CHAMPION) ? "CHAMPION: " : "NEMESIS: ", sizeof(line));
+    } else if (EV_RUNNING(EV_NEMESIS) || EV_RUNNING(EV_CHAMPION)) {
+        n = Ev_Append(line, 0, EV_RUNNING(EV_CHAMPION) ? "CHAMPION: " : "NEMESIS: ", sizeof(line));
         Ev_Append(line, n, (sNemPick >= 0) ? Pool_Name(sNemPick) : "???", sizeof(line));
+    } else if ((sActive >= 0) && (sComboHalt & 1) && (sCombo >= 0)) {
+        // The first half is done: the clock belongs to the half that's left.
+        n = Ev_Append(line, 0, "Now: ", sizeof(line));
+        n = Ev_Append(line, n, Events_ShortName(sCombo), sizeof(line));
+        if (V3_IsLong(sCombo)) {
+            n = Ev_Append(line, n, " ", sizeof(line));
+            Ev_FormatTime(time, MAX(65 * FPS - sEventFrames, 0));
+            Ev_Append(line, n, time, sizeof(line));
+        }
     } else if (sActive >= 0) {
         Card_ComboName(line, sizeof(line), sActive, sCombo);
         n = Ui_StrLen(line);
@@ -8298,12 +8661,12 @@ static Gfx* Ev_DrawTimer(PlayState* play, Gfx* gfx) {
     gfx = Ui_DrawRect(gfx, TIMER_X, TIMER_Y, TIMER_X + w, TIMER_Y + 20, 0, 0, 0, 170);
     if (compact) {
         // no bar
-    } else if ((sActive == EV_NEMESIS) || (sActive == EV_CHAMPION)) {
+    } else if (EV_RUNNING(EV_NEMESIS) || EV_RUNNING(EV_CHAMPION)) {
         // Its health instead of a clock.
         barW = (sNemMaxHealth > 0) ? (w - 8) * CLAMP(sNemHealth, 0, sNemMaxHealth) / sNemMaxHealth : 0;
         gfx = Ui_DrawRect(gfx, TIMER_X + 4, TIMER_Y + 15, TIMER_X + 4 + (w - 8), TIMER_Y + 18, 60, 0, 0, 200);
         gfx = Ui_DrawRect(gfx, TIMER_X + 4, TIMER_Y + 15, TIMER_X + 4 + barW, TIMER_Y + 18, 255, 60, 20, 240);
-    } else if (sActive >= 0) {
+    } else if ((sActive >= 0) && !(sComboHalt & 1)) {
         barW = (sTotalFrames > 0) ? (w - 8) * MAX(sFramesLeft, 0) / sTotalFrames : 0;
         gfx = Ui_DrawRect(gfx, TIMER_X + 4, TIMER_Y + 15, TIMER_X + 4 + barW, TIMER_Y + 18, 220, 30, 30, 230);
     }
@@ -8350,7 +8713,7 @@ static Gfx* Ev_DrawCenterMessage(PlayState* play, Gfx* gfx) {
     if ((sActive >= 0) && (sPauseReason == 1)) {
         return gfx; // paused in a safe zone: no stale RED LIGHT or IN THE LIGHT
     }
-    if ((sActive == EV_SEARCH) && (sSpotExposure > 0) && (sSpotAlert == 0)) {
+    if (EV_RUNNING(EV_SEARCH) && (sSpotExposure > 0) && (sSpotAlert == 0)) {
         text = "IN THE LIGHT!";
         r = 255;
         g = flash ? 240 : 170;
@@ -8360,8 +8723,8 @@ static Gfx* Ev_DrawCenterMessage(PlayState* play, Gfx* gfx) {
         r = 255;
         g = flash ? 40 : 0;
         b = flash ? 40 : 0;
-    } else if ((sActive == EV_REDLIGHT) || (sActive == EV_GLARE)) {
-        s32 glare = (sActive == EV_GLARE);
+    } else if (EV_RUNNING(EV_REDLIGHT) || EV_RUNNING(EV_GLARE)) {
+        s32 glare = EV_RUNNING(EV_GLARE);
 
         if (sRLZapFlash > 0) {
             text = glare ? "STRUCK!" : "ZAPPED!";
@@ -8430,7 +8793,7 @@ static Gfx* NextClock_Draw(PlayState* play, Gfx* gfx) {
 void Events_Draw(PlayState* play, Gfx** gfxP) {
     Gfx* gfx = *gfxP;
 
-    if ((sActive == EV_QUIZ) && (sBannerTimer <= 0)) {
+    if (EV_RUNNING(EV_QUIZ) && (sBannerTimer <= 0)) {
         gfx = Quiz_Draw(play, gfx);
     } else if ((sActive >= 0) && (sBannerTimer > 0)) {
         // Title card for the first few seconds, then the countdown.

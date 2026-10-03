@@ -22,6 +22,7 @@ s32 gFriendLinkSize = 0;          // LinkSizeMode while a friend's size change l
 static s32 sFriendSizeTimer = 0;
 static s32 sFakeTimer = 0;        // Fake Out: the "...or not." follow-up
 static s32 sNemHuntTimer = 0;     // "send it to them" is still trying to find room
+static s32 sNemHuntSlot = 0;      // ...for this Nemesis
 static s32 sLinkCurId = 0;        // id of the command being run
 static s32 sRefunds[8];           // ids of commands that couldn't run (the relay refunds them)
 static s32 sRefundCount = 0;
@@ -235,6 +236,9 @@ static void Link_Fail(const char* why, const char* what) {
 
 // A queued "start now" that will never happen: give the points back.
 static void Link_DropFriendNow(void) {
+    if (sFriendNow == EV_QUIZ) {
+        sFQuizCount = 0; // a friend's quiz that never happened takes its questions with it
+    }
     if (sFriendNow >= 0) {
         Link_Refund(sFriendNowId);
         Ev_Append(sLinkLast, 0, "Refunded: your queued event couldn't start", sizeof(sLinkLast));
@@ -299,16 +303,20 @@ static s32 Link_PoolOk(s32 pool) {
 
 // Same rules as the game's own combos, and only with events you have on.
 static s32 Link_ComboOk(s32 ev, s32 combo) {
+    // (3.1.8) The same event twice: one run, twice as fierce, for the events that allow it.
+    if ((combo == ev) && Ev_CanDouble(ev)) {
+        return Link_EventOk(ev) && gOpt[ID_EV_COMBOS] && gOpt[ID_EV_ON_FIRST + ev];
+    }
     return Link_EventOk(combo) && (combo != ev) && gOpt[ID_EV_COMBOS] && gOpt[ID_EV_ON_FIRST + combo] &&
-           Combo_CanBePrimary(ev) && Combo_CanBeSecond(combo);
+           Combo_CanBePrimary(ev) && Combo_CanBeSecondFriend(combo, ev);
 }
 
 // What a Friend Shield stops: anything that makes your life harder.
 static s32 Link_Harmful(const char* type) {
     static const char* sMean[] = { "ev_now",    "ev_next",   "ev_soon",  "nem_make", "nem_trait", "nem_level",
-                                   "nem_hunt",  "draft",     "bounty",   "ambush",   "curse",     "curse_set",
-                                   "tax",       "airstrike", "size",     "wanted",   "ev_extend", "empower",
-                                   "blackout",  "nem_stat",  "surprise", "place",    "steer",   "forced_ambush" };
+                                   "nem_hunt",  "draft",     "quiz",     "bounty",   "ambush",
+                                   "tax",       "airstrike", "wanted",   "ev_extend", "empower",
+                                   "blackout",  "surprise", "place",    "steer",   "forced_ambush" };
     s32 k;
 
     for (k = 0; k < (s32)ARRAY_COUNT(sMean); k++) {
@@ -343,12 +351,13 @@ RECOMP_IMPORT(".", void ger_map(const char* text, u32 len));
 // --- Friends and their modes -------------------------------------------------
 
 #define FR_MAX 12
-enum { FMODE_BLOCKED, FMODE_HELPFUL, FMODE_FULL };
+enum { FMODE_BLOCKED, FMODE_HELPFUL, FMODE_FULL, FMODE_EXP }; // EXP: Full plus the Experimental tab
 
 typedef struct {
     char name[6];
     u8 mode;
     u8 online;
+    u32 nemDied; // when their last Nemesis died (0: never had one): the oldest gets the next
 } FriendRec;
 
 static FriendRec sFr[FR_MAX];
@@ -379,7 +388,7 @@ static void Fr_Save(void) {
         }
         n = Ev_Append(buf, n, (n > 0) ? "," : "", sizeof(buf));
         n = Ev_Append(buf, n, sFr[k].name, sizeof(buf));
-        n = Ev_Append(buf, n, (sFr[k].mode == FMODE_BLOCKED) ? ":0" : ":1", sizeof(buf));
+        n = Ev_Append(buf, n, (sFr[k].mode == FMODE_BLOCKED) ? ":0" : (sFr[k].mode == FMODE_EXP) ? ":3" : ":1", sizeof(buf));
     }
     ger_store("friend_modes", buf);
 }
@@ -416,6 +425,7 @@ static s32 Fr_Add(const char* name) {
     sFr[k].name[i] = '\0';
     sFr[k].mode = FMODE_FULL;
     sFr[k].online = false;
+    sFr[k].nemDied = 0;
     return k;
 }
 
@@ -444,7 +454,7 @@ static void Fr_Load(void) {
         if ((i < len) && (buf[i] == ':') && (n > 0)) {
             k = Fr_Add(name);
             if (k >= 0) {
-                sFr[k].mode = (buf[i + 1] == '0') ? FMODE_BLOCKED : FMODE_HELPFUL;
+                sFr[k].mode = (buf[i + 1] == '0') ? FMODE_BLOCKED : (buf[i + 1] == '3') ? FMODE_EXP : FMODE_HELPFUL;
             }
             i += 2;
         }
@@ -472,40 +482,36 @@ static s32 Link_FriendsOnline(void) {
     return n;
 }
 
-// Menu rows: online friends first, then the ones we remember.
+// Menu rows: only friends who are here right now. (Offline friends with a
+// Blocked or Helpful setting stay remembered, hidden, until they come back.)
 static s32 Fr_Row(s32 row) {
-    s32 pass;
     s32 k;
 
-    for (pass = 0; pass < 2; pass++) {
-        for (k = 0; k < sFrCount; k++) {
-            if ((sFr[k].online == (pass == 0)) && (row-- == 0)) {
-                return k;
-            }
+    for (k = 0; k < sFrCount; k++) {
+        if (sFr[k].online && (row-- == 0)) {
+            return k;
         }
     }
     return -1;
 }
 
 s32 Link_FriendRows(void) {
-    return MIN(sFrCount, ID_LNK_FR_LAST - ID_LNK_FR_FIRST + 1);
+    return MIN(Link_FriendsOnline(), ID_LNK_FR_LAST - ID_LNK_FR_FIRST + 1);
 }
 
 static const char* Link_FriendLabel(s32 row) {
     static char sLabel[24];
     s32 k = Fr_Row(row);
-    s32 n;
 
     if (k < 0) {
         return "";
     }
-    n = Ev_Append(sLabel, 0, sFr[k].name, sizeof(sLabel));
-    Ev_Append(sLabel, n, sFr[k].online ? " (here)" : "", sizeof(sLabel));
+    Ev_Append(sLabel, 0, sFr[k].name, sizeof(sLabel));
     return sLabel;
 }
 
 static const char* Link_FriendValue(s32 row, char* out, s32 maxLen, u8* r, u8* g, u8* b) {
-    static const char* sWords[3] = { "Blocked", "Helpful", "Full" };
+    static const char* sWords[4] = { "Blocked", "Helpful", "Full", "Experimental" };
     s32 k = Fr_Row(row);
     s32 m = (k >= 0) ? sFr[k].mode : FMODE_FULL;
 
@@ -514,6 +520,8 @@ static const char* Link_FriendValue(s32 row, char* out, s32 maxLen, u8* r, u8* g
         *r = 255, *g = 70, *b = 70;
     } else if (m == FMODE_HELPFUL) {
         *r = 110, *g = 230, *b = 140;
+    } else if (m == FMODE_EXP) {
+        *r = 200, *g = 110, *b = 255;
     } else {
         *r = 255, *g = 200, *b = 90;
     }
@@ -526,8 +534,11 @@ static void Link_FriendCycle(s32 row) {
     if (k < 0) {
         return;
     }
-    // Full -> Helpful -> Blocked -> Full
-    sFr[k].mode = (sFr[k].mode == FMODE_FULL) ? FMODE_HELPFUL : (sFr[k].mode == FMODE_HELPFUL) ? FMODE_BLOCKED : FMODE_FULL;
+    // Full -> Experimental -> Helpful -> Blocked -> Full
+    sFr[k].mode = (sFr[k].mode == FMODE_FULL)    ? FMODE_EXP
+                  : (sFr[k].mode == FMODE_EXP)     ? FMODE_HELPFUL
+                  : (sFr[k].mode == FMODE_HELPFUL) ? FMODE_BLOCKED
+                                                   : FMODE_FULL;
     Fr_Save();
 }
 
@@ -570,6 +581,7 @@ static void Fr_Poll(s32 connected) {
                 Ev_Append(sLinkToast, t,
                           (sFr[k].mode == FMODE_BLOCKED)   ? " tried to join (blocked)"
                           : (sFr[k].mode == FMODE_HELPFUL) ? " joined (helpful only)"
+                          : (sFr[k].mode == FMODE_EXP)     ? " joined (Experimental)"
                                                            : " joined the Friend Link",
                           sizeof(sLinkToast));
                 Menu_Notify(sLinkToast, NOTE_FRIEND);
@@ -587,6 +599,130 @@ static void Fr_Poll(s32 connected) {
             }
         }
     }
+    // Forget friends who left with nothing special set (their setting was Full anyway).
+    for (k = 0, i = 0; k < sFrCount; k++) {
+        if (sFr[k].online || (sFr[k].mode != FMODE_FULL)) {
+            sFr[i++] = sFr[k];
+        }
+    }
+    sFrCount = i;
+}
+
+// --- Friends' Nemeses (3.1.8) ------------------------------------------------
+// The first friend here steers the default Nemesis (slot 0). Every other friend
+// here can have one of their own (slots 1-3). When one is free, it goes to the
+// friend whose Nemesis died longest ago. A friend who leaves keeps theirs.
+
+static u32 sNemDeathSeq = 0;
+static s32 sNemGrantTimer = 0;
+
+static void Fr_NemDied(const char* owner) {
+    s32 k = Fr_Find(owner);
+
+    if (k >= 0) {
+        sFr[k].nemDied = ++sNemDeathSeq;
+    }
+}
+
+static s32 Fr_FirstOnline(void) {
+    s32 k;
+
+    for (k = 0; k < sFrCount; k++) {
+        if (sFr[k].online) {
+            return k;
+        }
+    }
+    return -1;
+}
+
+// The Nemesis a friend's panel moves go to (-1: they have none).
+static s32 Nem_SlotForFriend(const char* name) {
+    s32 i;
+    s32 first;
+
+    if (name[0] == '\0') {
+        return 0;
+    }
+    for (i = 1; i < NEM_MAX; i++) {
+        if ((sNems[i].pool >= 0) && Str_Eq(sNems[i].owner, name)) {
+            return i;
+        }
+    }
+    first = Fr_FirstOnline();
+    if ((first < 0) || Str_Eq(sFr[first].name, name)) {
+        return 0;
+    }
+    return -1;
+}
+
+// A free slot for a friend's Nemesis (-1: all taken).
+static s32 Nem_FreeSlot(void) {
+    s32 i;
+
+    for (i = 1; i < NEM_MAX; i++) {
+        if (sNems[i].pool < 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Once a second: hands out friends' Nemeses (one a minute at most).
+static void Nem_FriendTick(PlayState* play) {
+    s32 first = Fr_FirstOnline();
+    s32 best = -1;
+    s32 slot = -1;
+    s32 k;
+    s32 i;
+
+    if (sNemGrantTimer > 0) {
+        sNemGrantTimer--;
+        return;
+    }
+    if (!V2_ON(ID_V2_NEM) || !V2_ON(ID_V2_LINK) || (Mut_SlotNow() < 1) || sNemBanished || (sActive >= 0) || (first < 0)) {
+        return;
+    }
+    for (k = 0; k < sFrCount; k++) {
+        if (!sFr[k].online || (k == first) || ((sFr[k].mode != FMODE_FULL) && (sFr[k].mode != FMODE_EXP)) ||
+            (Nem_SlotForFriend(sFr[k].name) >= 0)) {
+            continue;
+        }
+        if ((best < 0) || (sFr[k].nemDied < sFr[best].nemDied)) {
+            best = k;
+        }
+    }
+    if (best < 0) {
+        return;
+    }
+    // A loaded one with no owner (owners aren't saved) is adopted first.
+    for (i = 1; i < NEM_MAX; i++) {
+        if ((sNems[i].pool >= 0) && (sNems[i].owner[0] == '\0')) {
+            Ev_Append(sNems[i].owner, 0, sFr[best].name, sizeof(sNems[i].owner));
+            sNemGrantTimer = 60;
+            return;
+        }
+    }
+    slot = Nem_FreeSlot();
+    if (slot < 0) {
+        return;
+    }
+    sNemCur = slot;
+    sNems[slot].owner[0] = '\0';
+    Nem_Promote(play, sHuntPool[V2_Rand(ARRAY_COUNT(sHuntPool))], NULL);
+    if (sNem.pool >= 0) {
+        s32 here = V2_ZoneNow(play);
+        s32 far = V2_Rand(ZONE_OUTDOOR);
+
+        if (far == Zone_Outdoor(here)) {
+            far = (far + 7) % ZONE_OUTDOOR;
+        }
+        sNem.zone = far;
+        bzero(&sNem.body, sizeof(sNem.body));
+        Ev_Append(sNem.owner, 0, sFr[best].name, sizeof(sNem.owner));
+        Nem_Note(" hunts you now.", "");
+    }
+    sNemCur = 0;
+    sNemGrantTimer = 60;
 }
 
 // --- Spots a friend picks on the radar -----------------------------------------
@@ -690,6 +826,13 @@ static s32 Place_Open(void) {
 
 // --- Surprises -------------------------------------------------------------------
 
+// (3.1.8) A friend's wager on the next event locks it until it starts (-1: none).
+static s32 sBetLock = -1;
+
+static s32 Link_BetLocked(void) {
+    return (sBetLock >= 0) && (sActive < 0);
+}
+
 #define SURPRISE_MAX 8
 enum { SUR_EVENT, SUR_AMBUSH, SUR_BOMB, SUR_RUPOORS, SUR_NEMESIS, SUR_KINDS };
 
@@ -698,15 +841,53 @@ typedef struct {
     s8 zone;
     u8 kind;
     s16 arg;     // event or enemy
-    u8 hasPos;   // the friend picked a spot on the map
+    u8 hasPos;   // the friend picked a spot or an area on the map
     u8 ready;    // placed in the area you're in
-    Vec3f pos;
+    Vec3f pos;   // where it goes off (the spot, or where you stepped in)
+    f32 x0, z0, x1, z1; // (3.1.8) the area it covers: walk in and it goes off
     char from[6];
 } Surprise;
 
 static Surprise sSur[SURPRISE_MAX];
 static s32 sSurCount = 0;
 static s32 sSurScene = -1;
+
+// (3.1.8) A low see-through purple wall along the edges of surprise areas, only when you're
+// within SUR_WALL_NEAR of an edge (fading in as you get closer). Ground heights along the
+// edges come from floor raycasts every SUR_WALL_STEP units, cached per scene.
+#define SUR_WALL_MAX 48
+#define SUR_WALL_NEAR 150.0f
+#define SUR_WALL_STEP 100.0f
+#define SUR_WALL_SPAN 450.0f // how far along an edge (each way) the wall shows
+#define SUR_GCACHE 96
+#define SUR_EXIT_CLEAR 200.0f // never goes off this close to a door or loading zone
+typedef struct {
+    Vec3f a;
+    Vec3f b;
+    u8 alpha;
+} SurWall;
+static SurWall sSurWall[SUR_WALL_MAX];
+static s32 sSurWallCount = 0;
+static struct {
+    s32 x;
+    s32 z;
+    f32 y;
+    u8 state; // 0 empty, 1 ground, 2 none
+} sSurG[SUR_GCACHE];
+static s32 sSurGNext = 0;
+static s32 sSurGNew = 0; // raycasts left this frame
+
+// A spot becomes a small area around it.
+static void Sur_AreaAround(Surprise* s, f32 half) {
+    s->x0 = s->pos.x - half;
+    s->x1 = s->pos.x + half;
+    s->z0 = s->pos.z - half;
+    s->z1 = s->pos.z + half;
+}
+
+static s32 Sur_Inside(Surprise* s, Vec3f* p) {
+    return (p->x >= s->x0) && (p->x <= s->x1) && (p->z >= s->z0) && (p->z <= s->z1);
+}
 
 static void Sur_Remove(s32 i) {
     s32 k;
@@ -764,6 +945,9 @@ static s32 Sur_Fire(PlayState* play, Surprise* s) {
     Ev_Append(sLinkFrom, 0, s->from, sizeof(sLinkFrom));
     switch (s->kind) {
         case SUR_EVENT:
+            if (Link_BetLocked()) {
+                return false; // waits: a wager is on the next event
+            }
             if (!gOpt[ID_EV_MASTER] || !Link_EventOk(s->arg) || !gOpt[ID_EV_ON_FIRST + s->arg] ||
                 (sBanMask & (1ull << s->arg))) {
                 ok = false;
@@ -819,15 +1003,18 @@ static s32 Sur_Fire(PlayState* play, Surprise* s) {
             }
             break;
         case SUR_NEMESIS:
+            sNemCur = MAX(Nem_SlotForFriend(s->from), 0); // (the planter's own Nemesis)
             if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
                 ok = false;
             } else if ((sNem.actor == NULL) || !V2_IsLive(play, sNem.actor)) {
                 ok = Link_TrySpawnNemNear(play);
                 if (!ok) {
                     sNemHuntTimer = 15 * FPS;
+                    sNemHuntSlot = sNemCur;
                     ok = true;
                 }
             }
+            sNemCur = 0;
             break;
     }
     if (ok) {
@@ -841,17 +1028,114 @@ static s32 Sur_Fire(PlayState* play, Surprise* s) {
     return true;
 }
 
+// Cached ground height at an edge point (false: none, or not sampled yet this frame).
+static s32 Sur_Ground(PlayState* play, f32 x, f32 z, f32* y) {
+    s32 ix = (s32)x;
+    s32 iz = (s32)z;
+    s32 k;
+    Vec3f at;
+
+    for (k = 0; k < SUR_GCACHE; k++) {
+        if ((sSurG[k].state != 0) && (sSurG[k].x == ix) && (sSurG[k].z == iz)) {
+            *y = sSurG[k].y;
+            return sSurG[k].state == 1;
+        }
+    }
+    if (sSurGNew <= 0) {
+        return false;
+    }
+    sSurGNew--;
+    k = sSurGNext;
+    sSurGNext = (sSurGNext + 1) % SUR_GCACHE;
+    sSurG[k].x = ix;
+    sSurG[k].z = iz;
+    sSurG[k].state = Link_GroundAt(play, (f32)ix, (f32)iz, &at) ? 1 : 2;
+    sSurG[k].y = at.y;
+    *y = at.y;
+    return sSurG[k].state == 1;
+}
+
+// The wall pieces near you, rebuilt every frame (cheap: heights are cached).
+static void Sur_Walls(PlayState* play, s32 zone) {
+    Player* player = GET_PLAYER(play);
+    Vec3f* me = &player->actor.world.pos;
+    s32 i;
+
+    sSurWallCount = 0;
+    sSurGNew = 6;
+    for (i = 0; i < sSurCount; i++) {
+        Surprise* s = &sSur[i];
+        s32 e;
+
+        if ((zone < 0) || (s->zone != zone) || !s->ready || !(s->x1 > s->x0)) {
+            continue;
+        }
+        for (e = 0; e < 4; e++) {
+            // Edges: 0 north (z0), 1 south (z1), 2 west (x0), 3 east (x1).
+            s32 alongX = (e < 2);
+            f32 fixed = (e == 0) ? s->z0 : (e == 1) ? s->z1 : (e == 2) ? s->x0 : s->x1;
+            f32 lo = alongX ? s->x0 : s->z0;
+            f32 hi = alongX ? s->x1 : s->z1;
+            f32 meAlong = alongX ? me->x : me->z;
+            f32 across = fabsf((alongX ? me->z : me->x) - fixed);
+            f32 off = (meAlong < lo) ? lo - meAlong : (meAlong > hi) ? meAlong - hi : 0.0f;
+            f32 d = sqrtf(SQ(across) + SQ(off));
+            f32 near;
+            f32 t;
+            f32 t0;
+            f32 t1;
+
+            if (d > SUR_WALL_NEAR) {
+                continue;
+            }
+            near = 1.0f - d / SUR_WALL_NEAR;
+            t0 = MAX(lo, meAlong - SUR_WALL_SPAN);
+            t1 = MIN(hi, meAlong + SUR_WALL_SPAN);
+            for (t = t0; (t < t1) && (sSurWallCount < SUR_WALL_MAX);) {
+                s32 q = (s32)(t / SUR_WALL_STEP) - ((t < 0.0f) ? 1 : 0); // (floor)
+                f32 tn = MIN(t1, (q + 1) * SUR_WALL_STEP);
+                f32 ya;
+                f32 yb;
+                f32 mid = (t + tn) * 0.5f;
+                f32 fade = 1.0f - fabsf(mid - meAlong) / SUR_WALL_SPAN;
+                SurWall* w = &sSurWall[sSurWallCount];
+
+                if (Sur_Ground(play, alongX ? t : fixed, alongX ? fixed : t, &ya) &&
+                    Sur_Ground(play, alongX ? tn : fixed, alongX ? fixed : tn, &yb) && (fabsf(ya - me->y) < 400.0f) &&
+                    (fabsf(yb - me->y) < 400.0f) && (fabsf(ya - yb) < 150.0f)) {
+                    w->a.x = alongX ? t : fixed;
+                    w->a.z = alongX ? fixed : t;
+                    w->a.y = ya;
+                    w->b.x = alongX ? tn : fixed;
+                    w->b.z = alongX ? fixed : tn;
+                    w->b.y = yb;
+                    w->alpha = (u8)(150.0f * near * CLAMP(fade, 0.0f, 1.0f));
+                    if (w->alpha > 4) {
+                        sSurWallCount++;
+                    }
+                }
+                t = tn;
+            }
+        }
+    }
+}
+
 // Every frame while commands can land: settle, shimmer, and spring the trap.
 static void Sur_Update(PlayState* play) {
     Player* player = GET_PLAYER(play);
     s32 zone = V2_ZoneNow(play);
     s32 i;
 
+    if ((sActive >= 0) || ((sBetLock >= 0) && ((play->gameplayFrames % 10) == 0) && (Ev_PreviewNext(play) != sBetLock))) {
+        sBetLock = -1; // it started (the worker settles it), or it can't happen now (the worker refunds)
+    }
     if (player == NULL) {
         return;
     }
     if (play->sceneId != sSurScene) {
         sSurScene = play->sceneId;
+        sSurWallCount = 0;
+        bzero(sSurG, sizeof(sSurG));
         for (i = 0; i < sSurCount; i++) {
             sSur[i].ready = false;
         }
@@ -864,30 +1148,25 @@ static void Sur_Update(PlayState* play) {
         }
         if (!s->ready) {
             // Wait until the area's doors are known.
-            if ((sAreaTimer > FPS) && ((sAreaTimer % 10) == 0) && Sur_Settle(play, s)) {
+            if (s->x1 > s->x0) {
+                s->ready = sAreaTimer > FPS; // an area: nothing to settle
+            } else if ((sAreaTimer > FPS) && ((sAreaTimer % 10) == 0) && Sur_Settle(play, s)) {
+                Sur_AreaAround(s, 140.0f); // (no spot picked: a random one, a little area around it)
                 s->ready = true;
             }
             continue;
         }
-        // A faint shimmer: easy to miss if you aren't looking.
-        if (((play->gameplayFrames % 14) == (u32)(i * 2)) && (Ev_DistXZ(&s->pos, &player->actor.world.pos) < 1500.0f)) {
-            Vec3f p = s->pos;
-            Vec3f vel = { 0.0f, 0.6f, 0.0f };
-            Vec3f acc = { 0.0f, 0.0f, 0.0f };
-            Color_RGBA8 prim = { 255, 255, 255, 160 };
-            Color_RGBA8 env = { 190, 150, 255, 120 };
-
-            p.x += Rand_CenteredFloat(50.0f);
-            p.y += 15.0f + Rand_ZeroOne() * 30.0f;
-            p.z += Rand_CenteredFloat(50.0f);
-            EffectSsKirakira_SpawnDispersed(play, &p, &vel, &acc, &prim, &env, 1200, 24);
-        }
-        if ((Ev_DistXZ(&s->pos, &player->actor.world.pos) < 110.0f) &&
-            (fabsf(s->pos.y - player->actor.world.pos.y) < 120.0f) && Sur_Fire(play, s)) {
-            Sur_Remove(i);
-            return;
+        // Walked in (and not right at a door you just came through): it goes off where you are.
+        if (Sur_Inside(s, &player->actor.world.pos) && (World_ExitDist(&player->actor.world.pos) >= SUR_EXIT_CLEAR)) {
+            s->pos = player->actor.world.pos;
+            if (Sur_Fire(play, s)) {
+                Sur_Remove(i);
+                sSurWallCount = 0;
+                return;
+            }
         }
     }
+    Sur_Walls(play, zone);
 }
 
 // --- The map: the floor around you, sampled bit by bit ------------------------------
@@ -1024,6 +1303,7 @@ static s32 Link_Run(PlayState* play, char* line) {
     s32 b;
     s32 c;
     const char* text;
+    s32 wasQuiz = false;
     s32 hp = gSaveContext.save.saveInfo.playerData.health;
     s32 cap = gSaveContext.save.saveInfo.playerData.healthCapacity;
 
@@ -1055,6 +1335,23 @@ static s32 Link_Run(PlayState* play, char* line) {
         Link_Fail(sLinkFrom, " can only help");
         return !Str_Eq(type, "steer");
     }
+    // Experimental friends: the sandbox ("x|op|0|0|k:v,...").
+    if (Str_Eq(type, "x")) {
+        if (Fr_Mode(sLinkFrom) != FMODE_EXP) {
+            Link_Fail(sLinkFrom, " isn't Experimental");
+        } else {
+            const char* what = Exp_Run(play, a, text);
+
+            if (what == NULL) {
+                Link_Fail("unknown Experimental move", "");
+            } else if (what[0] == '!') {
+                Link_Fail("EXP: ", what + 1); // (can't happen there: the friend's page shows why)
+            } else {
+                Link_Result("EXP: ", what);
+            }
+        }
+        return true;
+    }
     // Steering: the friend holds the event's aim while they keep moving it.
     if (Str_Eq(type, "steer")) {
         if ((Steer_Kind() == a) && (sActive >= 0)) {
@@ -1080,11 +1377,30 @@ static s32 Link_Run(PlayState* play, char* line) {
             Menu_ShowToast("Friend Shield blocked your friend!");
         }
         Audio_PlaySfx(NA_SE_IT_SHIELD_REFLECT_SW);
+        if (Str_Eq(type, "quiz")) {
+            sFQuizCount = 0; // (their questions go with it)
+        }
         return true;
     }
 
+    // A friend's own Pop Quiz: "quizq" lines carry the questions, then "quiz" starts it.
+    if (Str_Eq(type, "quizq")) {
+        if ((a >= 0) && (a < 4)) {
+            Ev_Append(sFQuiz[a], 0, text, sizeof(sFQuiz[a]));
+        }
+        return true;
+    }
+    if (Str_Eq(type, "quiz")) {
+        sFQuizCount = CLAMP(a, 0, 4);
+        Ev_Append(sFQuizFrom, 0, sLinkFrom, sizeof(sFQuizFrom));
+        type = "ev_now";
+        a = EV_QUIZ;
+        wasQuiz = true;
+    }
     if (Str_Eq(type, "ev_now") && Link_EventOk(a)) {
-        if (!gOpt[ID_EV_MASTER]) {
+        if (Link_BetLocked()) {
+            Link_Fail("a wager locked the next event", "");
+        } else if (!gOpt[ID_EV_MASTER]) {
             Link_Fail("events are off", "");
         } else if (!gOpt[ID_EV_ON_FIRST + a]) {
             Link_Fail("that event is off", "");
@@ -1110,6 +1426,8 @@ static s32 Link_Run(PlayState* play, char* line) {
             Link_Fail("events are off", "");
         } else if (sForesight) {
             Link_Fail("Foresight locked the next event", "");
+        } else if (Link_BetLocked()) {
+            Link_Fail("a wager locked the next event", "");
         } else if (!gOpt[ID_EV_ON_FIRST + a]) {
             Link_Fail("that event is off", "");
         } else if ((b >= 0) && !Link_ComboOk(a, b)) {
@@ -1119,6 +1437,14 @@ static s32 Link_Run(PlayState* play, char* line) {
             sFriendCombo = (b >= 0) ? b : -1;
             Link_Result((sFriendCombo >= 0) ? "Next event (combo): " : "Next event: ", Events_ShortName(a));
             Link_Say("Your friend picked your next event...", "");
+        }
+    } else if (Str_Eq(type, "betlock") && Link_EventOk(a)) {
+        // (3.1.8) A friend wagered on the next event: it stays the next one (never shown to you).
+        if ((sActive >= 0) || (sRouletteTimer > 0) || (Ev_PreviewNext(play) != a)) {
+            Link_Fail("the next event changed", "");
+        } else {
+            sBetLock = a;
+            Link_Result("Next event locked: ", Events_ShortName(a));
         }
     } else if (Str_Eq(type, "ev_soon")) {
         if (!gOpt[ID_EV_MASTER]) {
@@ -1131,39 +1457,93 @@ static s32 Link_Run(PlayState* play, char* line) {
             Link_Say("Your friend hurried the next event!", "");
         }
     } else if (Str_Eq(type, "nem_make") && Link_PoolOk(a)) {
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
+
+        if (ns < 0) {
+            ns = Nem_FreeSlot(); // a friend with none of their own makes one
+        }
         if (!V2_ON(ID_V2_NEM)) {
             Link_Fail("Nemesis is off", "");
-        } else if (sNem.pool >= 0) {
+        } else if (ns < 0) {
+            Link_Fail("every Nemesis slot is taken", "");
+        } else if (sNems[ns].pool >= 0) {
             Link_Fail("they already have one", "");
         } else {
+            sNemCur = ns;
+            sNem.owner[0] = '\0';
             Nem_Promote(play, a, NULL);
+            if ((ns > 0) && (sNem.pool >= 0)) {
+                Ev_Append(sNem.owner, 0, sLinkFrom, sizeof(sNem.owner));
+            }
+            sNemCur = 0;
             Link_Result("Created a Nemesis: ", Pool_Name(a));
         }
-    } else if (Str_Eq(type, "nem_trait") && (a >= 0) && (a < TR_COUNT)) {
-        if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
+    } else if ((Str_Eq(type, "nem_trait") || Str_Eq(type, "nem_pick")) && (a >= 0) && (a < TR_COUNT) && (a != TR_RETIRED)) {
+        // nem_trait: a paid extra trait. nem_pick: the trait it earned (every 5 levels).
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
+
+        sNemCur = MAX(ns, 0);
+        if (!V2_ON(ID_V2_NEM) || (ns < 0) || (sNem.pool < 0)) {
             Link_Fail("no Nemesis", "");
         } else if (Nem_Traits() & (1 << a)) {
             Link_Fail("it already has ", sTraitNames[a]);
+        } else if (Str_Eq(type, "nem_pick") && (sNem.picks == 0)) {
+            Link_Fail("no trait pick waiting", "");
         } else {
-            sNemBonusTraits |= (1 << a);
+            if (Str_Eq(type, "nem_pick")) {
+                sNem.picks--;
+                if (sNem.picks == 0) {
+                    sNem.pickTimer = 0;
+                }
+            }
+            Nem_AddTraitId(a);
             Nem_RefreshLive(play);
             Link_Result("Nemesis trait: ", sTraitNames[a]);
             Link_Say("Nemesis gained ", sTraitNames[a]);
         }
+        sNemCur = 0;
     } else if (Str_Eq(type, "nem_level")) {
-        if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
+
+        sNemCur = MAX(ns, 0);
+        if (!V2_ON(ID_V2_NEM) || (ns < 0) || (sNem.pool < 0)) {
             Link_Fail("no Nemesis", "");
-        } else if (sNem.level >= Nem_TypeCap(sNem.pool)) {
+        } else if (sNem.level >= NEM_LEVEL_MAX) {
             Link_Fail("it's at max level", "");
         } else {
-            Link_Format("Your friend leveled up your Nemesis!", "");
-            Nem_LevelUp(sLinkToast);
-            Link_Result("Nemesis leveled up", "");
+            Nem_GainPoints(1, " got a skill point from a friend:");
+            Link_Result("Nemesis +1 skill point", "");
         }
+        sNemCur = 0;
+    } else if (Str_Eq(type, "nem_stat") && (a >= 0) && (a < NST_COUNT)) {
+        // Spending its unspent points: a stat and how many.
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
+        s32 put;
+
+        sNemCur = MAX(ns, 0);
+        if (!V2_ON(ID_V2_NEM) || (ns < 0) || (sNem.pool < 0)) {
+            Link_Fail("no Nemesis", "");
+        } else if (sNem.points == 0) {
+            Link_Fail("no skill points to spend", "");
+        } else if ((put = Nem_Spend(a, CLAMP(b, 1, 50))) == 0) {
+            Link_Fail("that stat is maxed", "");
+        } else {
+            s32 u;
+
+            for (u = a * 3; u < a * 3 + 3; u++) {
+                if ((sNem.stat[a] >= sNemUniqAt[u % 3]) && (sNem.stat[a] - put < sNemUniqAt[u % 3])) {
+                    Nem_Note(" learned ", sNemUniqNames[u]);
+                }
+            }
+            Link_Result("Trained ", sNemStatNames[a]);
+        }
+        sNemCur = 0;
     } else if (Str_Eq(type, "nem_hunt")) {
         Player* player = GET_PLAYER(play);
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
 
-        if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
+        sNemCur = MAX(ns, 0);
+        if (!V2_ON(ID_V2_NEM) || (ns < 0) || (sNem.pool < 0)) {
             Link_Fail("no Nemesis", "");
         } else if ((sNem.actor != NULL) && V2_IsLive(play, sNem.actor)) {
             // Already here: it jumps right next to them.
@@ -1187,14 +1567,18 @@ static s32 Link_Run(PlayState* play, char* line) {
             Link_Say("Your Nemesis found you!", "");
         } else {
             sNemHuntTimer = 15 * FPS; // keeps trying for a bit
+            sNemHuntSlot = sNemCur;
             Link_Result("Nemesis is on its way", "");
             Link_Say("Your Nemesis is coming for you!", "");
         }
-    } else if (Str_Eq(type, "draft") && (a >= 0) && (a < MUT_COUNT) && (b >= 0) && (b < MUT_COUNT) &&
-               (a != MUT_RETIRED) && (b != MUT_RETIRED)) {
+        sNemCur = 0;
+    } else if (Str_Eq(type, "draft") && (a >= 0) && (a < PICK_COUNT) && (b >= 0) && (b < PICK_COUNT)) {
+        // a and b are picks: a mutator id, or MUT_COUNT + a curse id.
         if (!gOpt[ID_V2_MUT]) {
-            Link_Fail("mutators are off", "");
-        } else if ((a == b) || (sMutCount >= 6) || (Mut_Has(a) && Mut_Has(b))) {
+            Link_Fail("the Moon Draft is off", "");
+        } else if (!Pick_Usable(a) || !Pick_Usable(b)) {
+            Link_Fail("they can't be offered that", "");
+        } else if ((a == b) || (sMutCount >= 6) || (Pick_Has(a) && Pick_Has(b))) {
             Link_Fail("that draft can't happen", "");
         } else {
             sFriendDraftA = a;
@@ -1268,15 +1652,8 @@ static s32 Link_Run(PlayState* play, char* line) {
         } else {
             Link_Fail("no room for an ambush", "");
         }
-    } else if (Str_Eq(type, "curse")) {
-        if (!gOpt[ID_EV_CURSE]) {
-            Link_Fail("Cycle Curse is off", "");
-        } else {
-            Curse_Roll();
-            Link_Result("Curse rerolled: ", Curse_Name(sCurse));
-        }
     } else if (Str_Eq(type, "gift")) {
-        sMarks = MIN(sMarks + 10, 60000);
+        sMarks = MIN(sMarks + 10, MARKS_MAX);
         Link_Result("Gave 10 Moon Marks", "");
         Link_Say("Your friend sent you 10 Moon Marks!", "");
     } else if (Str_Eq(type, "tax")) {
@@ -1428,19 +1805,6 @@ static s32 Link_Run(PlayState* play, char* line) {
             Link_Result("Gave ", sPouchNames[a]);
             Link_Say("Friend gift: ", sPouchNames[a]);
         }
-    } else if (Str_Eq(type, "curse_set") && (a >= 0) && (a < CURSE_COUNT)) {
-        if (!gOpt[ID_EV_CURSE]) {
-            Link_Fail("Cycle Curse is off", "");
-        } else if (!Curse_CanUse(a) || (a == sCurse)) {
-            Link_Fail("can't use ", Curse_Name(a));
-        } else {
-            sCurse = a;
-            Curse_PickFavorite();
-            sCurseCardPending = true;
-            sWrath = 0;
-            sWrathPending = false;
-            Link_Result("Curse set: ", Curse_Name(a));
-        }
     } else if (Str_Eq(type, "wanted")) {
         if (!V2_ON(ID_V2_BOUNTY)) {
             Link_Fail("bounties are off", "");
@@ -1470,50 +1834,44 @@ static s32 Link_Run(PlayState* play, char* line) {
         }
         Link_Result("Fake out", "");
     } else if (Str_Eq(type, "nem_name") && (text[0] != '\0')) {
-        if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
+
+        sNemCur = MAX(ns, 0);
+        if (!V2_ON(ID_V2_NEM) || (ns < 0) || (sNem.pool < 0)) {
             Link_Fail("no Nemesis", "");
         } else {
             s32 k;
 
             for (k = 0; (text[k] != '\0') && (k < 12); k++) {
-                sNemCustom[k] = text[k];
+                sNemCustom[k] = ((text[k] == '|') || (text[k] == ';') || (text[k] == ',')) ? ' ' : text[k];
             }
             sNemCustom[k] = '\0';
             Link_Result("Nemesis renamed: ", sNemCustom); // quietly: they find out when they meet it
         }
-    } else if (Str_Eq(type, "nem_stat") && (a >= 0) && (a < NS_COUNT)) {
-        if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
-            Link_Fail("no Nemesis", "");
-        } else if (Nem_PointsFree() <= 0) {
-            Link_Fail("no points to spend", "");
-        } else if (!Nem_SpendPoint(a)) {
-            Link_Fail("that stat is maxed: ", sNemStatNames[a]);
-        } else {
-            sNemPointTimer = 0;
-            Link_Result("Nemesis +1 ", sNemStatNames[a]);
-            Link_Say("Friend trained your Nemesis: +", sNemStatNames[a]);
-        }
+        sNemCur = 0;
     } else if (Str_Eq(type, "nem_purge")) {
-        if (!V2_ON(ID_V2_NEM) || (sNem.pool < 0)) {
+        s32 ns = Nem_SlotForFriend(sLinkFrom);
+
+        sNemCur = MAX(ns, 0);
+        if (!V2_ON(ID_V2_NEM) || (ns < 0) || (sNem.pool < 0)) {
             Link_Fail("no Nemesis", "");
         } else {
-            char num[8];
-
             if ((sNem.actor != NULL) && V2_IsLive(play, sNem.actor)) {
                 Ev_Poof(play, &sNem.actor->world.pos, 1);
                 Ev_KillOne(play, sNem.actor);
             }
-            sNemInherit = (u8)CLAMP(MAX(sNemInherit, sNem.level), 1, NEM_LEVEL_MAX);
-            sNem.pool = -1;
-            sNem.actor = NULL;
-            sNem.engaged = false;
-            Nem_ClearFriendStuff();
-            Nem_ResetStats();
-            sNemRestSlot = Mut_SlotNow(); // the next one has to be crowned, not handed out on the spot
-            Ev_Itoa(num, sNemInherit);
-            Link_Result("Nemesis purged. Next starts at level ", num);
-            Link_Say("Friend purged your Nemesis. Up to Lv", num);
+            if (sNem.owner[0] != '\0') {
+                Fr_NemDied(sNem.owner);
+            }
+            Nem_Reset();
+            sNem.owner[0] = '\0';
+            if (ns == 0) {
+                sNemRestSlot = Mut_SlotNow(); // the next one has to be crowned, not handed out on the spot
+            }
+            Link_Result("Nemesis purged", "");
+            Link_Say("Friend purged your Nemesis.", "");
         }
+        sNemCur = 0;
     } else if (Str_Eq(type, "empower")) {
         if (!gOpt[ID_EV_MASTER]) {
             Link_Fail("events are off", "");
@@ -1570,13 +1928,28 @@ static s32 Link_Run(PlayState* play, char* line) {
             sp->kind = (u8)b;
             sp->arg = (s16)c;
             sp->ready = false;
-            sp->hasPos = Link_ParseXZ(text, &x, &z) > 0;
+            s32 used = Link_ParseXZ(text, &x, &z);
+            s32 x2 = 0;
+            s32 z2 = 0;
+
+            sp->hasPos = used > 0;
             sp->pos.x = (f32)x;
             sp->pos.y = 0.0f;
             sp->pos.z = (f32)z;
+            sp->x0 = sp->x1 = sp->z0 = sp->z1 = 0.0f; // (no area yet: set once placed)
             Ev_Append(sp->from, 0, sLinkFrom, sizeof(sp->from));
             if (!sp->hasPos) {
                 sp->pos.x = sp->pos.z = 0.0f;
+            } else if (Link_ParseXZ(text + used, &x2, &z2) > 0) {
+                // Two corners: the area the friend dragged out, any size (at least a few steps across).
+                sp->x0 = (f32)MIN(x, x2);
+                sp->x1 = (f32)MAX(MAX(x, x2), MIN(x, x2) + 120);
+                sp->z0 = (f32)MIN(z, z2);
+                sp->z1 = (f32)MAX(MAX(z, z2), MIN(z, z2) + 120);
+                sp->pos.x = (sp->x0 + sp->x1) * 0.5f;
+                sp->pos.z = (sp->z0 + sp->z1) * 0.5f;
+            } else {
+                Sur_AreaAround(sp, 140.0f); // one spot: a small area around it
             }
             Link_Result("Surprise waiting in ", sZoneNames[a]);
             if (sLinkFrom[0] != '\0') {
@@ -1592,6 +1965,11 @@ static s32 Link_Run(PlayState* play, char* line) {
     } else if (Str_Eq(type, "msg") && (text[0] != '\0')) {
         Link_Result("Message shown", "");
         Link_Say("Friend: ", text);
+    } else {
+        Link_Fail("can't do that", ""); // an old or bad command: refunded
+    }
+    if (wasQuiz && !EV_RUNNING(EV_QUIZ) && (sFriendNow != EV_QUIZ)) {
+        sFQuizCount = 0; // the quiz didn't happen: their questions don't wait for a later one
     }
     return true;
 }
@@ -1906,7 +2284,10 @@ static s32 Link_Radar(PlayState* play, s32 n) {
     for (k = 0; k < sFrCount; k++) {
         t = Ev_Append(big, t, (k > 0) ? "," : "", sizeof(big));
         t = Ev_Append(big, t, sFr[k].name, sizeof(big));
-        t = Ev_Append(big, t, (sFr[k].mode == FMODE_BLOCKED) ? ":0" : (sFr[k].mode == FMODE_HELPFUL) ? ":1" : ":2",
+        t = Ev_Append(big, t, (sFr[k].mode == FMODE_BLOCKED)   ? ":0"
+                      : (sFr[k].mode == FMODE_HELPFUL) ? ":1"
+                      : (sFr[k].mode == FMODE_EXP)     ? ":3"
+                                                       : ":2",
                       sizeof(big));
     }
     n = Link_Line(n, "fmodes", big);
@@ -1917,7 +2298,7 @@ static s32 Link_Radar(PlayState* play, s32 n) {
         t = Ev_Append(big, t, ":", sizeof(big));
         t = Ev_AppendNum(big, t, (PLACE_WINDOW - sEventFrames + FPS - 1) / FPS, sizeof(big));
         t = Ev_Append(big, t, ":", sizeof(big));
-        Ev_AppendNum(big, t, (sActive == EV_SEALS) ? V3_PlaceCount() : 1, sizeof(big));
+        Ev_AppendNum(big, t, EV_RUNNING(EV_SEALS) ? V3_PlaceCount() : 1, sizeof(big));
         n = Link_Line(n, "evplace", big);
     }
     n = Link_LineNum(n, "steer", Steer_Kind());
@@ -1969,7 +2350,9 @@ static void Link_SendStatus(PlayState* play, s32 playing) {
     n = Link_Line(n, "hpfull", (hp >= cap) ? "1" : "0");
     if (sActive >= 0) {
         t = Ev_Append(tmp, 0, Events_Name(sActive), sizeof(tmp));
-        if (sCombo >= 0) {
+        if (Ev_IsDoubled()) {
+            Ev_Append(tmp, t, " x2", sizeof(tmp));
+        } else if ((sCombo >= 0) && (sCombo != sActive)) {
             t = Ev_Append(tmp, t, " + ", sizeof(tmp));
             Ev_Append(tmp, t, Events_Name(sCombo), sizeof(tmp));
         }
@@ -1980,53 +2363,116 @@ static void Link_SendStatus(PlayState* play, s32 playing) {
     } else {
         n = Link_Line(n, "ev", "-");
         if (gOpt[ID_EV_MASTER]) {
+            s32 up = Ev_PreviewNext(play);
+
             n = Link_LineNum(n, "next", sUntilNext / FPS);
+            // (3.1.8) What's coming, so friends can see it and wager on it before it starts.
+            if (up >= 0) {
+                t = Ev_Append(tmp, 0, Events_Name(up), sizeof(tmp));
+                if ((sFriendNext == up) && (sFriendCombo >= 0)) {
+                    t = Ev_Append(tmp, t, (sFriendCombo == up) ? " x2" : " + ", sizeof(tmp));
+                    if (sFriendCombo != up) {
+                        Ev_Append(tmp, t, Events_Name(sFriendCombo), sizeof(tmp));
+                    }
+                }
+                n = Link_Line(n, "nextev", tmp);
+                n = Link_LineNum(n, "nextid", up);
+            }
         }
     }
-    n = Link_Line(n, "curse", gOpt[ID_EV_CURSE] ? Curse_Name(sCurse) : "Off");
-    n = Link_LineNum(n, "curseid", gOpt[ID_EV_CURSE] ? sCurse : -1);
+    // Every curse picked this cycle, newest last.
+    t = 0;
+    tmp[0] = '\0';
+    for (k = 0; k < sMutCount; k++) {
+        if (Pick_IsCurse(sMutOrder[k])) {
+            t = Ev_Append(tmp, t, (t > 0) ? ", " : "", sizeof(tmp));
+            t = Ev_Append(tmp, t, Pick_Name(sMutOrder[k]), sizeof(tmp));
+        }
+    }
+    n = Link_Line(n, "curse", !gOpt[ID_EV_CURSE] ? "Off" : (t > 0) ? tmp : "None");
     n = Link_LineNum(n, "marks", sMarks);
     n = Link_Line(n, "rank", sRankNames[Rank_Of(sBountiesDone)]);
+    sNemCur = MAX(Nem_AnySlot(), 0);
     if (sNem.pool >= 0) {
-        u16 tr = Nem_Traits();
-        s32 first = true;
-
+        // The default (or first) Nemesis: name|type|level|area
         Nem_Name(tmp, sizeof(tmp));
         t = Ui_StrLen(tmp);
         t = Ev_Append(tmp, t, "|", sizeof(tmp));
         t = Ev_Append(tmp, t, Pool_Name(sNem.pool), sizeof(tmp));
         t = Ev_Append(tmp, t, "|", sizeof(tmp));
-        t = Ev_AppendNum(tmp, t, Nem_EffLevel(), sizeof(tmp));
-        t = Ev_Append(tmp, t, "|", sizeof(tmp));
-        t = Ev_Append(tmp, t, sZoneNames[sNem.zone % ZONE_COUNT], sizeof(tmp));
-        t = Ev_Append(tmp, t, "|", sizeof(tmp));
-        for (k = 0; k < TR_COUNT; k++) {
-            if (tr & (1 << k)) {
-                t = Ev_Append(tmp, t, first ? "" : ", ", sizeof(tmp));
-                t = Ev_Append(tmp, t, sTraitNames[k], sizeof(tmp));
-                first = false;
-            }
-        }
-        t = Ev_Append(tmp, t, "|", sizeof(tmp));
         t = Ev_AppendNum(tmp, t, sNem.level, sizeof(tmp));
         t = Ev_Append(tmp, t, "|", sizeof(tmp));
-        Ev_AppendNum(tmp, t, Nem_TypeCap(sNem.pool), sizeof(tmp));
-        n = Link_Line(n, "nem", tmp); // name|type|level now|area|traits|level|max level
-        t = 0;
-        for (k = 0; k < NS_COUNT; k++) {
-            t = Ev_AppendNum(tmp, t, sNemStat[k], sizeof(tmp));
-            t = Ev_Append(tmp, t, ",", sizeof(tmp));
-        }
-        Ev_AppendNum(tmp, t, Nem_PointsFree(), sizeof(tmp));
-        n = Link_Line(n, "nemstats", tmp); // speed,power,health,tracking,unspent
+        Ev_Append(tmp, t, sZoneNames[sNem.zone % ZONE_COUNT], sizeof(tmp));
+        n = Link_Line(n, "nem", tmp);
     } else {
         n = Link_Line(n, "nem", "-");
+    }
+    n = Link_LineNum(n, "nz", (sNem.pool >= 0) ? sNem.zone % ZONE_COUNT : -1);
+    sNemCur = 0;
+    {
+        // Every Nemesis, ";" between them:
+        // slot|owner|name|type|level|points|health,power,speed,tracking|picks|auto-spend s|auto-pick s|
+        // trait mask|unique mask|area|here (0/1)|times it beat you|area id
+        static char sNemsText[640];
+        s32 i;
+
+        t = 0;
+        sNemsText[0] = '\0';
+        for (i = 0; i < NEM_MAX; i++) {
+            char nm[24];
+
+            sNemCur = i;
+            if (sNem.pool < 0) {
+                continue;
+            }
+            t = Ev_Append(sNemsText, t, (t > 0) ? ";" : "", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, i, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, sNem.owner, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            Nem_Name(nm, sizeof(nm));
+            t = Ev_Append(sNemsText, t, nm, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, Pool_Name(sNem.pool), sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, sNem.level, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, sNem.points, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            for (k = 0; k < NST_COUNT; k++) {
+                t = Ev_Append(sNemsText, t, (k > 0) ? "," : "", sizeof(sNemsText));
+                t = Ev_AppendNum(sNemsText, t, Nem_Stat(k), sizeof(sNemsText));
+            }
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, sNem.picks, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, (sNem.points > 0) ? (sNem.pointTimer + FPS - 1) / FPS : 0, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, (sNem.picks > 0) ? (sNem.pickTimer + FPS - 1) / FPS : 0, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, Nem_Traits(), sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, Nem_Uniques(), sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, sZoneNames[sNem.zone % ZONE_COUNT], sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, ((sNem.actor != NULL) && V2_IsLive(play, sNem.actor)) ? "1" : "0",
+                          sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, sNem.wins, sizeof(sNemsText));
+            t = Ev_Append(sNemsText, t, "|", sizeof(sNemsText));
+            t = Ev_AppendNum(sNemsText, t, sNem.zone % ZONE_COUNT, sizeof(sNemsText));
+        }
+        sNemCur = 0;
+        n = Link_Line(n, "nems", sNemsText);
+        k = Fr_FirstOnline();
+        n = Link_Line(n, "nemfirst", (k >= 0) ? sFr[k].name : ""); // whose moves steer the default Nemesis
     }
     t = 0;
     tmp[0] = '\0';
     for (k = 0; k < sMutCount; k++) {
         t = Ev_Append(tmp, t, (k > 0) ? "," : "", sizeof(tmp));
-        t = Ev_Append(tmp, t, sMutNames[sMutOrder[k]], sizeof(tmp));
+        t = Ev_Append(tmp, t, Pick_Name(sMutOrder[k]), sizeof(tmp));
     }
     n = Link_Line(n, "muts", tmp);
     t = 0;
@@ -2059,7 +2505,6 @@ static void Link_SendStatus(PlayState* play, s32 playing) {
     // where your Nemesis is, and where each taken bounty waits (kind letter + area).
     n = Link_LineNum(n, "pz", zone);
     n = Link_LineNum(n, "lz", sPlayerZone);
-    n = Link_LineNum(n, "nz", (sNem.pool >= 0) ? sNem.zone % ZONE_COUNT : -1);
     t = 0;
     tmp[0] = '\0';
     for (k = 0; k < V2_BOUNTY_SLOTS; k++) {
@@ -2095,7 +2540,6 @@ static void Link_SendStatus(PlayState* play, s32 playing) {
            (gOpt[ID_EV_COMBOS] ? 64 : 0);
     n = Link_LineNum(n, "opts", opts);
     n = Link_LineNum(n, "mutcount", sMutCount);
-    n = Link_LineNum(n, "neminherit", sNemInherit);
     n = Link_Line(n, "foresight", sForesight ? "1" : "0");
     n = Link_Line(n, "friendnext", (sFriendNext >= 0) ? Events_Name(sFriendNext) : "");
     n = Link_Line(n, "friendnow", (sFriendNow >= 0) ? Events_Name(sFriendNow) : "");
@@ -2151,23 +2595,12 @@ static void Beam_Add(PlayState* play, f32 x, f32 z) {
 // Beams, the disco and confetti (every frame, even paused: they're only looks).
 static void Beam_Update(PlayState* play) {
     Player* player = GET_PLAYER(play);
-    Vec3f vel = { 0.0f, 3.5f, 0.0f };
-    Vec3f acc = { 0.0f, 0.0f, 0.0f };
-    Color_RGBA8 prim = { 255, 255, 230, 255 };
-    Color_RGBA8 env = { 255, 220, 120, 255 };
     s32 k;
 
+    // (The beams themselves are drawn as solid pillars of light: Beam_Draw3D.)
     for (k = 0; k < (s32)ARRAY_COUNT(sBeams); k++) {
         if (sBeams[k].timer > 0) {
-            Vec3f p = sBeams[k].pos;
-
             sBeams[k].timer--;
-            p.x += Rand_CenteredFloat(14.0f);
-            p.z += Rand_CenteredFloat(14.0f);
-            p.y += Rand_ZeroOne() * 260.0f;
-            EffectSsKirakira_SpawnDispersed(play, &p, &vel, &acc, &prim, &env, 2600, 22);
-            p.y = sBeams[k].pos.y + 4.0f;
-            EffectSsKirakira_SpawnDispersed(play, &p, &vel, &acc, &prim, &env, 3200, 14);
         }
     }
     if ((sConfettiTimer > 0) && (player != NULL)) {
@@ -2225,6 +2658,7 @@ static void Link_Update(PlayState* play, s32 playing) {
             sSteerTimer--;
         }
     }
+    Exp_Update(play, playing);
     if ((sFriendSizeTimer > 0) && playing && (--sFriendSizeTimer == 0)) {
         gFriendLinkSize = 0;
     }
@@ -2258,6 +2692,9 @@ static void Link_Update(PlayState* play, s32 playing) {
     if (++sLinkTimer >= FPS) {
         sLinkTimer = 0;
         Fr_Poll(ger_state() == 2);
+        if (playing) {
+            Nem_FriendTick(play);
+        }
         Link_SendStatus(play, playing);
     }
     if (playing && V2_ON(ID_V2_LINK) && (ger_state() == 2)) {
@@ -2340,12 +2777,14 @@ static void Link_Update(PlayState* play, s32 playing) {
     // "Send it to them" still looking for room.
     if (sNemHuntTimer > 0) {
         sNemHuntTimer--;
+        sNemCur = CLAMP(sNemHuntSlot, 0, NEM_MAX - 1);
         if ((sNem.pool < 0) || ((sNem.actor != NULL) && V2_IsLive(play, sNem.actor))) {
             sNemHuntTimer = 0;
         } else if (((sNemHuntTimer % 10) == 0) && Link_TrySpawnNemNear(play)) {
             sNemHuntTimer = 0;
             Menu_ShowToast("Your Nemesis found you!");
         }
+        sNemCur = 0;
     }
     Sur_Update(play);
     if (sLinkGap > 0) {
