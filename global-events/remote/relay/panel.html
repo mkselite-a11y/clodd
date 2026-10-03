@@ -1382,7 +1382,7 @@ function radarState(s) {
 }
 
 const AIM_DESC = {
-  surprise: "Drag a box over the area your surprise should cover (any size). It goes off when they walk into it. Then pick it in Hide a surprise below.",
+  surprise: "Drag a box over the area your surprise should cover (any size). On a phone you can also tap one corner, then the other. It goes off when they walk into it. Then pick it in Hide a surprise below.",
   look: "Click anywhere: a column of light shows up there in their world. Free.",
   airstrike: "Click where the bombs should fall.",
   ambush: "Click a spot for each enemy (the Ambush card below picks which and how many).",
@@ -1393,6 +1393,7 @@ const AIM_DESC = {
 function setAim(a) {
   radar.aim = a;
   radar.ambSpots = [];
+  radar.surCorner = null;
   document.querySelectorAll("#aimSeg button").forEach((b) => {
     b.classList.toggle("on", b.dataset.aim === a);
     if (b.dataset.aim === "airstrike" || b.dataset.aim === "ambush") b.hidden = b.dataset.aim !== a;
@@ -1502,6 +1503,12 @@ function drawRadar() {
     if (((T.zones[sz.zone] || {}).scenes || []).includes(view.scene)) drawSurZone(ctx, toS, sz.r, false);
   }
   if (radar.surDrag) drawSurZone(ctx, toS, radar.surDrag, true);
+  if (radar.surCorner && radar.surCorner.scene === view.scene) {
+    const [cx, cy] = toS(radar.surCorner.w[0], radar.surCorner.w[1]);
+    ctx.strokeStyle = "#c49bff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy); ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 7); ctx.stroke();
+  }
   // What you've clicked.
   ctx.strokeStyle = "#f3c969"; ctx.lineWidth = 2;
   for (const [x, z] of radar.ambSpots) { const [sx, sy] = toS(x, z); ctx.beginPath(); ctx.arc(sx, sy, 8, 0, 7); ctx.stroke(); }
@@ -1617,7 +1624,12 @@ function setupRadar() {
   let pinch0 = 0, zoom0 = 0;
   cv.addEventListener("pointerdown", (e) => {
     if (e.pointerType !== "touch") return;
+    // (3.1.9) A first finger starts a new gesture: forget fingers whose "up" never arrived
+    // (a pinch finger lifted off the map). Before, one stuck finger made every later
+    // one-finger drag look like a pinch, so traps couldn't be drawn on phones.
+    if (e.isPrimary) touches.clear();
     touches.set(e.pointerId, [e.clientX, e.clientY]);
+    try { cv.setPointerCapture(e.pointerId); } catch (err) { /* fine */ }
     if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); zoom0 = radar.zoom; }
   });
   cv.addEventListener("pointermove", (e) => {
@@ -1626,8 +1638,8 @@ function setupRadar() {
     if (touches.size === 2 && pinch0 > 0) { const [a, b] = [...touches.values()]; setZoom(zoom0 * pinch0 / Math.max(1, Math.hypot(a[0] - b[0], a[1] - b[1]))); }
   });
   const lift = (e) => { touches.delete(e.pointerId); if (touches.size < 2) pinch0 = 0; };
-  cv.addEventListener("pointerup", lift);
-  cv.addEventListener("pointercancel", lift);
+  window.addEventListener("pointerup", lift);
+  window.addEventListener("pointercancel", lift);
   let held = false, lastSteer = 0, pending = null, timer = null;
   const sendSteer = () => {
     timer = null;
@@ -1684,6 +1696,7 @@ function setupRadar() {
     if (radar.aim === "surprise" && radar.surDrag) {
       const q = radar.surDrag;
       radar.surDrag = null;
+      radar.surCorner = null;
       const r = [Math.min(q[0], q[2]), Math.min(q[1], q[3]), Math.max(q[0], q[2]), Math.max(q[1], q[3])];
       setSurSpot(r[2] - r[0] < 60 && r[3] - r[1] < 60 ? [Math.round((r[0] + r[2]) / 2), Math.round((r[1] + r[3]) / 2)] : r);
     }
@@ -1702,7 +1715,22 @@ function setupRadar() {
   const radarClick = (e, w) => {
     radar.mark = w; radar.markT = Date.now();
     if (viewingThem()) xSetSpot(w[0], w[1]); // the Experimental tab's spot
-    if (radar.aim === "surprise") return setSurSpot(w);
+    if (radar.aim === "surprise") {
+      // (3.1.9) On a touch screen: tap one corner, then the other (no drag needed).
+      if (e.pointerType === "touch") {
+        if (!radar.surCorner || radar.surCorner.scene !== viewOf($("radar").width).scene) {
+          radar.surCorner = { w, scene: viewOf($("radar").width).scene };
+          toast("First corner set. Tap the opposite corner (or the same spot for a small area).");
+          drawRadar();
+          return;
+        }
+        const c = radar.surCorner.w;
+        radar.surCorner = null;
+        const r = [Math.min(c[0], w[0]), Math.min(c[1], w[1]), Math.max(c[0], w[0]), Math.max(c[1], w[1])];
+        return setSurSpot(r[2] - r[0] < 60 && r[3] - r[1] < 60 ? [Math.round((r[0] + r[2]) / 2), Math.round((r[1] + r[3]) / 2)] : r);
+      }
+      return setSurSpot(w);
+    }
     if (!viewingThem()) {
       toast("They're not in this area. Use Back to them for that (or Surprise area to hide something here).");
       return;
