@@ -8587,22 +8587,7 @@ static s32 Ev_SubLine(PlayState* play, char* line, s32 size, u8* r, u8* g, u8* b
         }
         return false;
     }
-    // V3: otherwise, the one line on how to beat it.
-    if ((sActive >= 0) && !Curse_Is(CURSE_UNSEEN)) {
-        // A combo shows both halves' how-to in turn (only the second's once the first is done).
-        s32 which = ((sCombo >= 0) && !(sComboHalt & 2) && ((sComboHalt & 1) || ((sEventFrames / (3 * FPS)) & 1)))
-                        ? sCombo
-                        : sActive;
-        const char* how = Events_Flavor(which);
-
-        if ((how != NULL) && (how[0] != '\0')) {
-            Ev_Append(line, 0, how, size);
-            *r = 255;
-            *g = 235;
-            *b = 150;
-            return true;
-        }
-    }
+    // (3.1.9) No flavor/how-to line under the running event: just its name, timer and goals.
     return false;
 }
 

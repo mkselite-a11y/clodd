@@ -1084,6 +1084,7 @@ static void Sur_Walls(PlayState* play, s32 zone) {
             f32 t;
             f32 t0;
             f32 t1;
+            s32 steps;
 
             if (d > SUR_WALL_NEAR) {
                 continue;
@@ -1091,9 +1092,21 @@ static void Sur_Walls(PlayState* play, s32 zone) {
             near = 1.0f - d / SUR_WALL_NEAR;
             t0 = MAX(lo, meAlong - SUR_WALL_SPAN);
             t1 = MIN(hi, meAlong + SUR_WALL_SPAN);
-            for (t = t0; (t < t1) && (sSurWallCount < SUR_WALL_MAX);) {
-                s32 q = (s32)(t / SUR_WALL_STEP) - ((t < 0.0f) ? 1 : 0); // (floor)
-                f32 tn = MIN(t1, (q + 1) * SUR_WALL_STEP);
+            // (3.1.9) The step always moves forward. Before, an edge on a negative multiple of 100
+            // (x = -1200, say) gave the same point back as "next", and the loop never ended: the
+            // game froze as soon as you came near that rectangle.
+            for (t = t0, steps = 0; (t < t1) && (sSurWallCount < SUR_WALL_MAX) && (steps < 24); steps++) {
+                s32 q = (s32)(t / SUR_WALL_STEP);
+                f32 tn;
+
+                if ((f32)q * SUR_WALL_STEP > t) {
+                    q--; // (floor for negatives)
+                }
+                tn = (f32)(q + 1) * SUR_WALL_STEP;
+                if (!(tn > t)) {
+                    tn = t + SUR_WALL_STEP;
+                }
+                tn = MIN(t1, tn);
                 f32 ya;
                 f32 yb;
                 f32 mid = (t + tn) * 0.5f;
@@ -1499,7 +1512,7 @@ static s32 Link_Run(PlayState* play, char* line) {
             Nem_AddTraitId(a);
             Nem_RefreshLive(play);
             Link_Result("Nemesis trait: ", sTraitNames[a]);
-            Link_Say("Nemesis gained ", sTraitNames[a]);
+            // (3.1.9) no pop-up: the new trait shows on the Nemesis page
         }
         sNemCur = 0;
     } else if (Str_Eq(type, "nem_level")) {
@@ -1530,11 +1543,7 @@ static s32 Link_Run(PlayState* play, char* line) {
         } else {
             s32 u;
 
-            for (u = a * 3; u < a * 3 + 3; u++) {
-                if ((sNem.stat[a] >= sNemUniqAt[u % 3]) && (sNem.stat[a] - put < sNemUniqAt[u % 3])) {
-                    Nem_Note(" learned ", sNemUniqNames[u]);
-                }
-            }
+            (void)u; // (3.1.9) what it learns shows on the Nemesis page, no pop-up
             Link_Result("Trained ", sNemStatNames[a]);
         }
         sNemCur = 0;
@@ -1932,6 +1941,9 @@ static s32 Link_Run(PlayState* play, char* line) {
             s32 x2 = 0;
             s32 z2 = 0;
 
+            // (3.1.9) Every corner inside the world, whatever the panel sent.
+            x = CLAMP(x, -32000, 32000);
+            z = CLAMP(z, -32000, 32000);
             sp->hasPos = used > 0;
             sp->pos.x = (f32)x;
             sp->pos.y = 0.0f;
@@ -1941,6 +1953,8 @@ static s32 Link_Run(PlayState* play, char* line) {
             if (!sp->hasPos) {
                 sp->pos.x = sp->pos.z = 0.0f;
             } else if (Link_ParseXZ(text + used, &x2, &z2) > 0) {
+                x2 = CLAMP(x2, -32000, 32000);
+                z2 = CLAMP(z2, -32000, 32000);
                 // Two corners: the area the friend dragged out, any size (at least a few steps across).
                 sp->x0 = (f32)MIN(x, x2);
                 sp->x1 = (f32)MAX(MAX(x, x2), MIN(x, x2) + 120);

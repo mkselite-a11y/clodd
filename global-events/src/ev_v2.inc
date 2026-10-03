@@ -1420,14 +1420,9 @@ static void Nem_GainPoints(s32 n, const char* why) {
             }
         }
     }
-    if (why != NULL) {
-        k = Ev_Append(num, 0, " +", sizeof(num));
-        k = Ev_AppendNum(num, k, n, sizeof(num));
-        k = Ev_Append(num, k, " (Lv ", sizeof(num));
-        k = Ev_AppendNum(num, k, sNem.level, sizeof(num));
-        Ev_Append(num, k, ")", sizeof(num));
-        Nem_Note(why, num);
-    }
+    // (3.1.9) No pop-up: levels and points show on the Nemesis page.
+    (void)why;
+    (void)num;
 }
 
 // The next unique-trait mark above a stat (5, 10, 20).
@@ -1497,8 +1492,7 @@ static void Nem_AutoPick(void) {
             break;
         }
         sNem.picks--;
-        Nem_AddTraitId(tr);
-        Nem_Note(" gained ", sTraitNames[tr]);
+        Nem_AddTraitId(tr); // (3.1.9: quietly; it shows on the Nemesis page)
     }
     sNem.pickTimer = 0;
 }
@@ -1517,11 +1511,7 @@ static void Nem_Tick(PlayState* play) {
         }
         Nem_AutoSpend();
         sNem.pointTimer = 0;
-        for (k = 0; k < NU_COUNT; k++) {
-            if ((had[k / 3] < sNemUniqAt[k % 3]) && (sNem.stat[k / 3] >= sNemUniqAt[k % 3])) {
-                Nem_Note(" learned ", sNemUniqNames[k]);
-            }
-        }
+        (void)had; // (3.1.9) unique traits it learns show on the Nemesis page, no pop-up
     }
     if ((sNem.picks > 0) && (--sNem.pickTimer <= 0)) {
         Nem_AutoPick();
@@ -1966,7 +1956,7 @@ RECOMP_HOOK("Actor_ApplyDamage") void V2_BeforeApplyDamage(Actor* actor) {
         }
         if (Nem_HasU(NU_UNDYING) && !(sNem.fight & NF_UNDYING) && (dmg >= actor->colChkInfo.health) && (t->reserve == 0)) {
             sNem.fight |= NF_UNDYING;
-            Menu_Notify("Undying! Your Nemesis refuses to fall.", NOTE_NEMESIS);
+            // (3.1.9) Undying: no pop-up
             if (actor->colChkInfo.health <= 1) {
                 sNemCur = 0;
                 actor->colChkInfo.damage = 0;
@@ -2059,7 +2049,7 @@ static void Nem_OnPlayerHurt(PlayState* play) {
                     sNem.body.hasHome = false;
                     sNem.spawnedVisit = false;
                     sNem.tries = 0;
-                    Nem_Note(" smelled your blood. It's here!", "");
+                    // (3.1.9) Bloodscent: no pop-up
                 }
             }
         }
@@ -4371,9 +4361,7 @@ static void Nem_Echo(PlayState* play, s32 zone) {
             Ev_Poof(play, &e->world.pos, 1);
         }
     }
-    if ((sNem.keese[0] != NULL) || (sNem.keese[1] != NULL)) {
-        Nem_Note(" sent Recon Keese after you!", "");
-    }
+    // (3.1.9) Echolocation's Recon Keese: no pop-up
 }
 
 static void World_UpdateNemOne(PlayState* play, s32 zone);
@@ -4498,7 +4486,7 @@ static void World_UpdateNemOne(PlayState* play, s32 zone) {
             sNem.body.arriving = false;
             sNem.body.phase = 1;
             sNem.engaged = true;
-            Nem_Note(": Battlethirst!", "");
+            // (3.1.9) Battlethirst: no pop-up
         }
         return;
     }
@@ -4615,7 +4603,7 @@ static void World_OnPlayerZoneChange(s32 from, s32 to) {
             sNem.zone = to;
             sNem.body.arriving = true;
             sNem.body.hasHome = false;
-            Nem_Note(" followed you in!", "");
+            // (3.1.9) followed you in (Tracking): no pop-up
         }
     }
     sNemCur = 0;
@@ -5197,7 +5185,7 @@ static Gfx* V2_Draw(PlayState* play, Gfx* gfx) {
         Actor* na = sNems[nemSlot].actor;
         s32 hpw = (s32)((w - 4) * CLAMP((f32)na->colChkInfo.health / MAX(Tag_Get(na)->maxHp, 1), 0.0f, 1.0f));
 
-        gfx = Ui_DrawRect(gfx, (SCREEN_WIDTH - w) / 2, 186, (SCREEN_WIDTH + w) / 2, 214, 20, 0, 0, 190);
+        gfx = Ui_DrawRect(gfx, (SCREEN_WIDTH - w) / 2, 196, (SCREEN_WIDTH + w) / 2, 214, 20, 0, 0, 190);
         gfx = Ui_DrawRect(gfx, (SCREEN_WIDTH - w) / 2 + 2, 209, (SCREEN_WIDTH - w) / 2 + 2 + hpw, 212, 230, 30, 30,
                           240);
     }
@@ -5319,29 +5307,8 @@ static Gfx* V2_Draw(PlayState* play, Gfx* gfx) {
         Ev_AppendNum(line, n, sNem.level, sizeof(line));
         GfxPrint_SetColor(&printer, 255, 90, 90, 255);
         Ui_Print(&printer, (SCREEN_WIDTH - Ui_StrLen(line) * 8) / 2, 199, line);
-        // Its stats (H P S T), how many traits and unique traits.
-        n = 0;
-        for (k = 0; k < NST_COUNT; k++) {
-            static const char* sLetter[NST_COUNT] = { "H", "P", "S", "T" };
-
-            n = Ev_Append(line, n, (k > 0) ? " " : "", sizeof(line));
-            n = Ev_Append(line, n, sLetter[k], sizeof(line));
-            n = Ev_AppendNum(line, n, Nem_Stat(k), sizeof(line));
-        }
-        n = Ev_Append(line, n, "  Tr ", sizeof(line));
-        n = Ev_AppendNum(line, n, sNem.traitCount, sizeof(line));
-        {
-            s32 u;
-            s32 uc = 0;
-
-            for (u = 0; u < NU_COUNT; u++) {
-                uc += Nem_HasU(u);
-            }
-            n = Ev_Append(line, n, " U ", sizeof(line));
-            Ev_AppendNum(line, n, uc, sizeof(line));
-        }
-        GfxPrint_SetColor(&printer, 255, 160, 160, 255);
-        Ui_Print(&printer, (SCREEN_WIDTH - Ui_StrLen(line) * 8) / 2, 188, line);
+        // (3.1.9) Just its name, level and health bar here: stats and traits live on the Nemesis page.
+        (void)k;
         sNemCur = 0;
     }
     // Compass (the default Nemesis, or the first one there is)
