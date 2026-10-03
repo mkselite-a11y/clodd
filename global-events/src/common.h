@@ -438,7 +438,7 @@ typedef enum { LVL_LOW, LVL_MID, LVL_HIGH, LVL_MAX } Level3Mode;
 typedef enum { STEP_1, STEP_2, STEP_3, STEP_4, STEP_MAX } Step4Mode;
 
 // Shown in the menu footer. Keep it in step with mod.toml / mod_cheats.toml (file names stay "_v3").
-#define GE_VERSION "v3.1.8"
+#define GE_VERSION "v3.1.9"
 
 extern u8 gOpt[ID_MAX];
 

@@ -52,6 +52,12 @@ New in 3.1.1:
 - **Radar zoom**: mouse wheel, pinch, + and -, "Whole area" and "Near them".
 - **Archipelago heatmap (spoilers)** on the Map tab, off until a friend turns it on. You set your room once in game: **Friends tab > Archipelago room** (address like `archipelago.gg:38281`, and your slot name). It's remembered; update it when your room's port changes. The page connects as a read-only tracker and colors each area by how many important items are left there. Rooms with a password aren't supported.
 
+New in 3.1.9:
+
+- **Fixed: placing a surprise box could freeze the game.** When a box edge sat on certain map positions, the purple edge wall never finished drawing as you walked up to it.
+- **Cleaner screen.** No description line under a running event (just its name, timer and goals). No pop-ups about your Nemesis's points, stats, picks or unique traits; they're on the Nemesis page. When a Nemesis is near, its bar shows only its name, level and health.
+- **Phones can draw surprise boxes again.** After a pinch zoom, the page could think a finger was still down and ignore every drag. You can also tap one corner, then the other.
+
 New in 3.1.8:
 
 - **A new Nemesis system.** Its level is the number of skill points it has earned. A strong level-up (it kills you, you flee its area, or it gets away) gives 5-6 points; any other fall gives 1-3. Friends spend points on Health, Power, Speed and Tracking (the game spends them after 2 minutes). Every 5 points it gains a trait friends pick. Each stat unlocks a unique trait at 5, 10 and 20: Second Skin, Undying, Colossus, Heavy Hand, Shatter, Executioner, Lunge, Afterimage, Blitz, Echolocation, Bloodscent and Battlethirst. Every extra friend gets their own Nemesis (up to 4 in all), handed out to whoever's died longest ago. Killing one pays a flat 40 Moon Marks, and a Thief keeps what it stole.
