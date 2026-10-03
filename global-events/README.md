@@ -52,6 +52,13 @@ New in 3.1.1:
 - **Radar zoom**: mouse wheel, pinch, + and -, "Whole area" and "Near them".
 - **Archipelago heatmap (spoilers)** on the Map tab, off until a friend turns it on. You set your room once in game: **Friends tab > Archipelago room** (address like `archipelago.gg:38281`, and your slot name). It's remembered; update it when your room's port changes. The page connects as a read-only tracker and colors each area by how many important items are left there. Rooms with a password aren't supported.
 
+New in 3.1.10:
+
+- **Friend ambushes happen once.** Enemies from a surprise ambush (or any friend ambush) stay beaten. Kinds that revive or re-form on their own are cleared away shortly after they fall.
+- **Surprise boxes show properly.** The purple wall now shows outside events too, appears from farther away, and has no gaps over uneven ground.
+- **"Look here" works.** The beam of light now shows any time, not only during an event.
+- **Friend page.** Surprises read "Waiting for them here:" for the area they're in, with a fold-out "Waiting for elsewhere:" list for the rest. The Moon Draft card is gone.
+
 New in 3.1.9:
 
 - **Fixed: placing a surprise box could freeze the game.** When a box edge sat on certain map positions, the purple edge wall never finished drawing as you walked up to it.

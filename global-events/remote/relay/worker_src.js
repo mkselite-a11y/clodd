@@ -49,7 +49,6 @@ const COMMANDS = {
   nem_stat:  [0,    1, "Spend Nemesis points"],
   nem_pick:  [0,    1, "Pick the Nemesis trait"],
   nem_purge: [45, 300, "Purge the Nemesis"],
-  draft:     [20,  60, "Rig the next Moon Draft"],
   bounty:    [20, 120, "Post a bounty on them"],
   wanted:    [40, 600, "Post a WANTED poster"],
   ambush:    [25,  45, "Ambush"],
@@ -77,7 +76,7 @@ const COMMANDS = {
 };
 
 // What a Helpful friend can't do (matches the game's own list).
-const HARMFUL = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt", "draft",
+const HARMFUL = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt",
   "bounty", "ambush", "quiz", "tax", "airstrike", "wanted", "ev_extend", "empower", "blackout",
   "surprise", "place", "steer", "forced_ambush", "bet"]);
 
@@ -297,13 +296,6 @@ function precheck(type, a, b, c, st) {
       if ((type === "nem_pick" || type === "nem_trait") && ((mine.traits >> a) & 1)) return "It already has that trait.";
       if (type === "nem_level" && mine.level >= 255) return "It's at its max level.";
       return "";
-    case "draft":
-      if (!on(OPT.muts)) return "Their Moon Draft is turned off.";
-      if (parseInt(st.mutcount || "0", 10) >= 6) return "Their 6 draft slots are full.";
-      if (a === b) return "Pick two different ones.";
-      if ([a, b].some((x) => PICKS.has(x) && PICKS.get(x).kind === "curse") && !on(OPT.curse)) return "They have curses turned off.";
-      if (PICKS.has(a) && PICKS.has(b) && muts.includes(PICKS.get(a).name) && muts.includes(PICKS.get(b).name)) return "They already have both.";
-      return "";
     case "bounty":
     case "wanted":
       if (!on(OPT.bounties)) return "Their bounties are turned off.";
@@ -365,9 +357,6 @@ function validate(type, a, b, c, text) {
       const t = clean(text, 12);
       return t ? [0, 0, 0, t, '"' + t + '"'] : "Type a name.";
     }
-    case "draft":
-      if (!PICKS.has(a) || !PICKS.has(b) || a === b) return "Pick two different ones.";
-      return [a, b, 0, "", PICKS.get(a).name + " / " + PICKS.get(b).name];
     case "nem_stat":
       if (!(a >= 0 && a < TABLES.stats.length)) return "Pick a stat.";
       if (!(b >= 1 && b <= 20)) return "1 to 20 points.";

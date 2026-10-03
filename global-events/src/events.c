@@ -1897,6 +1897,7 @@ static void Ev_End(PlayState* play) {
 // combo == ev doubles it (friends only, see sDoubled); other combos of an event
 // with itself are dropped.
 static void V3_DrawWorld(PlayState* play);
+static void V3_DrawFriendWorld(PlayState* play);
 
 static void Ev_StartFull(PlayState* play, s32 ev, s32 combo, s32 fromRoulette) {
     if (sActive >= 0) {
@@ -7733,6 +7734,7 @@ RECOMP_HOOK_RETURN("Actor_DrawAll") void Events_AfterDrawAll(void) {
     sDrawAllPlay = NULL;
     if (play != NULL) {
         V2_DrawWorld(play);
+        V3_DrawFriendWorld(play);
     }
     if ((play == NULL) || !sSceneReady) {
         return;

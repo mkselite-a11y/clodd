@@ -142,7 +142,12 @@ Alt source: scratchpad/alt/mod/src (events_list.c has the 19 events to port)
     - A dropped friend quiz clears its questions.
     - Ev_MoonSentRunning guards Trigger, Start, Stop All Events and the master toggle, so none of them skip a moon-sent event for free.
     - How-to and compact timer fixes; Foresight message order; V2_InitOnce runs before contract flags are restored.
-- 3.1.9:
+- 3.1.10:
+  - **Look here / surprise walls never drew outside events:** V3_DrawWorld needed sSceneReady, which is only set while an event runs. Beams and walls now draw from V3_DrawFriendWorld right after V2_DrawWorld (no event needed; skipped during a transition). Beams are cleared on a scene change.
+  - **Surprise box walls:** SUR_WALL_NEAR 150 -> 320, 64 pieces, 10 raycasts a frame, cache 128. A point with no floor borrows the last good height on that edge (else Link's), and a ledge keeps the piece level, so the box has no holes.
+  - **Friend ambushes happen once:** FAmb_Spawn (surprise ambush, ambush, forced ambush) records each enemy and marks it TAGF_V2_SPLIT. FAmb_Update: once its health reaches 0 after being seen above 0, it gets 2 s, then Ev_Poof + Actor_Kill, so kinds that revive or re-form can't come back. The surprise command also ignores an id it already planted (ring of 16).
+  - **Panel:** "Waiting for them here:" (their current area) plus a folded "Waiting for elsewhere: n" list. The Moon Draft card and the "draft" command are gone from the panel and relay (the game still understands it).
+- 3.1.9 (built):
   - **Surprise crash (root cause):** Sur_Walls stepped along each edge with q = (s32)(t/100) - (t<0); on a negative multiple of 100 that gave tn == t, so the loop never advanced and the game hung near that edge (Sur_Ground stops adding pieces once its 6 raycasts per frame are spent). Now: floor computed exactly, tn > t forced, 24 steps max per edge. Corners clamped to +-32000 on arrival. Checked: status line, Sur_Settle/Sur_Inside, the door check and Draw3D_Wall (48 pieces max, 4 vertices each) were already bounded; surprises aren't saved.
   - **Event HUD:** Ev_SubLine no longer falls back to Events_Flavor; only per-event goal lines show.
   - **Nemesis pop-ups removed:** points/level gains (Nem_GainPoints), auto-picked traits, learned uniques (auto-spend and friend nem_stat), friend nem_trait, and the Bloodscent, Echolocation, Battlethirst, Undying and Tracking-follow notes.

@@ -62,6 +62,8 @@
   .sfxtree { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
   .sfxtree details details { margin-left: 12px; }
   .sfxtree summary { cursor: pointer; padding: 1px 0; }
+  .surAway > summary { cursor: pointer; padding: 2px 0; }
+  .surAway > div { padding-left: 14px; }
   .quizbox > summary { cursor: pointer; list-style: none; }
   .quizbox > summary::-webkit-details-marker { display: none; }
   .quizbox > summary h2 { display: inline; margin: 0; }
@@ -265,16 +267,6 @@
       <button data-act="quiz">Start my quiz <span class="cost"></span></button>
       <div class="desc">Questions up to 36 letters, answers up to 14. The first answer box is the right one.</div>
       </details>
-    </div>
-    <div class="card">
-      <h2 data-tip="Each dawn and dusk they pick one of two: a curse or a mutator. Picks last the whole 3-day cycle, up to 6, and each adds 10% to their Moon Marks.">Moon Draft</h2>
-      <div class="note" data-need="2">They have the Moon Draft turned off.</div>
-      <div class="note" data-need="32">They have curses turned off, so only mutators can be offered.</div>
-      <div id="mutList"></div>
-      <div class="sub" data-tip="At each dawn and dusk they pick one of two. You choose which two: any mix of curses and mutators.">Rig their next draft</div>
-      <div class="row"><select id="draftA"></select><select id="draftB"></select></div>
-      <div class="desc" id="draftDesc"></div>
-      <button data-act="draft">Rig it <span class="cost"></span></button>
     </div>
   </section>
 
@@ -623,10 +615,8 @@ function setup() {
   fill($("comboSel"), T.events.filter((e) => e.second), true);
   fill($("nemPool"), T.pools); fill($("bPool"), T.pools); fill($("ambPool"), T.pools);
   fill($("nemTrait"), T.traits); fill($("nemPickSel"), T.traits);
-  fill($("draftA"), PICK_LIST); fill($("draftB"), PICK_LIST);
   fill($("sfxSel"), T.sounds); fill($("pouchSel"), T.pouch);
   fill($("surEv"), T.events); fill($("surPool"), T.pools);
-  $("draftB").selectedIndex = 1;
   $("bStars").innerHTML = [1, 2, 3, 4, 5].map((s) => `<option value="${s}">${"*".repeat(s)}</option>`).join("") + '<option value="W">WANTED</option>';
   $("bStars").value = "3";
   $("bTraits").innerHTML = T.traits.map((t) => `<label data-tip="${esc(t.desc)}"><input type="checkbox" value="${t.id}">${esc(t.name)}</label>`).join("");
@@ -657,7 +647,6 @@ function setup() {
     $("nemTraitDesc").textContent = descOf(T.traits, $("nemTrait").value);
     $("nemPickDesc").textContent = descOf(T.traits, $("nemPickSel").value);
     $("pouchDesc").textContent = descOf(T.pouch, $("pouchSel").value);
-    $("draftDesc").textContent = `A: ${descOf(T.picks, $("draftA").value)} B: ${descOf(T.picks, $("draftB").value)}`;
     const bTier = ((T.pools.find((p) => p.id == $("bPool").value)) || { tier: 1 }).tier;
     // Same as the game's Bounty_Pay: a friend's bounty pays half.
     const stars = parseInt($("bStars").value, 10) || 1;
@@ -668,9 +657,9 @@ function setup() {
     const c = T.events.find((x) => x.id == $("comboSel").value);
     $("comboDesc").textContent = (c && e && c.id === e.id) ? "Doubled: " + e.name + " runs once, twice as fierce (x2)." : c ? "Combo: " + c.desc + " If either one has a goal, they have to clear both." : "Combos only work with \"Make it the next one\". Any event can ride along.";
   };
-  ["evSel", "comboSel", "draftA", "draftB", "bStars", "bPool", "nemTrait", "nemPickSel", "pouchSel"].forEach((id) => $(id).addEventListener("change", showDesc));
+  ["evSel", "comboSel", "bStars", "bPool", "nemTrait", "nemPickSel", "pouchSel"].forEach((id) => $(id).addEventListener("change", showDesc));
   // Prices depend on what's picked.
-  ["evSel", "comboSel", "ambPool", "ambCount", "nemPool", "bPool", "bStars", "stakeSel", "nemTrait", "draftA", "draftB", "surKind", "surEv", "surPool", "pouchSel"]
+  ["evSel", "comboSel", "ambPool", "ambCount", "nemPool", "bPool", "bStars", "stakeSel", "nemTrait", "surKind", "surEv", "surPool", "pouchSel"]
     .forEach((id) => $(id).addEventListener("change", () => render()));
   // Ambush: Normal (1-3, Auto or Aim) or Forced (3-6, pulls them out of menus, no aiming).
   const ambMode = () => {
@@ -755,7 +744,6 @@ function args(type, dataA) {
     case "nem_make": return { a: v("nemPool") };
     case "nem_trait": return { a: v("nemTrait") };
     case "nem_name": return { text: $("nemName").value };
-    case "draft": return { a: v("draftA"), b: v("draftB") };
     case "bounty": {
       let mask = 0;
       document.querySelectorAll("#bTraits input:checked").forEach((c) => (mask |= 1 << parseInt(c.value, 10)));
@@ -914,11 +902,6 @@ function render() {
   // Combat tab.
   renderNemesis(s, on);
 
-  // Moon Draft: their curses and mutators.
-  const muts = (s.muts || "").split(",").filter(Boolean);
-  setHtml($("mutList"), `<div class="muted" style="font-size:13px">They carry ${muts.length} of 6</div>` +
-    tags(muts, (m) => (T.picks.find((x) => x.name === m) || {}).desc));
-
   // Gifts tab.
   $("marksNow").textContent = s.marks !== undefined ? `They have ${s.marks} Moon Marks` + (s.rank ? ` (Hunter Rank: ${s.rank})` : "") : "";
   $("pouchNow").textContent = s.pouch ? "Their pouch: " + s.pouch : "";
@@ -959,7 +942,17 @@ function render() {
   }).join("") : "");
   {
     const waiting = (s.surprises || "").split(";").filter(Boolean).map((x) => x.split(":"));
-    $("surWaiting").textContent = waiting.length ? "Waiting for them: " + waiting.map(([z, k, f]) => `${SURPRISE_KINDS[k] || "?"} in ${(T.zones[z] || {}).name || "?"}${f ? " (" + f + ")" : ""}`).join(", ") : "";
+    // (3.1.10) The area they're in first, the rest folded away.
+    const scene = s.scene !== undefined ? parseInt(s.scene, 10) : -1;
+    const isHere = ([z]) => ((T.zones[z] || {}).scenes || []).includes(scene);
+    const line = ([z, k, f]) => esc(`${SURPRISE_KINDS[k] || "?"} in ${(T.zones[z] || {}).name || "?"}${f ? " (" + f + ")" : ""}`);
+    const here = waiting.filter(isHere);
+    const away = waiting.filter((w) => !isHere(w));
+    const wasOpen = !!$("surWaiting").querySelector("details[open]");
+    setHtml($("surWaiting"), !waiting.length ? "" :
+      `<div>Waiting for them here: ${here.length ? here.map(line).join(", ") : '<span class="muted">nothing</span>'}</div>` +
+      (away.length ? `<details class="surAway"${wasOpen ? " open" : ""}><summary>Waiting for elsewhere: ${away.length}</summary>` +
+        away.map((w) => `<div>${line(w)}</div>`).join("") + "</details>" : ""));
   }
   refreshTip();
 }
@@ -1017,7 +1010,7 @@ function blockReason(type, dataA, over) {
 // --- Hover help -------------------------------------------------------------
 
 // Moves a Friend Shield blocks, and that Helpful friends can't send (matches the game).
-const MEAN = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt", "draft",
+const MEAN = new Set(["ev_now", "ev_next", "ev_soon", "nem_make", "nem_trait", "nem_level", "nem_hunt",
   "bounty", "ambush", "quiz", "tax", "airstrike", "wanted", "ev_extend", "empower", "blackout",
   "surprise", "place", "steer", "forced_ambush", "bet"]);
 
@@ -1047,7 +1040,6 @@ const ACT_TIPS = {
   "nem_stat:2": "Speed: +3% movement per point. 5 Lunge, 10 Afterimage, 20 Blitz.",
   "nem_stat:3": "Tracking: moves toward them faster, turns up more often, follows through doors at 8. 5 Echolocation, 10 Bloodscent, 20 Battlethirst.",
   nem_purge: "Removes your Nemesis. Free to place points and pick traits again on a new one, which starts at level 0.",
-  draft: "At each dawn and dusk they pick one of two curses or mutators. This picks the two they get to choose from next time.",
   bounty: "Spawns the enemy right next to them as a bounty, with your stars and traits. Beating it pays them half the usual Moon Marks. Only one friend bounty at a time: a new one (from anyone) replaces it.",
   wanted: "Puts a WANTED poster on their Bounty Board: a 5-star enemy with Meteor Caller that pays 1.5 times as much. They have to go find it. One at a time.",
   airstrike: "Auto: drops 5 bombs from the sky right around them. Or use Aim and click where.",
@@ -1168,8 +1160,6 @@ const descOf = (arr, id) => (arr.find((x) => x.id == id) || {}).desc || "";
 const SEL_TIPS = {
   evSel: () => descOf(T.events, $("evSel").value),
   comboSel: () => ($("comboSel").value === "-1" ? "Pick a second event to run with it. Combos only apply to \"next event\"." : "Combo: " + descOf(T.events, $("comboSel").value)),
-  draftA: () => "First choice: " + descOf(T.picks, $("draftA").value),
-  draftB: () => "Second choice: " + descOf(T.picks, $("draftB").value),
   nemTrait: () => descOf(T.traits, $("nemTrait").value),
   pouchSel: () => descOf(T.pouch, $("pouchSel").value),
   bStars: () => "More stars means a tougher enemy and more trait slots. Pay grows with stars and enemy toughness (shown below), plus their Hunter Rank bonus.",

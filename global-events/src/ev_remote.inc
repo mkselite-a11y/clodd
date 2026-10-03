@@ -855,11 +855,11 @@ static s32 sSurScene = -1;
 // (3.1.8) A low see-through purple wall along the edges of surprise areas, only when you're
 // within SUR_WALL_NEAR of an edge (fading in as you get closer). Ground heights along the
 // edges come from floor raycasts every SUR_WALL_STEP units, cached per scene.
-#define SUR_WALL_MAX 48
-#define SUR_WALL_NEAR 150.0f
+#define SUR_WALL_MAX 64
+#define SUR_WALL_NEAR 320.0f // (3.1.10: was 150, too close to see the box coming)
 #define SUR_WALL_STEP 100.0f
 #define SUR_WALL_SPAN 450.0f // how far along an edge (each way) the wall shows
-#define SUR_GCACHE 96
+#define SUR_GCACHE 128
 #define SUR_EXIT_CLEAR 200.0f // never goes off this close to a door or loading zone
 typedef struct {
     Vec3f a;
@@ -936,6 +936,65 @@ static s32 Sur_Settle(PlayState* play, Surprise* s) {
     return World_PickHome(play, &s->pos);
 }
 
+// (3.1.10) A friend's ambush happens once. Its enemies are remembered; once one is
+// beaten it gets 2 seconds to finish dying, then it's gone for good. Some kinds
+// (Chuchus, Stalchildren, Floormasters) come back on their own otherwise. They
+// never split either.
+#define FAMB_MAX 24
+static Actor* sFAmb[FAMB_MAX];
+static u8 sFAmbDead[FAMB_MAX];
+
+static Actor* FAmb_Spawn(PlayState* play, s32 pool, Vec3f* at, f32 minD, f32 maxD) {
+    Actor* e = V2_SpawnEnemy(play, pool, at, minD, maxD, TAG_V2);
+    TagData* t;
+    s32 k;
+
+    if (e == NULL) {
+        return NULL;
+    }
+    t = Tag_Get(e);
+    if (t != NULL) {
+        t->v2flags |= TAGF_V2_SPLIT;
+    }
+    for (k = 0; k < FAMB_MAX; k++) {
+        if (sFAmb[k] == NULL) {
+            sFAmb[k] = e;
+            sFAmbDead[k] = 0;
+            break;
+        }
+    }
+    return e;
+}
+
+static void FAmb_Update(PlayState* play, s32 playing) {
+    s32 k;
+
+    // sFAmbDead: 0 not seen with health yet (some kinds start at 0), 1 alive, 2+ beaten (counting up).
+    for (k = 0; k < FAMB_MAX; k++) {
+        Actor* e = sFAmb[k];
+
+        if (e == NULL) {
+            continue;
+        }
+        if (!V2_IsLive(play, e) || (e->update == NULL) || (Tag_Of(e) != TAG_V2)) {
+            sFAmb[k] = NULL; // (gone, or the slot now holds something else)
+            continue;
+        }
+        if (sFAmbDead[k] == 0) {
+            if (e->colChkInfo.health > 0) {
+                sFAmbDead[k] = 1;
+            }
+        } else if ((sFAmbDead[k] == 1) && (e->colChkInfo.health == 0)) {
+            sFAmbDead[k] = 2;
+        } else if ((sFAmbDead[k] >= 2) && playing && (++sFAmbDead[k] >= 2 * FPS + 2)) {
+            // (once beaten it stays beaten, even if it heals itself back up)
+            Ev_Poof(play, &e->world.pos, 1);
+            Actor_Kill(e);
+            sFAmb[k] = NULL;
+        }
+    }
+}
+
 // Sets off a surprise. Returns false if it has to wait (an event is already queued).
 static s32 Sur_Fire(PlayState* play, Surprise* s) {
     Player* player = GET_PLAYER(play);
@@ -971,9 +1030,9 @@ static s32 Sur_Fire(PlayState* play, Surprise* s) {
 
                 if (Link_GroundAt(play, s->pos.x + Math_SinS(yaw) * 160.0f, s->pos.z + Math_CosS(yaw) * 160.0f,
                                   &at) &&
-                    (V2_SpawnEnemy(play, s->arg, &at, 0.0f, 0.0f, TAG_V2) != NULL)) {
+                    (FAmb_Spawn(play, s->arg, &at, 0.0f, 0.0f) != NULL)) {
                     made++;
-                } else if (V2_SpawnEnemy(play, s->arg, NULL, 200.0f, 400.0f, TAG_V2) != NULL) {
+                } else if (FAmb_Spawn(play, s->arg, NULL, 200.0f, 400.0f) != NULL) {
                     made++;
                 }
             }
@@ -1062,7 +1121,7 @@ static void Sur_Walls(PlayState* play, s32 zone) {
     s32 i;
 
     sSurWallCount = 0;
-    sSurGNew = 6;
+    sSurGNew = 10;
     for (i = 0; i < sSurCount; i++) {
         Surprise* s = &sSur[i];
         s32 e;
@@ -1084,6 +1143,7 @@ static void Sur_Walls(PlayState* play, s32 zone) {
             f32 t;
             f32 t0;
             f32 t1;
+            f32 lastY = me->y;
             s32 steps;
 
             if (d > SUR_WALL_NEAR) {
@@ -1113,9 +1173,19 @@ static void Sur_Walls(PlayState* play, s32 zone) {
                 f32 fade = 1.0f - fabsf(mid - meAlong) / SUR_WALL_SPAN;
                 SurWall* w = &sSurWall[sSurWallCount];
 
-                if (Sur_Ground(play, alongX ? t : fixed, alongX ? fixed : t, &ya) &&
-                    Sur_Ground(play, alongX ? tn : fixed, alongX ? fixed : tn, &yb) && (fabsf(ya - me->y) < 400.0f) &&
-                    (fabsf(yb - me->y) < 400.0f) && (fabsf(ya - yb) < 150.0f)) {
+                // (3.1.10) A point with no floor (a wall, a pit, or not sampled yet) borrows the
+                // last good height on this edge, else Link's, so the box has no holes.
+                if (!Sur_Ground(play, alongX ? t : fixed, alongX ? fixed : t, &ya) || !(fabsf(ya - me->y) < 400.0f)) {
+                    ya = lastY;
+                }
+                if (!Sur_Ground(play, alongX ? tn : fixed, alongX ? fixed : tn, &yb) || !(fabsf(yb - me->y) < 400.0f)) {
+                    yb = ya;
+                }
+                if (fabsf(ya - yb) >= 150.0f) {
+                    yb = ya; // (a ledge: keep the piece level instead of dropping it)
+                }
+                lastY = yb;
+                {
                     w->a.x = alongX ? t : fixed;
                     w->a.z = alongX ? fixed : t;
                     w->a.y = ya;
@@ -1148,6 +1218,7 @@ static void Sur_Update(PlayState* play) {
     if (play->sceneId != sSurScene) {
         sSurScene = play->sceneId;
         sSurWallCount = 0;
+        bzero(sBeams, sizeof(sBeams)); // (a friend's beam belongs to the area it was sent in)
         bzero(sSurG, sizeof(sSurG));
         for (i = 0; i < sSurCount; i++) {
             sSur[i].ready = false;
@@ -1645,11 +1716,11 @@ static s32 Link_Run(PlayState* play, char* line) {
             if (used > 0) {
                 at += used;
                 if (Link_GroundAt(play, (f32)x, (f32)z, &spot) && (World_ExitDist(&spot) >= 150.0f)) {
-                    e = V2_SpawnEnemy(play, a, &spot, 0.0f, 0.0f, TAG_V2);
+                    e = FAmb_Spawn(play, a, &spot, 0.0f, 0.0f);
                 }
             }
             if (e == NULL) {
-                e = V2_SpawnEnemy(play, a, NULL, 200.0f, 450.0f, TAG_V2);
+                e = FAmb_Spawn(play, a, NULL, 200.0f, 450.0f);
             }
             if (e != NULL) {
                 made++;
@@ -1755,10 +1826,10 @@ static s32 Link_Run(PlayState* play, char* line) {
             Actor* e = NULL;
 
             if (Ev_FindSpot(play, 180.0f, 320.0f, (s16)(i * (0x10000 / b)), 0x1800, true, &spot)) {
-                e = V2_SpawnEnemy(play, a, &spot, 0.0f, 0.0f, TAG_V2);
+                e = FAmb_Spawn(play, a, &spot, 0.0f, 0.0f);
             }
             if (e == NULL) {
-                e = V2_SpawnEnemy(play, a, NULL, 200.0f, 400.0f, TAG_V2);
+                e = FAmb_Spawn(play, a, NULL, 200.0f, 400.0f);
             }
             if (e != NULL) {
                 Ev_Poof(play, &e->world.pos, 1);
@@ -1924,6 +1995,20 @@ static s32 Link_Run(PlayState* play, char* line) {
         s32 x = 0;
         s32 z = 0;
 
+        static s32 sSurSeen[16];
+        static s32 sSurSeenNext = 0;
+        s32 dup = false;
+        s32 k;
+
+        // (3.1.10) The same surprise is only ever planted once.
+        for (k = 0; k < 16; k++) {
+            dup |= (sLinkCurId > 0) && (sSurSeen[k] == sLinkCurId);
+        }
+        if (dup) {
+            return false;
+        }
+        sSurSeen[sSurSeenNext] = sLinkCurId;
+        sSurSeenNext = (sSurSeenNext + 1) % 16;
         if (sSurCount == SURPRISE_MAX) {
             Link_Fail("too many surprises waiting", "");
         } else if ((b == SUR_EVENT) && !Link_EventOk(c)) {
@@ -2682,6 +2767,7 @@ static void Link_Update(PlayState* play, s32 playing) {
     }
     Prank_SoundUpdate();
     Beam_Update(play);
+    FAmb_Update(play, playing);
     ApUi_Update(play);
     if ((sFakeTimer > 0) && playing && (--sFakeTimer == 0)) {
         Menu_ShowToast("...or not.");

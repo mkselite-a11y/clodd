@@ -1910,21 +1910,29 @@ static void Sur_DrawWalls(PlayState* play) {
 
 static void V3_DrawWorld(PlayState* play) {
     const V3Fns* f = V3_Fns(V3_Cur());
-    s32 ev = (f != NULL) && (f->draw3d != NULL) && sSceneReady && (sV3Running == V3_Cur());
-    s32 beams = false;
-    s32 k;
 
-    for (k = 0; k < (s32)ARRAY_COUNT(sBeams); k++) {
-        beams |= (sBeams[k].timer > 0);
-    }
-    beams |= (sSurWallCount > 0);
-    if (!ev && !(beams && sSceneReady)) {
+    if ((f == NULL) || (f->draw3d == NULL) || !sSceneReady || (sV3Running != V3_Cur())) {
         return;
     }
     Draw3D_Begin(play);
-    if (ev) {
-        f->draw3d(play);
+    f->draw3d(play);
+    Draw3D_End();
+}
+
+// (3.1.10) Friend beams and surprise walls draw on their own. They used to wait for
+// sSceneReady, which is only set while an event runs, so outside events "Look here"
+// showed nothing and a surprise area's walls only showed up during an event.
+static void V3_DrawFriendWorld(PlayState* play) {
+    s32 any = (sSurWallCount > 0);
+    s32 k;
+
+    for (k = 0; k < (s32)ARRAY_COUNT(sBeams); k++) {
+        any |= (sBeams[k].timer > 0);
     }
+    if (!any || (GET_PLAYER(play) == NULL) || (play->transitionTrigger != TRANS_TRIGGER_OFF)) {
+        return;
+    }
+    Draw3D_Begin(play);
     Beam_Draw3D();
     Sur_DrawWalls(play);
     Draw3D_End();
